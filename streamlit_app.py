@@ -1,4 +1,4 @@
-"""
+""""""
 Urban Flow & Life-Lines: Bangalore Traffic Grid
 v5 — Fixed: Background Map · NumPy-Only Engine · O(1) Algorithm for Large Fleets
 Team: Nishchal Vishwanath (NB25ISE160) & Rishul KH (NB25ISE186) | ISE, NMIT
@@ -358,9 +358,8 @@ def get_vehicle_positions_sample(fleet, max_normal=300, seed=0):
     # Normal positions
     if len(normal_idx):
         nlats, nlons = idx_to_pos(normal_idx)
-        # Color by route
-        route_colors = [ROUTES[ROUTES.index(r)]["color"] if r else "#00aaff"
-                        for r in [ROUTES[fleet["route_id"][i] % NR]["color"] for i in normal_idx]]
+        # Color by route — directly index ROUTES by route_id
+        route_colors = [ROUTES[int(fleet["route_id"][i]) % NR]["color"] for i in normal_idx]
     else:
         nlats, nlons = np.array([]), np.array([])
         route_colors = []
