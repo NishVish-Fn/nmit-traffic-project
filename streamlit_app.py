@@ -1112,7 +1112,7 @@ while True:
         fig_map = build_map_figure(fleet, hour_df, dens_arr, signal_phases, edge_cong,
                                     st.session_state.show_routes, st.session_state.show_heatmap,
                                     tick, stats)
-        st.plotly_chart(fig_map, use_container_width=True)
+        st.plotly_chart(fig_map, use_container_width=True, key=f"map_chart_{tick}")
 
     # ---------- TAB 1: Fleet info panel ----------
     with slot_fleet_info:
@@ -1156,7 +1156,7 @@ while True:
                          yaxis=dict(color=TICK_COL, gridcolor=GRID_COL),
                          margin=dict(l=20,r=5,t=5,b=10))
             fig_mini.update_layout(showlegend=False)
-            st.plotly_chart(fig_mini, use_container_width=True)
+            st.plotly_chart(fig_mini, use_container_width=True, key=f"mini_dr_{tick}")
 
     # ---------- TAB 2 ----------
     with slot_t2_heat:
@@ -1168,7 +1168,7 @@ while True:
             colorbar=dict(tickfont=dict(color=TICK_COL,size=8)),
             hovertemplate="<b>%{y}</b><br>%{x}<br>Congestion: %{z:.1f}<extra></extra>"))
         apply_layout(fig_h, xtitle="Hour", ytitle="Junction", height=320)
-        st.plotly_chart(fig_h, use_container_width=True)
+        st.plotly_chart(fig_h, use_container_width=True, key=f"heat_map_{tick}")
 
     with slot_t2_speed:
         jns4  = ["Silk Board","Hebbal","Whitefield","MG Road"]
@@ -1180,7 +1180,7 @@ while True:
             fig_s.add_trace(go.Scatter(x=jdf["Hour"], y=jdf["Avg_Speed_kmh"], name=jn,
                 mode="lines", line=dict(color=col,width=2), fill="tozeroy", fillcolor=fill))
         apply_layout(fig_s, xtitle="Hour", ytitle="Avg Speed (km/h)", height=320)
-        st.plotly_chart(fig_s, use_container_width=True)
+        st.plotly_chart(fig_s, use_container_width=True, key=f"speed_profile_{tick}")
 
     with slot_t2_delay:
         hb = hour_df.set_index("Junction")["Delay_Min"].reindex(JNAMES).fillna(0)
@@ -1193,7 +1193,7 @@ while True:
         apply_layout(fig_b, ytitle="Delay (min)", height=290, barmode="group",
                      xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
                      yaxis=dict(range=[0,max(hb.max()*1.4,1)],color=TICK_COL,gridcolor=GRID_COL))
-        st.plotly_chart(fig_b, use_container_width=True)
+        st.plotly_chart(fig_b, use_container_width=True, key=f"delay_bar_{tick}")
 
     with slot_t2_dr:
         if len(st.session_state.delay_history) > 2:
@@ -1203,7 +1203,7 @@ while True:
             fig_dr.add_hline(y=25, line=dict(color="rgba(255,170,0,0.4)",width=1,dash="dash"))
             apply_layout(fig_dr, ytitle="DR%", height=290,
                          yaxis=dict(range=[0,60],color=TICK_COL,gridcolor=GRID_COL))
-            st.plotly_chart(fig_dr, use_container_width=True)
+            st.plotly_chart(fig_dr, use_container_width=True, key=f"dr_history_{tick}")
         else:
             st.info("Start simulation to see live DR history")
 
@@ -1219,7 +1219,7 @@ while True:
         apply_layout(fig_ec, ytitle="Congestion %", height=220,
                      xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
                      yaxis=dict(range=[0,100],color=TICK_COL,gridcolor=GRID_COL))
-        st.plotly_chart(fig_ec, use_container_width=True)
+        st.plotly_chart(fig_ec, use_container_width=True, key=f"edge_cong_{tick}")
 
     with slot_t2_table:
         hb2 = hour_df[["Junction","Time","Congestion_Index","Vehicles_Per_Hour",
@@ -1277,7 +1277,7 @@ while True:
         apply_layout(fig_g, xtitle="Seconds in cycle", height=340, barmode="stack",
                      xaxis=dict(range=[0,T_v],color=TICK_COL,gridcolor=GRID_COL),
                      yaxis=dict(autorange="reversed",color=TICK_COL))
-        st.plotly_chart(fig_g, use_container_width=True)
+        st.plotly_chart(fig_g, use_container_width=True, key=f"sig_gantt_{tick}")
 
     with slot_t3_ts:
         dists = np.linspace(0,22,60)
@@ -1298,7 +1298,7 @@ while True:
             fig_ts.add_vline(x=jd["km"],line=dict(color="rgba(0,170,255,0.18)",width=1,dash="dash"),
                 annotation_text=jn[:6],annotation_font_color="#3a5a6a",annotation_font_size=7)
         apply_layout(fig_ts,xtitle="Distance (km)",ytitle="Travel time (min)",height=340)
-        st.plotly_chart(fig_ts,use_container_width=True)
+        st.plotly_chart(fig_ts, use_container_width=True, key=f"time_space_{tick}")
 
     # ---------- TAB 4 ----------
     with slot_t4_algo:
