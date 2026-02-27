@@ -16,15 +16,24 @@ class PoliceCommandLogic:
         }
 
     def solve_delay_objective(self, densities, em_indices):
-        """Minimizes W while applying P=infinity for Emergency vehicles [cite: 38, 41, 42]"""
-        def objective(green_times):
-            weights = np.ones(len(densities))
-            for idx in em_indices: weights[idx] = 1000000 # EVP Logic [cite: 42]
-            return np.sum((densities * weights) / green_times) [cite: 38]
+    # The 'green_times' variable is what the minimize function iterates on
+    def objective(x): 
+        # x represents the green light timings for each intersection
+        weights = np.ones(len(densities))
+        for idx in em_indices: 
+            [cite_start]weights[idx] = 1000000 # EVP Logic: P to infinity [cite: 42]
+        
+        # [cite_start]Calculate W = sum(density * weight / green_time) [cite: 38, 39]
+        return np.sum((densities * weights) / x)
 
-        constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.cycle_time})
-        res = minimize(objective, [40]*len(densities), bounds=[(15, 90)]*len(densities), constraints=constraints)
-        return res.x
+    # [cite_start]Total Cycle Time T = 120s [cite: 44]
+    constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.cycle_time})
+    
+    # [cite_start]Safety bounds for Silk Board, HSR, and Bellandur [cite: 22, 28]
+    res = minimize(objective, [40]*len(densities), 
+                   bounds=[(15, 90)]*len(densities), 
+                   constraints=constraints)
+    return res.x
 
 # --- 2. THE DASHBOARD UI ---
 st.set_page_config(page_title="Bangalore Traffic Command Center", layout="wide", initial_sidebar_state="collapsed")
@@ -96,4 +105,5 @@ if st.button("Start Live Feed"):
     for _ in range(10):
         # Move cars slightly to simulate flow [cite: 29]
         st.session_state.cars += np.random.randn(50, 2) / [5000, 5000]
+
         st.rerun()
