@@ -1,6 +1,6 @@
-""""""
+"""
 Urban Flow & Life-Lines: Bangalore Traffic Grid
-v5 — Fixed: Background Map · NumPy-Only Engine · O(1) Algorithm for Large Fleets
+v5 - Fixed: Background Map . NumPy-Only Engine . O(1) Algorithm for Large Fleets
 Team: Nishchal Vishwanath (NB25ISE160) & Rishul KH (NB25ISE186) | ISE, NMIT
 """
 
@@ -13,16 +13,16 @@ from collections import defaultdict
 
 st.set_page_config(
     page_title="Urban Flow & Life-Lines | Bangalore",
-    page_icon="🚦", layout="wide",
+    page_icon="", layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # CSS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2family=Share+Tech+Mono&family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;600&display=swap');
 html,body,[class*="css"]{background:#03080d!important;color:#b8cfd8!important;font-family:'Barlow',sans-serif!important}
 .block-container{padding:0.6rem 1.2rem 1rem!important}
 .main-title{font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#fff;margin:0}
@@ -68,9 +68,9 @@ html,body,[class*="css"]{background:#03080d!important;color:#b8cfd8!important;fo
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # CONSTANTS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 JUNCTIONS = {
     "Silk Board":      {"lat": 12.9174, "lon": 77.6229, "km": 0,  "base_cong": 78},
     "HSR Layout":      {"lat": 12.9116, "lon": 77.6474, "km": 4,  "base_cong": 55},
@@ -104,7 +104,7 @@ ROAD_EDGES = [
 
 ROUTES = [
     {"name":"ORR Corridor",       "path":["Electronic City","Silk Board","HSR Layout","Bellandur","Marathahalli","Whitefield"], "color":"#00aaff"},
-    {"name":"MG Road → Hebbal",   "path":["MG Road","Koramangala","Silk Board","HSR Layout","Hebbal"],                          "color":"#00ff88"},
+    {"name":"MG Road -> Hebbal",   "path":["MG Road","Koramangala","Silk Board","HSR Layout","Hebbal"],                          "color":"#00ff88"},
     {"name":"South to North",     "path":["Electronic City","Bannerghatta","Silk Board","Koramangala","MG Road","Hebbal"],       "color":"#ffaa00"},
     {"name":"IT Corridor",        "path":["Electronic City","Silk Board","HSR Layout","Bellandur","Marathahalli"],               "color":"#aa44ff"},
     {"name":"Whitefield Express", "path":["Whitefield","Marathahalli","Bellandur","HSR Layout","Silk Board"],                    "color":"#00e5ff"},
@@ -129,17 +129,17 @@ GRID_COL = "rgba(17,34,51,0.6)"; TICK_COL = "#3a5a6a"
 FONT_MONO = "Share Tech Mono, monospace"
 
 EVP_TYPES = [
-    {"emoji":"🚑","label":"Ambulance",    "color":"#ff5500","spd_mult":2.2,"p_color":"rgba(255,85,0,0.3)"},
-    {"emoji":"🚒","label":"Fire Engine",  "color":"#ff2200","spd_mult":1.9,"p_color":"rgba(255,34,0,0.3)"},
-    {"emoji":"🚓","label":"Police Car",   "color":"#0088ff","spd_mult":2.0,"p_color":"rgba(0,136,255,0.3)"},
-    {"emoji":"🚐","label":"Rapid Response","color":"#aa44ff","spd_mult":1.85,"p_color":"rgba(170,68,255,0.3)"},
-    {"emoji":"🚁","label":"Air Ambulance","color":"#ff8800","spd_mult":2.8,"p_color":"rgba(255,136,0,0.3)"},
+    {"emoji":"","label":"Ambulance",    "color":"#ff5500","spd_mult":2.2,"p_color":"rgba(255,85,0,0.3)"},
+    {"emoji":"","label":"Fire Engine",  "color":"#ff2200","spd_mult":1.9,"p_color":"rgba(255,34,0,0.3)"},
+    {"emoji":"","label":"Police Car",   "color":"#0088ff","spd_mult":2.0,"p_color":"rgba(0,136,255,0.3)"},
+    {"emoji":"","label":"Rapid Response","color":"#aa44ff","spd_mult":1.85,"p_color":"rgba(170,68,255,0.3)"},
+    {"emoji":"","label":"Air Ambulance","color":"#ff8800","spd_mult":2.8,"p_color":"rgba(255,136,0,0.3)"},
 ]
-NORMAL_EMOJIS = ["🚗","🚕","🚙","🚌","🚛","🏍️","🚐","🚎"]
+NORMAL_EMOJIS = ["","","","","","","",""]
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # TRAFFIC DATA
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 @st.cache_data
 def generate_traffic_data():
     rng = np.random.default_rng(42)
@@ -168,13 +168,13 @@ def generate_traffic_data():
 
 df_traffic = generate_traffic_data()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VEHICLE STATE — Pure NumPy arrays (no per-vehicle dicts for the bulk fleet)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# VEHICLE STATE - Pure NumPy arrays (no per-vehicle dicts for the bulk fleet)
+# -----------------------------------------------------------------------------
 # For N vehicles we store flat arrays:
 #   route_id   int16   which ROUTES[] index
 #   seg        int16   current segment index within route
-#   t          float32 0.0–1.0 position within segment
+#   t          float32 0.0-1.0 position within segment
 #   speed      float32 base speed per tick
 #   is_evp     bool    emergency vehicle flag
 #   evp_type   int8    index into EVP_TYPES (-1 for normal)
@@ -247,7 +247,7 @@ def get_current_junction_idx(fleet):
 def step_fleet(fleet, gw_enabled, vc, T, tick):
     """
     100% numpy vehicle step. No Python loops over vehicles.
-    O(N) with tiny constant — works for 100k vehicles.
+    O(N) with tiny constant - works for 100k vehicles.
     """
     N = fleet["N"]
     done = fleet["completed"]
@@ -304,7 +304,7 @@ def step_fleet(fleet, gw_enabled, vc, T, tick):
     fleet["wait_ticks"] += wait_mask.astype(np.int32)
     fleet["total_ticks"] += active.astype(np.int32)
 
-    # Handle segment advancement — only for vehicles that crossed t>=1.0
+    # Handle segment advancement - only for vehicles that crossed t>=1.0
     advanced = active & (new_t >= 1.0)
     if advanced.any():
         new_t = np.where(advanced, new_t - 1.0, new_t)
@@ -358,7 +358,7 @@ def get_vehicle_positions_sample(fleet, max_normal=300, seed=0):
     # Normal positions
     if len(normal_idx):
         nlats, nlons = idx_to_pos(normal_idx)
-        # Color by route — directly index ROUTES by route_id
+        # Color by route - directly index ROUTES by route_id
         route_colors = [ROUTES[int(fleet["route_id"][i]) % NR]["color"] for i in normal_idx]
     else:
         nlats, nlons = np.array([]), np.array([])
@@ -427,9 +427,9 @@ def get_edge_vehicle_counts(fleet):
         counts[(JNAMES[ja], JNAMES[jb])] += 1
     return counts
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ALGORITHM — Batch signal optimizer (all junctions, one numpy pass)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# ALGORITHM - Batch signal optimizer (all junctions, one numpy pass)
+# -----------------------------------------------------------------------------
 def batch_signal_optimizer(tick, T, vc, gw_enabled, densities_arr, evp_junctions, police_active):
     """
     Vectorized: compute all NJ junction phases in a single numpy pass.
@@ -466,20 +466,20 @@ def batch_signal_optimizer(tick, T, vc, gw_enabled, densities_arr, evp_junctions
     results = {}
     for i, jn in enumerate(JNAMES):
         if jn in evp_junctions:
-            results[jn] = ("GREEN", 99, 60.0, "EVP PREEMPT: P→∞")
+            results[jn] = ("GREEN", 99, 60.0, "EVP PREEMPT: P->inf")
         elif police_active and jn in evp_junctions:
             results[jn] = ("GREEN", 99, 45.0, "POLICE: Priority corridor")
         else:
             results[jn] = (
                 pnames[phases[i]], int(timers[i]),
                 round(float(delay_saved[i]), 1),
-                f"Φ={phi:.1f}s g={g_dur[i]}s ρ={densities_arr[i]:.0f}"
+                f"Phi={phi:.1f}s g={g_dur[i]}s rho={densities_arr[i]:.0f}"
             )
     return results
 
 
 def compute_network_delay_reduction(T, vc, gw_enabled, evp_active):
-    """O(1) — no vehicle iteration, just junction math."""
+    """O(1) - no vehicle iteration, just junction math."""
     rho = J_CONG / 100.0
     base_wait = 0.50 * rho * 100
     g_opt = np.minimum(0.52 + rho * 0.20, 0.80)
@@ -515,9 +515,9 @@ def cong_color(cong):
     elif cong < 88: return "#dd2c00", 8, "SEVERE"
     else:           return "#7f0000", 9, "STANDSTILL"
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # SESSION STATE
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 def init_state():
     defs = {
         "tick": 0, "evp_count": 50, "normal_count": 500,
@@ -543,9 +543,9 @@ if st.session_state.fleet is None:
     st.session_state.fleet = make_fleet(
         st.session_state.normal_count, st.session_state.evp_count)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # COMMAND LOG
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 def add_log(msg, kind="info"):
     st.session_state.cmd_log.append({
         "ts": f"[{st.session_state.tick:05d}]", "msg": msg, "kind": kind})
@@ -557,9 +557,9 @@ def render_log():
              for e in reversed(st.session_state.cmd_log[-20:])]
     return '<div class="cmd-log">' + "\n".join(lines) + "</div>"
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # SIMULATION STEP
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 if st.session_state.sim_running:
     st.session_state.fleet = step_fleet(
         st.session_state.fleet,
@@ -587,18 +587,18 @@ if st.session_state.sim_running:
 
     if tick % 8 == 0:
         if evp_active:
-            add_log(f"🚨 {stats['active_evp']} EVP unit(s) active — all corridors PREEMPTED", "evp")
+            add_log(f" {stats['active_evp']} EVP unit(s) active - all corridors PREEMPTED", "evp")
         else:
             add_log(f"DR: {dr:.1f}% | Active: {stats['active_total']:,} | GW: {'ON' if st.session_state.gw_enabled else 'OFF'}", "ok")
     if tick % 20 == 0:
         phi_log = (4000/(max(st.session_state.vc,1)/3.6)) % st.session_state.T
-        add_log(f"Tick {tick} | Φ={phi_log:.1f}s | T={st.session_state.T}s | Fleet {fleet['N']:,}", "info")
+        add_log(f"Tick {tick} | Phi={phi_log:.1f}s | T={st.session_state.T}s | Fleet {fleet['N']:,}", "info")
     if tick % 5 == 0 and evp_active:
-        add_log(f"⚠ EVP ALERT: {stats['active_evp']} unit(s) — signals PREEMPTED", "warn")
+        add_log(f" EVP ALERT: {stats['active_evp']} unit(s) - signals PREEMPTED", "warn")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # PRECOMPUTE shared values used everywhere
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 fleet     = st.session_state.fleet
 stats     = get_fleet_stats(fleet)
 vc_v      = st.session_state.vc
@@ -632,9 +632,9 @@ edge_vcounts  = get_edge_vehicle_counts(fleet)
 edge_cong     = compute_edge_congestion(
     hour_df, edge_vcounts, st.session_state.tick, max(stats["active_total"], 1))
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAP BACKGROUND BUILDER — cached, not re-rendered every tick
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# MAP BACKGROUND BUILDER - cached, not re-rendered every tick
+# -----------------------------------------------------------------------------
 def build_map_background(hour_df, dens_arr, signal_phases, edge_cong,
                          show_routes, show_heatmap, tick):
     """
@@ -658,7 +658,7 @@ def build_map_background(hour_df, dens_arr, signal_phases, edge_cong,
             traces.append(go.Scattermapbox(
                 lat=[j1["lat"],j2["lat"]], lon=[j1["lon"],j2["lon"]],
                 mode="lines", line=dict(width=rw, color=rcol),
-                hovertext=f"<b>{j1n}→{j2n}</b><br>{label}: {cong:.0f}%",
+                hovertext=f"<b>{j1n}->{j2n}</b><br>{label}: {cong:.0f}%",
                 hoverinfo="text", showlegend=False))
 
     if show_heatmap:
@@ -725,46 +725,46 @@ if map_stale or st.session_state.map_fig_json is None:
 else:
     bg_traces = st.session_state.map_fig_json   # reuse cached
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # HEADER
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 ch1, ch2 = st.columns([3,1])
 with ch1:
     st.markdown("""
     <div class="main-title">Urban Flow &amp; <span>Life-Lines</span></div>
-    <div class="sub-title">REAL-TIME BANGALORE · ADAPTIVE ALGORITHM · POLICE CONTROL CENTRE · NMIT ISE 2025</div>
+    <div class="sub-title">REAL-TIME BANGALORE . ADAPTIVE ALGORITHM . POLICE CONTROL CENTRE . NMIT ISE 2025</div>
     """, unsafe_allow_html=True)
 with ch2:
-    badge = (f'<span class="evp-badge">🔴 {stats["active_evp"]:,} EVP ACTIVE</span>'
-             if evp_active else '<span class="live-badge">● SIM LIVE</span>')
+    badge = (f'<span class="evp-badge"> {stats["active_evp"]:,} EVP ACTIVE</span>'
+             if evp_active else '<span class="live-badge"> SIM LIVE</span>')
     st.markdown(f"""
     <div style='text-align:right;padding-top:6px'>
       {badge}<br>
       <span style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a'>
-      TICK #{st.session_state.tick} · {stats["active_total"]:,}/{fleet["N"]:,} ACTIVE · Φ={phi_v:.1f}s
+      TICK #{st.session_state.tick} . {stats["active_total"]:,}/{fleet["N"]:,} ACTIVE . Phi={phi_v:.1f}s
       </span>
     </div>""", unsafe_allow_html=True)
 
 st.markdown("<hr style='border-color:#112233;margin:5px 0 8px'>", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("""
     <div style='text-align:center;padding:6px 0 14px'>
-      <div style='font-family:Barlow Condensed,sans-serif;font-size:1.1rem;font-weight:900;color:#fff;letter-spacing:2px'>🚦 URBAN FLOW</div>
-      <div style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a;letter-spacing:2px'>BANGALORE · ADAPTIVE SIM v5</div>
+      <div style='font-family:Barlow Condensed,sans-serif;font-size:1.1rem;font-weight:900;color:#fff;letter-spacing:2px'> URBAN FLOW</div>
+      <div style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a;letter-spacing:2px'>BANGALORE . ADAPTIVE SIM v5</div>
     </div>""", unsafe_allow_html=True)
 
     st.markdown('<div class="sec-header green">Simulation</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("▶ START" if not st.session_state.sim_running else "⏸ PAUSE"):
+        if st.button(" START" if not st.session_state.sim_running else " PAUSE"):
             st.session_state.sim_running = not st.session_state.sim_running
             add_log("Simulation " + ("STARTED" if st.session_state.sim_running else "PAUSED"), "ok")
     with c2:
-        if st.button("↺ RESET"):
+        if st.button(" RESET"):
             st.session_state.fleet = make_fleet(
                 st.session_state.normal_count, st.session_state.evp_count)
             st.session_state.tick = 0
@@ -776,15 +776,15 @@ with st.sidebar:
             add_log(f"Reset: {st.session_state.normal_count:,}N + {st.session_state.evp_count:,}E spawned", "info")
             st.rerun()
 
-    new_normal = st.slider("🚗 Normal Vehicles", 100, 20000, st.session_state.normal_count, step=100)
-    new_evp    = st.slider("🚨 Emergency Vehicles", 10, 2000, st.session_state.evp_count, step=10)
+    new_normal = st.slider(" Normal Vehicles", 100, 20000, st.session_state.normal_count, step=100)
+    new_evp    = st.slider(" Emergency Vehicles", 10, 2000, st.session_state.evp_count, step=10)
 
     st.markdown(f"""
     <div style='font-family:Share Tech Mono,monospace;font-size:0.58rem;color:#00aaff;margin:4px 0 8px;padding:4px 8px;background:rgba(0,170,255,0.05);border-radius:3px'>
-    FLEET: {new_normal+new_evp:,} total · {new_normal:,} normal · {new_evp:,} EVP
+    FLEET: {new_normal+new_evp:,} total . {new_normal:,} normal . {new_evp:,} EVP
     </div>""", unsafe_allow_html=True)
 
-    if st.button("🔄 Respawn Fleet"):
+    if st.button(" Respawn Fleet"):
         st.session_state.normal_count = new_normal
         st.session_state.evp_count    = new_evp
         st.session_state.fleet = make_fleet(new_normal, new_evp)
@@ -803,19 +803,19 @@ with st.sidebar:
     phi_sb = (4000/max(st.session_state.vc/3.6,1)) % st.session_state.T
     st.markdown(f"""
     <div class="equation-box" style='font-size:0.62rem'>
-      Φ = (L/v_c) mod T = <b>{phi_sb:.1f}s</b><br>
-      <div class="eq-comment">Vectorized · O(N) numpy · background map cache</div>
+      Phi = (L/v_c) mod T = <b>{phi_sb:.1f}s</b><br>
+      <div class="eq-comment">Vectorized . O(N) numpy . background map cache</div>
     </div>""", unsafe_allow_html=True)
     gw_on = st.session_state.algo_mode != "Baseline (Fixed)"
     st.session_state.gw_enabled  = gw_on
     st.session_state.lwr_enabled = st.session_state.algo_mode in ["Adaptive GW + LWR","Density-Only"]
-    st.session_state.police_control = st.toggle("🚓 Police Control Centre", st.session_state.police_control)
+    st.session_state.police_control = st.toggle(" Police Control Centre", st.session_state.police_control)
 
     st.markdown("---")
     st.markdown('<div class="sec-header amber">Map</div>', unsafe_allow_html=True)
     st.session_state.show_routes  = st.toggle("Road Network + Traffic", st.session_state.show_routes)
     st.session_state.show_heatmap = st.toggle("Congestion Heatmap", st.session_state.show_heatmap)
-    st.session_state.selected_hour = st.slider("Data Hour (0–23)", 0, 23, st.session_state.selected_hour)
+    st.session_state.selected_hour = st.slider("Data Hour (0-23)", 0, 23, st.session_state.selected_hour)
     st.session_state.map_interval = st.slider("Map BG Refresh (ticks)", 2, 15, st.session_state.map_interval)
     st.markdown(f"""
     <div style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a;margin-top:4px'>
@@ -827,16 +827,16 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("""
     <div style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a;line-height:1.7'>
-      NISHCHAL VISHWANATH · NB25ISE160<br>
-      RISHUL KH · NB25ISE186<br>
-      ISE · NMIT BANGALORE<br><br>
-      Engine: NumPy arrays · Zero dict loops<br>
-      Map: Carto Dark · Real-Time Traffic
+      NISHCHAL VISHWANATH . NB25ISE160<br>
+      RISHUL KH . NB25ISE186<br>
+      ISE . NMIT BANGALORE<br><br>
+      Engine: NumPy arrays . Zero dict loops<br>
+      Map: Carto Dark . Real-Time Traffic
     </div>""", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # METRICS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 def mc(col, label, val, unit, sub, sub_cls, card_cls):
     with col:
         st.markdown(f"""
@@ -848,30 +848,30 @@ def mc(col, label, val, unit, sub, sub_cls, card_cls):
 
 m1,m2,m3,m4,m5,m6 = st.columns(6)
 mc(m1,"Congestion",      f"{avg_cong:.0f}",           "/100", f"Hour {st.session_state.selected_hour:02d}:00","","mc-red")
-mc(m2,"Delay Reduction", f"{dr_now:.1f}",              "%",   "▲ Adaptive vs baseline","up","mc-green")
+mc(m2,"Delay Reduction", f"{dr_now:.1f}",              "%",   " Adaptive vs baseline","up","mc-green")
 mc(m3,"Avg Speed",       f"{eff_speed:.1f}",           "km/h","optimised corridor","","mc-blue")
 mc(m4,"Red-Light Wait",  f"{wait_ratio:.1f}",          "%",   "of journey time","","mc-amber")
 mc(m5,"Fleet",           f"{fleet['N']:,}",            "",    f"{st.session_state.evp_count:,} EVP units","","mc-red" if evp_active else "mc-cyan")
 mc(m6,"Active",          f"{stats['active_total']:,}", "",    f"{stats['active_evp']:,} EVP","","mc-red" if evp_active else "mc-blue")
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # TABS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🗺️  LIVE MAP + VEHICLES",
-    "📊  TRAFFIC DATA",
-    "🚦  SIGNAL CONTROL",
-    "🧮  ALGORITHM & MATH",
+    "  LIVE MAP + VEHICLES",
+    "  TRAFFIC DATA",
+    "  SIGNAL CONTROL",
+    "  ALGORITHM & MATH",
 ])
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — LIVE MAP
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
+# TAB 1 - LIVE MAP
+# ==============================================================================
 with tab1:
     # Police Control Centre
     if st.session_state.police_control:
-        st.markdown('<div class="sec-header police">🚓 Police Control Centre — Real-Time Command Dashboard</div>',
+        st.markdown('<div class="sec-header police"> Police Control Centre - Real-Time Command Dashboard</div>',
                     unsafe_allow_html=True)
         pcc1, pcc2, pcc3, pcc4 = st.columns([1.2,1.2,1.2,2.4])
         h_df = hour_df
@@ -898,7 +898,7 @@ with tab1:
             for jn in JNAMES[:5]:
                 phase, timer, _, _ = signal_phases[jn]
                 has_evp = jn in evp_junctions
-                dot = "🟢" if phase=="GREEN" else ("🔴" if phase=="RED" else "🟡")
+                dot = "" if phase=="GREEN" else ("" if phase=="RED" else "")
                 note = "PREEMPTED" if has_evp else f"{timer}s"
                 st.markdown(f"""
                 <div class="pcc-row">
@@ -946,13 +946,13 @@ with tab1:
     with map_col:
         ticks_since = tick_now - st.session_state.map_last_tick
         st.markdown(
-            f'<div class="sec-header green">Real Bangalore — Live Traffic · '
+            f'<div class="sec-header green">Real Bangalore - Live Traffic . '
             f'<span style="color:#00aaff">{stats["active_total"]:,} vehicles</span> '
             f'<span style="font-size:0.5rem;color:#1a3a4a">MAP BG IN {max(0,st.session_state.map_interval-ticks_since)} TICK(S)</span></div>',
             unsafe_allow_html=True)
 
         # Build figure: BG traces (cached) + vehicle layer (always fresh)
-        fig_map = go.Figure(data=bg_traces)   # ← background from cache, NOT re-rendered
+        fig_map = go.Figure(data=bg_traces)   # <- background from cache, NOT re-rendered
 
         # Vehicle density heatmap (full fleet sample, up to 3000 pts)
         active_normal_idx = np.where((~fleet["is_evp"]) & (~fleet["completed"]))[0]
@@ -996,7 +996,7 @@ with tab1:
             fig_map.add_trace(go.Scattermapbox(
                 lat=elats.tolist(), lon=elons.tolist(), mode="markers",
                 marker=dict(size=14, color=ecols, opacity=1),
-                hovertext=[f"<b>{eemoji[k]} E{e_idx[k]:04d} {elabs[k]}</b><br>P→∞ PREEMPTED" for k in range(len(e_idx))],
+                hovertext=[f"<b>{eemoji[k]} E{e_idx[k]:04d} {elabs[k]}</b><br>P->inf PREEMPTED" for k in range(len(e_idx))],
                 hoverinfo="text",
                 name=f"Emergency ({stats['active_evp']:,})", showlegend=True))
 
@@ -1012,20 +1012,20 @@ with tab1:
 
         st.markdown("""
         <div style='display:flex;gap:12px;flex-wrap:wrap;font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a;margin-top:4px'>
-          <span style='color:#00c853'>■ CLEAR</span>
-          <span style='color:#64dd17'>■ LIGHT</span>
-          <span style='color:#ffd600'>■ MODERATE</span>
-          <span style='color:#ff6d00'>■ HEAVY</span>
-          <span style='color:#dd2c00'>■ SEVERE</span>
-          <span style='color:#7f0000'>■ STANDSTILL</span>
-          <span>· Roads colored by live congestion · Map BG cached · Vehicles always live</span>
+          <span style='color:#00c853'> CLEAR</span>
+          <span style='color:#64dd17'> LIGHT</span>
+          <span style='color:#ffd600'> MODERATE</span>
+          <span style='color:#ff6d00'> HEAVY</span>
+          <span style='color:#dd2c00'> SEVERE</span>
+          <span style='color:#7f0000'> STANDSTILL</span>
+          <span>. Roads colored by live congestion . Map BG cached . Vehicles always live</span>
         </div>""", unsafe_allow_html=True)
 
     with info_col:
         st.markdown(f'<div class="sec-header red">Live Fleet</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div style='font-family:Share Tech Mono,monospace;font-size:0.58rem;color:#3a5a6a;margin-bottom:6px'>
-        FLEET {fleet["N"]:,} &nbsp;·&nbsp; ACTIVE {stats["active_total"]:,} &nbsp;·&nbsp; DONE {stats["completed"]:,}
+        FLEET {fleet["N"]:,} &nbsp;.&nbsp; ACTIVE {stats["active_total"]:,} &nbsp;.&nbsp; DONE {stats["completed"]:,}
         </div>""", unsafe_allow_html=True)
 
         # Show a small sample of EVP vehicles (from arrays)
@@ -1044,7 +1044,7 @@ with tab1:
                 <span style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:{et['color']}">EVP</span>
               </div>
               <div style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:#3a5a6a;margin-top:2px">
-                {et['label']}<br>{jn_cur[:10]}→{jn_nxt[:10]}
+                {et['label']}<br>{jn_cur[:10]}->{jn_nxt[:10]}
               </div>
               <div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:2px;height:3px">
                 <div style="width:{prog}%;height:100%;background:{et['color']};border-radius:2px"></div>
@@ -1082,9 +1082,9 @@ with tab1:
                 showlegend=False, font=dict(color=TICK_COL, size=9))
             st.plotly_chart(fig_mini, use_container_width=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — TRAFFIC DATA
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
+# TAB 2 - TRAFFIC DATA
+# ==============================================================================
 with tab2:
     dc1, dc2 = st.columns(2)
 
@@ -1101,7 +1101,7 @@ with tab2:
         fig.update_layout(**layout)
 
     with dc1:
-        st.markdown('<div class="sec-header amber">Congestion Heatmap — Junction × Hour</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-header amber">Congestion Heatmap - Junction x Hour</div>', unsafe_allow_html=True)
         pivot = df_traffic.pivot_table(index="Junction", columns="Hour", values="Congestion_Index", aggfunc="mean")
         fig_h = go.Figure(go.Heatmap(
             z=pivot.values, x=[f"{h:02d}:00" for h in pivot.columns], y=pivot.index.tolist(),
@@ -1112,7 +1112,7 @@ with tab2:
         st.plotly_chart(fig_h, use_container_width=True)
 
     with dc2:
-        st.markdown('<div class="sec-header green">Speed Profile — 24h (Key Junctions)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-header green">Speed Profile - 24h (Key Junctions)</div>', unsafe_allow_html=True)
         jns4  = ["Silk Board","Hebbal","Whitefield","MG Road"]
         cols4 = [("#ff3344","rgba(255,51,68,0.07)"),("#00ff88","rgba(0,255,136,0.07)"),
                  ("#00aaff","rgba(0,170,255,0.07)"),("#ffaa00","rgba(255,170,0,0.07)")]
@@ -1130,7 +1130,7 @@ with tab2:
 
     dc3, dc4 = st.columns(2)
     with dc3:
-        st.markdown('<div class="sec-header">Baseline vs Adaptive — Delay (min)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-header">Baseline vs Adaptive - Delay (min)</div>', unsafe_allow_html=True)
         hb = df_traffic[df_traffic["Hour"]==st.session_state.selected_hour]
         bd = hb.set_index("Junction")["Delay_Min"].reindex(JNAMES).fillna(0)
         pd_vals = (bd * (1-dr_now/100)).round(2)
@@ -1161,7 +1161,7 @@ with tab2:
 
     # Real-time edge congestion bar
     st.markdown('<div class="sec-header green">Real-Time Edge Congestion</div>', unsafe_allow_html=True)
-    edge_names = [f"{j1[:5]}→{j2[:5]}" for (j1,j2) in ROAD_EDGES]
+    edge_names = [f"{j1[:5]}->{j2[:5]}" for (j1,j2) in ROAD_EDGES]
     edge_vals  = [edge_cong.get(e, 50) for e in ROAD_EDGES]
     edge_cols  = [cong_color(c)[0] for c in edge_vals]
     fig_ec = go.Figure()
@@ -1190,9 +1190,9 @@ with tab2:
         {"Congestion":"{:.1f}","Speed (km/h)":"{:.1f}","Delay (min)":"{:.2f}"}),
         use_container_width=True, height=280)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — SIGNAL CONTROL
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
+# TAB 3 - SIGNAL CONTROL
+# ==============================================================================
 with tab3:
     def apply_layout(fig, xtitle="", ytitle="", height=300, **extra):
         layout = dict(
@@ -1207,18 +1207,18 @@ with tab3:
         fig.update_layout(**layout)
 
     hdf_s = df_traffic[df_traffic["Hour"]==st.session_state.selected_hour]
-    st.markdown(f'<div class="sec-header{"  red" if evp_junctions else ""}">Adaptive Signal Matrix — {"⚠️ EVP ACTIVE" if evp_junctions else "Normal Operations"} | DR = {dr_now:.1f}%</div>',
+    st.markdown(f'<div class="sec-header{"  red" if evp_junctions else ""}">Adaptive Signal Matrix - {" EVP ACTIVE" if evp_junctions else "Normal Operations"} | DR = {dr_now:.1f}%</div>',
                 unsafe_allow_html=True)
 
     cols_sig = st.columns(5)
-    phase_emoji = {"GREEN":"🟢","RED":"🔴","AMBER":"🟡"}
+    phase_emoji = {"GREEN":"","RED":"","AMBER":""}
     phase_color = {"GREEN":"#00ff88","RED":"#ff3344","AMBER":"#ffaa00"}
 
     for i, jn in enumerate(JNAMES):
         phase, timer, dr_jn, _ = signal_phases[jn]
         clr = phase_color[phase]
         density = float(dens_arr[i])
-        note = "EVP PREEMPTED 🚑" if jn in evp_junctions else f"DR: +{dr_jn:.0f}%"
+        note = "EVP PREEMPTED " if jn in evp_junctions else f"DR: +{dr_jn:.0f}%"
         with cols_sig[i % 5]:
             st.markdown(f"""
             <div class="sig-card" style="border-color:{clr}33">
@@ -1227,7 +1227,7 @@ with tab3:
               <div style="font-family:Barlow Condensed,sans-serif;font-size:1.5rem;font-weight:900;color:{clr}">{timer}s</div>
               <div style="font-family:Share Tech Mono,monospace;font-size:0.58rem;color:{clr}">{phase}</div>
               <div style="font-family:Share Tech Mono,monospace;font-size:0.54rem;color:#3a5a6a;margin-top:3px">{note}</div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.5rem;color:#1a3a4a;margin-top:2px">ρ={density:.0f}</div>
+              <div style="font-family:Share Tech Mono,monospace;font-size:0.5rem;color:#1a3a4a;margin-top:2px">rho={density:.0f}</div>
             </div>""", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -1235,7 +1235,7 @@ with tab3:
 
     with sc1:
         phi_g = (4000/max(st.session_state.vc/3.6,1)) % st.session_state.T
-        st.markdown(f'<div class="sec-header amber">Signal Gantt — Φ={phi_g:.1f}s</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="sec-header amber">Signal Gantt - Phi={phi_g:.1f}s</div>', unsafe_allow_html=True)
         fig_g = go.Figure()
         T_g = st.session_state.T
         for i, jn in enumerate(JNAMES):
@@ -1253,9 +1253,9 @@ with tab3:
                     y=[jn], x=[sw], base=[s%T_g], orientation="h",
                     marker=dict(color=col, opacity=0.75 if jn not in evp_junctions else 1.0, line=dict(width=0)),
                     name=ph, showlegend=(i==0),
-                    hovertemplate=f"<b>{jn}</b><br>{ph}: {s}→{e}s<extra></extra>"))
+                    hovertemplate=f"<b>{jn}</b><br>{ph}: {s}->{e}s<extra></extra>"))
             if jn in evp_junctions:
-                fig_g.add_annotation(x=T_g/2, y=jn, text="🚑 PREEMPTED",
+                fig_g.add_annotation(x=T_g/2, y=jn, text=" PREEMPTED",
                     font=dict(color="#ff5500",size=9,family=FONT_MONO), showarrow=False)
         apply_layout(fig_g, xtitle="Seconds in cycle", height=340, barmode="stack",
                      xaxis=dict(range=[0,T_g],color=TICK_COL,gridcolor=GRID_COL),
@@ -1264,7 +1264,7 @@ with tab3:
 
     with sc2:
         vc_g = st.session_state.vc
-        st.markdown('<div class="sec-header green">Time-Space Diagram — Green Wave</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-header green">Time-Space Diagram - Green Wave</div>', unsafe_allow_html=True)
         dists   = np.linspace(0, 22, 60)
         base_ts = dists*2.5 + np.sin(dists*0.45)*3.5
         gw_ts   = dists*(3.6/max(vc_g,1)) if st.session_state.gw_enabled else dists*2.1
@@ -1298,28 +1298,28 @@ with tab3:
         apply_layout(fig_ts, xtitle="Distance (km)", ytitle="Time (min)", height=340)
         st.plotly_chart(fig_ts, use_container_width=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — ALGORITHM & MATH
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
+# TAB 4 - ALGORITHM & MATH
+# ==============================================================================
 with tab4:
     mm1, mm2 = st.columns(2)
     phi_m = (4000/max(vc_v/3.6,1)) % T_v
 
     with mm1:
-        st.markdown('<div class="sec-header green">v5 Algorithm — NumPy-Vectorized 5-Layer Optimizer</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-header green">v5 Algorithm - NumPy-Vectorized 5-Layer Optimizer</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="equation-box">
           <b>Layer 1: LP Objective (O(J) not O(N))</b><br>
-          minimize W = Σⱼ (ρⱼ · red_frac_j · w_j)<br>
-          <span class="eq-comment">Computed on junction arrays only — independent of fleet size</span><br><br>
+          minimize W = S (rho . red_frac_j . w_j)<br>
+          <span class="eq-comment">Computed on junction arrays only - independent of fleet size</span><br><br>
           <b>Layer 2: Green Wave (vectorized)</b><br>
-          Φ = (L/v_c) mod T = <b>{phi_m:.2f}s</b><br>
-          offsets = np.floor(Φ × j_idx) mod T<br><br>
+          Phi = (L/v_c) mod T = <b>{phi_m:.2f}s</b><br>
+          offsets = np.floor(Phi x j_idx) mod T<br><br>
           <b>Layer 3: LWR Density-Adaptive Green</b><br>
-          g_dur = min(g_base + ⌊ρ×20⌋, 0.80T) = {int(min(T_v*0.52 + 20*0.6, T_v*0.80))}s typ.<br><br>
+          g_dur = min(g_base + rhox20, 0.80T) = {int(min(T_v*0.52 + 20*0.6, T_v*0.80))}s typ.<br><br>
           <b>Layer 4: EVP Preemption (O(n_evp))</b><br>
-          P→∞ : only iterate n_evp vehicles<br>
-          n_evp = {st.session_state.evp_count:,} ≪ N = {fleet["N"]:,}<br><br>
+          P->inf : only iterate n_evp vehicles<br>
+          n_evp = {st.session_state.evp_count:,}  N = {fleet["N"]:,}<br><br>
           <b>Layer 5: Background Map Cache</b><br>
           Roads/junctions cached for {st.session_state.map_interval} ticks<br>
           Vehicles rendered fresh every tick
@@ -1333,13 +1333,13 @@ with tab4:
           <b>Old approach (dicts + Python loops):</b><br>
           spawn: O(N) Python loop = {N:,} iters<br>
           step:  O(N) write-back loop = {N:,} iters<br>
-          stats: O(N) list comprehensions × 6<br>
-          → freezes at N > ~5,000<br><br>
+          stats: O(N) list comprehensions x 6<br>
+          -> freezes at N > ~5,000<br><br>
           <b>New approach (numpy arrays):</b><br>
           spawn: vectorized rng.uniform(size=N)<br>
           step:  pure numpy ops, zero Python loops<br>
-          stats: np.sum, np.where — O(1) SIMD<br>
-          → handles N = 100,000+ smoothly<br><br>
+          stats: np.sum, np.where - O(1) SIMD<br>
+          -> handles N = 100,000+ smoothly<br><br>
           Delay reduction (O(J=10), not O(N)):<br>
           <b>DR = {dr_now:.1f}%</b>  |  wait: {wait_ratio:.1f}%
         </div>""", unsafe_allow_html=True)
@@ -1348,23 +1348,23 @@ with tab4:
         st.markdown('<div class="sec-header">LWR + Graph Theory Model</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="equation-box">
-          G = (V,E) — Directed Weighted Graph<br>
+          G = (V,E) - Directed Weighted Graph<br>
           |V| = {NJ} junctions  |  |E| = {len(ROAD_EDGES)} edges<br><br>
-          Edge weight: w(u,v) = dist(u,v)/v_seg(ρ)<br>
-          EVP: w(u,v)→0 (preemption)<br><br>
+          Edge weight: w(u,v) = dist(u,v)/v_seg(rho)<br>
+          EVP: w(u,v)->0 (preemption)<br><br>
           LWR conservation:<br>
-          ∂ρ/∂t + ∂(ρ·v)/∂x = 0<br><br>
-          Greenshields: v(ρ) = v_max(1−ρ/ρ_max)<br>
-          Flux: q(ρ) = ρ·v_max·(1−ρ/ρ_max)<br>
-          Shock wave: w_s = (q₂−q₁)/(ρ₂−ρ₁)<br><br>
-          <span class="eq-comment">Predicts jam → proactive green extension</span>
+          drho/dt + d(rho.v)/dx = 0<br><br>
+          Greenshields: v(rho) = v_max(1rho/rho_max)<br>
+          Flux: q(rho) = rho.v_max.(1rho/rho_max)<br>
+          Shock wave: w_s = (qq)/(rhorho)<br><br>
+          <span class="eq-comment">Predicts jam -> proactive green extension</span>
         </div>""", unsafe_allow_html=True)
 
         st.markdown('<div class="sec-header green">Live Metrics</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="equation-box">
           Algo mode: {st.session_state.algo_mode}<br>
-          v_c={vc_v}km/h · T={T_v}s · Φ={phi_m:.1f}s<br><br>
+          v_c={vc_v}km/h . T={T_v}s . Phi={phi_m:.1f}s<br><br>
           Network DR:        <b>{dr_now:.1f}%</b><br>
           Red-wait ratio:    <b>{wait_ratio:.1f}%</b><br>
           Fleet size:        <b>{N:,}</b><br>
@@ -1372,27 +1372,27 @@ with tab4:
           EVP active:        <b>{stats["active_evp"]:,}</b><br>
           Completed:         <b>{stats["completed"]:,}</b><br>
           Tick:              <b>#{st.session_state.tick}</b><br><br>
-          Ambulance saving:  <b>−60%</b><br>
-          Throughput gain:   <b>+28–35%</b><br>
-          Emissions saved:   <b>−22%</b>
+          Ambulance saving:  <b>60%</b><br>
+          Throughput gain:   <b>+28-35%</b><br>
+          Emissions saved:   <b>22%</b>
         </div>""", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # FOOTER
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 st.markdown("<hr style='border-color:#112233;margin:8px 0 5px'>", unsafe_allow_html=True)
 st.markdown(f"""
 <div style='display:flex;justify-content:space-between;align-items:center'>
-  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>URBAN FLOW & LIFE-LINES · BANGALORE · NMIT ISE 2025</span>
+  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>URBAN FLOW & LIFE-LINES . BANGALORE . NMIT ISE 2025</span>
   <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>
-    {st.session_state.algo_mode} · DR={dr_now:.1f}% · Φ={phi_v:.1f}s · FLEET {fleet["N"]:,} · TICK #{st.session_state.tick}
+    {st.session_state.algo_mode} . DR={dr_now:.1f}% . Phi={phi_v:.1f}s . FLEET {fleet["N"]:,} . TICK #{st.session_state.tick}
   </span>
-  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>NISHCHAL VISHWANATH (NB25ISE160) · RISHUL KH (NB25ISE186)</span>
+  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>NISHCHAL VISHWANATH (NB25ISE160) . RISHUL KH (NB25ISE186)</span>
 </div>""", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# AUTO-REFRESH — fast tick, no visible map flash
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# AUTO-REFRESH - fast tick, no visible map flash
+# -----------------------------------------------------------------------------
 if st.session_state.sim_running:
     time.sleep(0.35)
     st.rerun()
