@@ -361,6 +361,12 @@ def base_layout(xtitle="", ytitle="", height=300):
         legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#112233", borderwidth=1, font=dict(size=9)),
     )
 
+def apply_layout(fig, xtitle="", ytitle="", height=300, **extra):
+    """Apply base layout to a figure, avoiding duplicate keyword conflicts."""
+    layout = base_layout(xtitle=xtitle, ytitle=ytitle, height=height)
+    layout.update(extra)
+    fig.update_layout(**layout)
+
 # ── LOAD DATA ─────────────────────────────────────────────────────────────────
 df_traffic = generate_kaggle_traffic_data()
 
@@ -769,7 +775,7 @@ with tab2:
             colorbar=dict(tickfont=dict(color=TICK_COL, size=8), title=dict(text="Congestion", font=dict(color=TICK_COL, size=9))),
             hovertemplate="<b>%{y}</b><br>%{x}<br>Congestion: %{z:.1f}<extra></extra>",
         ))
-        fig_heat.update_layout(**base_layout(xtitle="Hour of Day", ytitle="Junction"), height=320)
+        apply_layout(fig_heat, xtitle="Hour of Day", ytitle="Junction", height=320)
         st.plotly_chart(fig_heat, use_container_width=True)
 
     with dc2:
@@ -777,19 +783,20 @@ with tab2:
         st.markdown('<div class="sec-header green">Avg Speed Profile — 24-Hour (Selected Junctions)</div>', unsafe_allow_html=True)
         selected_jns = ["Silk Board", "Hebbal", "Whitefield", "MG Road"]
         fig_spd = go.Figure()
-        colors_jn = ["#ff3344", "#00ff88", "#00aaff", "#ffaa00"]
-        for jn, col in zip(selected_jns, colors_jn):
+        colors_jn = [("#ff3344", "rgba(255,51,68,0.08)"), ("#00ff88", "rgba(0,255,136,0.08)"),
+                     ("#00aaff", "rgba(0,170,255,0.08)"), ("#ffaa00", "rgba(255,170,0,0.08)")]
+        for jn, (col, fill) in zip(selected_jns, colors_jn):
             jdf = df_traffic[df_traffic["Junction"] == jn].sort_values("Hour")
             fig_spd.add_trace(go.Scatter(
                 x=jdf["Hour"], y=jdf["Avg_Speed_kmh"],
                 name=jn, mode="lines",
                 line=dict(color=col, width=2),
-                fill="tozeroy", fillcolor=col.replace(")", ",0.06)").replace("#", "rgba(").replace("rgba(","rgba(") if "#" not in col else col + "10",
+                fill="tozeroy", fillcolor=fill,
                 hovertemplate=f"<b>{jn}</b><br>Hour: %{{x}}:00<br>Speed: %{{y:.1f}} km/h<extra></extra>"
             ))
         fig_spd.add_vrect(x0=7, x1=10, fillcolor="rgba(255,170,0,0.07)", line_width=0, annotation_text="Morning Peak", annotation_font_color="#ffaa00", annotation_font_size=8)
         fig_spd.add_vrect(x0=17, x1=20, fillcolor="rgba(255,51,68,0.07)", line_width=0, annotation_text="Evening Peak", annotation_font_color="#ff3344", annotation_font_size=8)
-        fig_spd.update_layout(**base_layout(xtitle="Hour", ytitle="Avg Speed (km/h)"), height=320,
+        apply_layout(fig_spd, xtitle="Hour", ytitle="Avg Speed (km/h)", height=320,
                               xaxis=dict(tickvals=list(range(0,24,2)), ticktext=[f"{h:02d}:00" for h in range(0,24,2)], color=TICK_COL, gridcolor=GRID_COL))
         st.plotly_chart(fig_spd, use_container_width=True)
 
@@ -815,7 +822,7 @@ with tab2:
             text=[f"{v:.1f}m" for v in proto_delays.values], textposition="outside",
             textfont=dict(color="#00ff88", size=8)
         ))
-        fig_bar.update_layout(**base_layout(ytitle="Delay (min)"), height=290, barmode="group",
+        apply_layout(fig_bar, ytitle="Delay (min)", height=290, barmode="group",
                               xaxis=dict(tickangle=-30, color=TICK_COL, gridcolor=GRID_COL),
                               yaxis=dict(range=[0, base_delays.max() * 1.4], color=TICK_COL, gridcolor=GRID_COL))
         st.plotly_chart(fig_bar, use_container_width=True)
@@ -836,7 +843,7 @@ with tab2:
         fig_flow.add_vline(x=st.session_state.selected_hour, line=dict(color="#00e5ff", width=1.5, dash="dash"),
                            annotation_text=f"Hour {st.session_state.selected_hour:02d}:00",
                            annotation_font_color="#00e5ff", annotation_font_size=8)
-        fig_flow.update_layout(**base_layout(xtitle="Hour", ytitle="Vehicles / Hour"), height=290,
+        apply_layout(fig_flow, xtitle="Hour", ytitle="Vehicles / Hour", height=290,
                                xaxis=dict(tickvals=list(range(0,24,3)), ticktext=[f"{h:02d}:00" for h in range(0,24,3)], color=TICK_COL, gridcolor=GRID_COL))
         st.plotly_chart(fig_flow, use_container_width=True)
 
@@ -932,8 +939,7 @@ with tab3:
                 fig_gantt.add_annotation(x=T/2, y=jn, text="🚑 PREEMPTED",
                     font=dict(color="#ff5500", size=9, family=FONT_MONO), showarrow=False)
 
-        fig_gantt.update_layout(
-            **base_layout(xtitle="Time in cycle (s)"), height=300, barmode="stack",
+        apply_layout(fig_gantt, xtitle="Time in cycle (s)", height=300, barmode="stack",
             xaxis=dict(range=[0, T], color=TICK_COL, gridcolor=GRID_COL),
             yaxis=dict(autorange="reversed", color=TICK_COL),
         )
@@ -975,7 +981,7 @@ with tab3:
                     showlegend=False
                 ))
 
-        fig_ts.update_layout(**base_layout(xtitle="Distance (km)", ytitle="Time (min)"), height=300)
+        apply_layout(fig_ts, xtitle="Distance (km)", ytitle="Time (min)", height=300)
         st.plotly_chart(fig_ts, use_container_width=True)
 
 
