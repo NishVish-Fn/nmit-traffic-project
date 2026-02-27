@@ -2,17 +2,16 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pydeck as pdk
-import time
 from scipy.optimize import minimize
 
-# --- 1. CORE MATH & OPTIMIZATION ---
+# --- 1. CORE LOGIC (From Project PDF) ---
 class PoliceCommandLogic:
     def __init__(self):
         self.cycle_time = 120 
         self.intersections = {
-            "Silk Board": {"pos": [12.9177, 77.6238], "dist": 0},
-            "HSR Layout": {"pos": [12.9100, 77.6450], "dist": 4000},
-            "Bellandur": {"pos": [12.9260, 77.6762], "dist": 8000}
+            "Silk Board": {"pos": [12.9177, 77.6238]},
+            "HSR Layout": {"pos": [12.9100, 77.6450]},
+            "Bellandur": {"pos": [12.9260, 77.6762]}
         }
 
     def solve_delay_objective(self, densities, em_indices):
@@ -20,16 +19,15 @@ class PoliceCommandLogic:
             weights = np.ones(len(densities))
             for idx in em_indices: 
                 weights[idx] = 1000000 
+            # W = sum(density * weight / green_time)
             return np.sum((densities * weights) / x)
 
         constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.cycle_time})
         bounds = [(15, 90) for _ in range(len(densities))]
-        
-        res = minimize(objective_func, [40]*len(densities), 
-                       method='SLSQP', bounds=bounds, constraints=constraints)
+        res = minimize(objective_func, [40]*len(densities), method='SLSQP', bounds=bounds, constraints=constraints)
         return res.x
 
-# --- 2. THE DASHBOARD UI ---
+# --- 2. DASHBOARD UI ---
 st.set_page_config(page_title="Bangalore Traffic Command Center", layout="wide")
 st.title("🏙️ Bangalore Active Grid Control: Police Dashboard")
 
@@ -41,13 +39,13 @@ if 'cars' not in st.session_state:
 
 logic = PoliceCommandLogic()
 
-# Sidebar
+# Sidebar: Dispatch & Perception Layer
 st.sidebar.header("🚨 Emergency Dispatch")
 em_active = st.sidebar.multiselect("Active Emergency Corridors", list(logic.intersections.keys()))
 em_indices = [list(logic.intersections.keys()).index(name) for name in em_active]
 
-# Processing
-densities = np.array([np.random.randint(40, 90) for _ in range(3)])
+# Processing Layer
+densities = np.array([50, 30, 45])
 optimized_signals = logic.solve_delay_objective(densities, em_indices)
 
 # --- 3. METRICS ---
@@ -59,7 +57,7 @@ with col2:
 with col3:
     st.metric("Ambulance Path Status", "CLEARED" if em_active else "BLOCKED")
 
-# --- 4. MAP ---
+# --- 4. THE MAP (Corrected Data Layers) ---
 car_layer = pdk.Layer(
     "ScatterplotLayer",
     st.session_state.cars,
@@ -68,18 +66,17 @@ car_layer = pdk.Layer(
     get_radius=40,
 )
 
-signal_data = []
+signal_list = []
 for i, (name, info) in enumerate(logic.intersections.items()):
-    is_green = i in em_indices
-    signal_data.append({
+    signal_list.append({
         "name": name,
         "coordinates": [info["pos"][1], info["pos"][0]],
-        "color": [0, 255, 0] if is_green else [255, 0, 0]
+        "color": [0, 255, 0] if i in em_indices else [255, 0, 0]
     })
 
 signal_layer = pdk.Layer(
-    "IconLayer",
-    pd.DataFrame(signal_data),
+    "ScatterplotLayer",
+    pd.DataFrame(signal_list),
     get_position='coordinates',
     get_color='color',
     get_radius=150,
@@ -92,6 +89,5 @@ st.pydeck_chart(pdk.Deck(
 ))
 
 if st.button("🔴 Start Live Feed"):
-    for _ in range(10):
-        st.session_state.cars += np.random.randn(50, 2) / [5000, 5000]
-        st.rerun()
+    st.session_state.cars += np.random.randn(50, 2) / [5000, 5000]
+    st.rerun()
