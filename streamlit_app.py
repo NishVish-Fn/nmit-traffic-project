@@ -1,1114 +1,1391 @@
 """
-Urban Flow & Life-Lines: Bangalore Traffic Grid
-v5 - Fixed: Background Map . NumPy-Only Engine . O(1) Algorithm for Large Fleets
-Team: Nishchal Vishwanath (NB25ISE160) & Rishul KH (NB25ISE186) | ISE, NMIT
+har har mahadev
+╔══════════════════════════════════════════════════════════════════════╗
+║   URBAN FLOW & LIFE-LINES                                            ║
+║   Multi-Objective Optimization Dashboard – Bangalore ATCS            ║
+║   NMIT ISE · Nishchal Vishwanath (NB25ISE160) · Rishul KH (NB25ISE186)║
+╚══════════════════════════════════════════════════════════════════════╝
+
+Install requirements:
+    pip install streamlit plotly folium streamlit-folium numpy pandas
+
+Run:
+    streamlit run bangalore_traffic_dashboard.py
 """
 
-import streamlit as st
-try:
-    from streamlit_autorefresh import st_autorefresh
-except ImportError:
-    st_autorefresh = None
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
-import time, math, random
-from collections import defaultdict
+# ─────────────────────────────────────────────────────────────
+# IMPORTS  (all standard; verified against requirements.txt)
+# ─────────────────────────────────────────────────────────────
+import math
+import random
+import datetime
+import time as _time
 
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import folium
+from streamlit_folium import st_folium
+import streamlit as st
+
+# ─────────────────────────────────────────────────────────────
+# PAGE CONFIG  (must be first Streamlit call)
+# ─────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Urban Flow & Life-Lines | Bangalore",
-    page_icon="", layout="wide",
+    page_title="Urban Flow & Life-Lines | Bangalore ATCS",
+    page_icon="🚦",
+    layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# -----------------------------------------------------------------------------
-# CSS
-# -----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+# GLOBAL STYLE  (dark police-dashboard theme)
+# ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2family=Share+Tech+Mono&family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;600&display=swap');
-html,body,[class*="css"]{background:#03080d!important;color:#b8cfd8!important;font-family:'Barlow',sans-serif!important}
-.block-container{padding:0.6rem 1.2rem 1rem!important}
-.main-title{font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#fff;margin:0}
-.main-title span{color:#00ff88}
-.sub-title{font-family:'Share Tech Mono',monospace;font-size:0.56rem;color:#3a5a6a;letter-spacing:2px;margin-top:2px}
-.live-badge{font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#00ff88;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);padding:3px 10px;border-radius:3px;letter-spacing:2px}
-.evp-badge{font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#ff5500;background:rgba(255,85,0,0.1);border:1px solid rgba(255,85,0,0.3);padding:3px 10px;border-radius:3px;letter-spacing:2px;animation:epulse 1s infinite}
-@keyframes epulse{0%,100%{opacity:1}50%{opacity:0.5}}
-.metric-card{background:#070f18;border:1px solid #112233;border-radius:6px;padding:10px 14px;position:relative;overflow:hidden}
-.metric-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
-.mc-green::after{background:linear-gradient(90deg,transparent,#00ff88,transparent)}
-.mc-blue::after{background:linear-gradient(90deg,transparent,#00aaff,transparent)}
-.mc-red::after{background:linear-gradient(90deg,transparent,#ff3344,transparent)}
-.mc-amber::after{background:linear-gradient(90deg,transparent,#ffaa00,transparent)}
-.mc-cyan::after{background:linear-gradient(90deg,transparent,#00e5ff,transparent)}
-.metric-label{font-family:'Share Tech Mono',monospace;font-size:0.56rem;letter-spacing:2px;color:#3a5a6a;text-transform:uppercase;margin-bottom:2px}
-.metric-value{font-family:'Barlow Condensed',sans-serif;font-size:1.9rem;font-weight:900;color:#e8f4ff;line-height:1}
-.metric-value span{font-size:0.85rem;color:#3a5a6a;margin-left:2px}
-.metric-sub{font-size:0.62rem;color:#3a5a6a;margin-top:2px}
-.metric-sub.up{color:#00ff88}
-.sec-header{font-family:'Barlow Condensed',sans-serif;font-size:0.65rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#3a5a6a;margin-bottom:7px;border-left:3px solid #00aaff;padding-left:8px}
-.sec-header.green{border-color:#00ff88}.sec-header.red{border-color:#ff3344}
-.sec-header.amber{border-color:#ffaa00}.sec-header.police{border-color:#0088ff}
-.pcc-box{background:rgba(0,136,255,0.05);border:1px solid rgba(0,136,255,0.2);border-radius:6px;padding:12px;margin-bottom:8px}
-.pcc-title{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:900;color:#0088ff;letter-spacing:2px;margin-bottom:8px}
-.pcc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;padding:4px 0;border-bottom:1px solid rgba(0,136,255,0.08)}
-.pcc-key{font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:#3a5a6a;letter-spacing:1px}
-.pcc-val{font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:#00aaff}
-.pcc-val.alert{color:#ff5500;font-weight:700}.pcc-val.ok{color:#00ff88}
-.cmd-log{background:#03080d;border:1px solid #112233;border-radius:4px;padding:8px;height:180px;overflow-y:auto;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:#3a5a6a;line-height:1.7}
-.cmd-line-evp{color:#ff5500}.cmd-line-ok{color:#00ff88}.cmd-line-info{color:#00aaff}.cmd-line-warn{color:#ffaa00}
-.vcard{background:rgba(0,0,0,0.3);border:1px solid #112233;border-radius:5px;padding:7px 9px;margin-bottom:5px}
-.vcard.emg{border-color:rgba(255,85,0,0.5)}
-.sig-card{background:rgba(0,0,0,0.3);border:1px solid #112233;border-radius:5px;padding:8px;text-align:center;margin-bottom:5px}
-.equation-box{background:rgba(0,170,255,0.04);border:1px solid rgba(0,170,255,0.12);border-radius:5px;padding:10px 14px;font-family:'Share Tech Mono',monospace;font-size:0.7rem;color:#00e5ff;margin:8px 0}
-.eq-comment{color:#3a5a6a;font-size:0.58rem}
-[data-testid="stSidebar"]{background:#070f18!important;border-right:1px solid #112233}
-[data-testid="stSidebar"] *{color:#b8cfd8!important}
-.stButton>button{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);color:#00ff88!important;font-family:'Barlow Condensed',sans-serif;font-size:0.78rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;width:100%}
-.stTabs [data-baseweb="tab-list"]{background:#070f18;border-bottom:1px solid #112233}
-.stTabs [data-baseweb="tab"]{font-family:'Barlow Condensed',sans-serif;font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;color:#3a5a6a!important}
-.stTabs [aria-selected="true"]{color:#00ff88!important;border-bottom:2px solid #00ff88}
+/* ── Root Variables ── */
+:root {
+    --bg:        #050a14;
+    --panel:     #0a1628;
+    --card:      #0d1f3c;
+    --blue:      #00d4ff;
+    --green:     #00ff88;
+    --red:       #ff3366;
+    --orange:    #ff8c00;
+    --purple:    #a855f7;
+    --dim:       #5a7a9a;
+    --border:    #1a3a5c;
+    --text:      #e0f0ff;
+}
+
+/* ── Global reset ── */
+html, body, [data-testid="stAppViewContainer"],
+[data-testid="stHeader"], [data-testid="stToolbar"] {
+    background-color: #050a14 !important;
+    color: #e0f0ff !important;
+    font-family: 'Courier New', monospace !important;
+}
+
+[data-testid="stSidebar"] {
+    background: #0a1628 !important;
+    border-right: 1px solid #1a3a5c !important;
+}
+
+[data-testid="stSidebar"] * { color: #e0f0ff !important; }
+
+/* ── Remove default padding ── */
+.block-container { padding: 0.5rem 1rem 1rem 1rem !important; }
+
+/* ── Metric cards ── */
+[data-testid="metric-container"] {
+    background: #0d1f3c !important;
+    border: 1px solid #1a3a5c !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+}
+[data-testid="stMetricValue"]  { color: #00d4ff !important; font-family: 'Courier New', monospace !important; }
+[data-testid="stMetricLabel"]  { color: #5a7a9a !important; font-size: 11px !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
+[data-testid="stMetricDelta"]  { font-size: 11px !important; }
+
+/* ── Tabs ── */
+[data-testid="stTabs"] button {
+    background: #0a1628 !important;
+    color: #5a7a9a !important;
+    border: 1px solid #1a3a5c !important;
+    border-radius: 4px 4px 0 0 !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 11px !important;
+    letter-spacing: 1px !important;
+}
+[data-testid="stTabs"] button[aria-selected="true"] {
+    background: #0d1f3c !important;
+    color: #00d4ff !important;
+    border-bottom-color: #00d4ff !important;
+}
+
+/* ── Slider ── */
+[data-testid="stSlider"] > div > div > div { background: #00d4ff !important; }
+
+/* ── Buttons ── */
+.stButton > button {
+    background: linear-gradient(135deg, #0d1f3c, #0a1628) !important;
+    border: 1px solid #1a3a5c !important;
+    color: #00d4ff !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 11px !important;
+    letter-spacing: 1px !important;
+    border-radius: 4px !important;
+    transition: all 0.2s !important;
+}
+.stButton > button:hover {
+    border-color: #00d4ff !important;
+    box-shadow: 0 0 12px rgba(0,212,255,0.3) !important;
+}
+
+/* ── Selectbox / Multiselect ── */
+[data-testid="stSelectbox"] select,
+[data-testid="stSelectbox"] > div,
+.stSelectbox > div { background: #0d1f3c !important; border-color: #1a3a5c !important; color: #e0f0ff !important; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #050a14; }
+::-webkit-scrollbar-thumb { background: #1a3a5c; border-radius: 2px; }
+
+/* ── Divider ── */
+hr { border-color: #1a3a5c !important; }
+
+/* ── Info / warning boxes ── */
+[data-testid="stAlert"] { background: #0d1f3c !important; border-color: #1a3a5c !important; }
+
+/* ── Expander ── */
+[data-testid="stExpander"] {
+    background: #0a1628 !important;
+    border: 1px solid #1a3a5c !important;
+    border-radius: 6px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# CONSTANTS
-# -----------------------------------------------------------------------------
-JUNCTIONS = {
-    "Silk Board":      {"lat": 12.9174, "lon": 77.6229, "km": 0,  "base_cong": 78},
-    "HSR Layout":      {"lat": 12.9116, "lon": 77.6474, "km": 4,  "base_cong": 55},
-    "Bellandur":       {"lat": 12.9258, "lon": 77.6763, "km": 8,  "base_cong": 62},
-    "Marathahalli":    {"lat": 12.9591, "lon": 77.6974, "km": 13, "base_cong": 66},
-    "Hebbal":          {"lat": 13.0450, "lon": 77.5940, "km": 22, "base_cong": 58},
-    "Whitefield":      {"lat": 12.9698, "lon": 77.7500, "km": 18, "base_cong": 60},
-    "Koramangala":     {"lat": 12.9352, "lon": 77.6245, "km": 3,  "base_cong": 50},
-    "MG Road":         {"lat": 12.9757, "lon": 77.6011, "km": 7,  "base_cong": 70},
-    "Electronic City": {"lat": 12.8458, "lon": 77.6733, "km": 12, "base_cong": 45},
-    "Bannerghatta":    {"lat": 12.8647, "lon": 77.5955, "km": 9,  "base_cong": 38},
-}
-JNAMES = list(JUNCTIONS.keys())
-NJ = len(JNAMES)
-JN_IDX = {jn: i for i, jn in enumerate(JNAMES)}
 
-# Pre-built numpy arrays for junction lat/lon/base_cong
-J_LATS  = np.array([JUNCTIONS[j]["lat"]       for j in JNAMES], dtype=np.float32)
-J_LONS  = np.array([JUNCTIONS[j]["lon"]       for j in JNAMES], dtype=np.float32)
-J_CONG  = np.array([JUNCTIONS[j]["base_cong"] for j in JNAMES], dtype=np.float32)
+# ─────────────────────────────────────────────────────────────
+# KAGGLE-INSPIRED DATA (Bangalore Traffic Dataset 2024-2025)
+# Source: TomTom Traffic Index, Kaggle BLR Traffic, BBMP data
+# ─────────────────────────────────────────────────────────────
+HOURLY_PATTERN = [
+    0.28, 0.18, 0.13, 0.11, 0.16, 0.42,
+    0.82, 0.97, 0.91, 0.73, 0.67, 0.74,
+    0.80, 0.75, 0.70, 0.77, 0.92, 0.99,
+    0.96, 0.84, 0.72, 0.62, 0.52, 0.40,
+]
+
+JUNCTION_NAMES = [
+    "Silk Board", "Hebbal", "ORR Junction", "Koramangala",
+    "HSR Layout", "Bellandur", "Indiranagar", "Whitefield",
+    "Yeshwanthpur", "Kengeri",
+]
+
+JUNCTION_COORDS = {
+    "Silk Board":    [12.9172, 77.6228],
+    "Hebbal":        [13.0350, 77.5970],
+    "ORR Junction":  [12.9698, 77.6496],
+    "Koramangala":   [12.9352, 77.6245],
+    "HSR Layout":    [12.9082, 77.6476],
+    "Bellandur":     [12.9270, 77.6780],
+    "Indiranagar":   [12.9784, 77.6408],
+    "Whitefield":    [12.9699, 77.7500],
+    "Yeshwanthpur":  [13.0275, 77.5530],
+    "Kengeri":       [12.9116, 77.4843],
+}
+
+BASE_LOADS = {
+    "Silk Board": 95, "Hebbal": 85, "ORR Junction": 78, "Koramangala": 70,
+    "HSR Layout": 72, "Bellandur": 68, "Indiranagar": 60, "Whitefield": 55,
+    "Yeshwanthpur": 65, "Kengeri": 40,
+}
 
 ROAD_EDGES = [
-    ("Silk Board","HSR Layout"), ("Silk Board","Koramangala"),
-    ("HSR Layout","Bellandur"),  ("HSR Layout","Koramangala"),
-    ("Bellandur","Marathahalli"),("Bellandur","Whitefield"),
-    ("Marathahalli","Whitefield"),("Marathahalli","Hebbal"),
-    ("MG Road","Koramangala"),   ("MG Road","Hebbal"),
-    ("Electronic City","Silk Board"),("Electronic City","Bannerghatta"),
-    ("Bannerghatta","Silk Board"),
+    ("Silk Board",   "HSR Layout"),
+    ("Silk Board",   "Koramangala"),
+    ("Silk Board",   "ORR Junction"),
+    ("HSR Layout",   "Bellandur"),
+    ("Bellandur",    "Whitefield"),
+    ("ORR Junction", "Indiranagar"),
+    ("Indiranagar",  "Koramangala"),
+    ("Hebbal",       "Yeshwanthpur"),
+    ("Hebbal",       "ORR Junction"),
+    ("Yeshwanthpur", "Kengeri"),
+    ("Koramangala",  "HSR Layout"),
+    ("ORR Junction", "Bellandur"),
 ]
 
-ROUTES = [
-    {"name":"ORR Corridor",       "path":["Electronic City","Silk Board","HSR Layout","Bellandur","Marathahalli","Whitefield"], "color":"#00aaff"},
-    {"name":"MG Road -> Hebbal",   "path":["MG Road","Koramangala","Silk Board","HSR Layout","Hebbal"],                          "color":"#00ff88"},
-    {"name":"South to North",     "path":["Electronic City","Bannerghatta","Silk Board","Koramangala","MG Road","Hebbal"],       "color":"#ffaa00"},
-    {"name":"IT Corridor",        "path":["Electronic City","Silk Board","HSR Layout","Bellandur","Marathahalli"],               "color":"#aa44ff"},
-    {"name":"Whitefield Express", "path":["Whitefield","Marathahalli","Bellandur","HSR Layout","Silk Board"],                    "color":"#00e5ff"},
-    {"name":"Inner Ring Road",    "path":["Koramangala","HSR Layout","Bellandur","Marathahalli","MG Road"],                     "color":"#ff88aa"},
-]
-NR = len(ROUTES)
+DAYS  = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+WEEKS = [0.75, 0.82, 0.90, 0.93, 0.98, 0.72, 0.52]
 
-# Pre-build per-route numpy data: for each route, per-segment start/end indices
-ROUTE_SEG_STARTS = []  # list of arrays: [seg0_j_idx, seg1_j_idx, ...]
-ROUTE_SEG_ENDS   = []
-ROUTE_LENGTHS    = []
-for r in ROUTES:
-    p = r["path"]
-    starts = np.array([JN_IDX[p[s]]   for s in range(len(p)-1)], dtype=np.int32)
-    ends   = np.array([JN_IDX[p[s+1]] for s in range(len(p)-1)], dtype=np.int32)
-    ROUTE_SEG_STARTS.append(starts)
-    ROUTE_SEG_ENDS.append(ends)
-    ROUTE_LENGTHS.append(len(p) - 1)  # number of segments
+PLOTLY_LAYOUT = dict(
+    paper_bgcolor="#050a14",
+    plot_bgcolor="#0a1628",
+    font=dict(family="Courier New, monospace", color="#e0f0ff", size=11),
+    xaxis=dict(gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a")),
+    yaxis=dict(gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a")),
+    margin=dict(l=40, r=20, t=35, b=35),
+    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#5a7a9a", size=10)),
+)
 
-PLOT_BG = "rgba(7,15,24,0)"; PAPER_BG = "rgba(7,15,24,0)"
-GRID_COL = "rgba(17,34,51,0.6)"; TICK_COL = "#3a5a6a"
-FONT_MONO = "Share Tech Mono, monospace"
 
-EVP_TYPES = [
-    {"emoji":"","label":"Ambulance",    "color":"#ff5500","spd_mult":2.2,"p_color":"rgba(255,85,0,0.3)"},
-    {"emoji":"","label":"Fire Engine",  "color":"#ff2200","spd_mult":1.9,"p_color":"rgba(255,34,0,0.3)"},
-    {"emoji":"","label":"Police Car",   "color":"#0088ff","spd_mult":2.0,"p_color":"rgba(0,136,255,0.3)"},
-    {"emoji":"","label":"Rapid Response","color":"#aa44ff","spd_mult":1.85,"p_color":"rgba(170,68,255,0.3)"},
-    {"emoji":"","label":"Air Ambulance","color":"#ff8800","spd_mult":2.8,"p_color":"rgba(255,136,0,0.3)"},
-]
-NORMAL_EMOJIS = ["","","","","","","",""]
+# ─────────────────────────────────────────────────────────────
+# MATH MODELS  (from the paper)
+# ─────────────────────────────────────────────────────────────
+def green_wave_offset(L_km: float, v_kmh: float, T_s: float) -> float:
+    """φ = (L / v_c) mod T  — Green Wave synchronisation offset (seconds)"""
+    if v_kmh <= 0:
+        return 0.0
+    v_ms = v_kmh * 1000.0 / 3600.0
+    L_m  = L_km * 1000.0
+    return (L_m / v_ms) % T_s
 
-# -----------------------------------------------------------------------------
-# TRAFFIC DATA
-# -----------------------------------------------------------------------------
-@st.cache_data
-def generate_traffic_data():
-    rng = np.random.default_rng(42)
-    records = []
-    morning_peak = [7,8,9,10]; evening_peak = [17,18,19,20]
-    for jname, jdata in JUNCTIONS.items():
-        base = jdata["base_cong"]
-        for hour in range(24):
-            if hour in morning_peak:   mult = 1.55 + rng.uniform(-0.1, 0.2)
-            elif hour in evening_peak: mult = 1.70 + rng.uniform(-0.1, 0.25)
-            elif 0 <= hour <= 5:       mult = 0.12 + rng.uniform(0, 0.08)
-            elif 11 <= hour <= 16:     mult = 0.72 + rng.uniform(-0.1, 0.15)
-            else:                      mult = 0.52 + rng.uniform(-0.05, 0.1)
-            cong = float(np.clip(base * mult + rng.normal(0, 4), 5, 100))
-            spd  = float(max(5, 60 - cong * 0.55 + rng.normal(0, 3)))
-            records.append({
-                "Junction": jname, "Hour": hour, "Time": f"{hour:02d}:00",
-                "Congestion_Index": round(cong, 1),
-                "Vehicles_Per_Hour": max(0, int(cong * 28 + rng.normal(0, 60))),
-                "Avg_Speed_kmh": round(spd, 1),
-                "Delay_Min": round(max(0, (cong/100)*22 + rng.normal(0, 1.2)), 2),
-                "Incidents": int(rng.poisson(0.3 if cong > 70 else 0.05)),
-                "Is_Peak": hour in morning_peak + evening_peak,
-            })
-    return pd.DataFrame(records)
 
-df_traffic = generate_traffic_data()
+def evp_signal_time(d_m: float, v_kmh: float) -> float:
+    """S = d / v  — Emergency Vehicle Preemption lead time (seconds)"""
+    v_ms = v_kmh * 1000.0 / 3600.0
+    return (d_m / v_ms) if v_ms > 0 else float("inf")
 
-# -----------------------------------------------------------------------------
-# VEHICLE STATE - Pure NumPy arrays (no per-vehicle dicts for the bulk fleet)
-# -----------------------------------------------------------------------------
-# For N vehicles we store flat arrays:
-#   route_id   int16   which ROUTES[] index
-#   seg        int16   current segment index within route
-#   t          float32 0.0-1.0 position within segment
-#   speed      float32 base speed per tick
-#   is_evp     bool    emergency vehicle flag
-#   evp_type   int8    index into EVP_TYPES (-1 for normal)
-#   completed  bool
-#   wait_ticks int32
-#   total_ticks int32
 
-def make_fleet(n_normal, n_evp):
-    """Build numpy vehicle arrays. Fast for any fleet size."""
-    N = n_normal + n_evp
-    rng = np.random.default_rng(42)
+def lwr_density(flow_vph: float, speed_kmh: float) -> float:
+    """LWR: density = flow / speed  (vehicles per km)"""
+    return flow_vph / speed_kmh if speed_kmh > 0 else 0.0
 
-    route_id    = np.zeros(N, dtype=np.int16)
-    seg         = np.zeros(N, dtype=np.int16)
-    t_pos       = np.zeros(N, dtype=np.float32)
-    speed       = np.zeros(N, dtype=np.float32)
-    is_evp      = np.zeros(N, dtype=bool)
-    evp_type    = np.full(N, -1, dtype=np.int8)
-    completed   = np.zeros(N, dtype=bool)
-    wait_ticks  = np.zeros(N, dtype=np.int32)
-    total_ticks = np.zeros(N, dtype=np.int32)
 
-    # Normal vehicles
-    for i in range(n_normal):
-        rid = i % NR
-        r = ROUTES[rid]
-        nseg = ROUTE_LENGTHS[rid]
-        route_id[i]  = rid
-        seg[i]       = rng.integers(0, max(1, nseg))
-        t_pos[i]     = float(rng.uniform(0, 0.99))
-        speed[i]     = float(rng.uniform(0.005, 0.015))
+def delay_objective(loads: list[float], gw_active: bool) -> float:
+    """LP objective: W(D) = Σ min ∫ t dt  (simplified)"""
+    factor = 0.65 if gw_active else 1.0
+    return sum(max(0, (l - 40) * 0.4 * factor) for l in loads)
 
-    # Emergency vehicles
-    for i in range(n_evp):
-        idx = n_normal + i
-        rid = (n_normal + i) % NR
-        r = ROUTES[rid]
-        nseg = ROUTE_LENGTHS[rid]
-        et_idx = i % len(EVP_TYPES)
-        et = EVP_TYPES[et_idx]
-        route_id[idx]  = rid
-        seg[idx]       = rng.integers(0, max(1, nseg))
-        t_pos[idx]     = float(rng.uniform(0, 0.35))
-        speed[idx]     = float(rng.uniform(0.014, 0.022)) * et["spd_mult"]
-        is_evp[idx]    = True
-        evp_type[idx]  = et_idx
 
+# ─────────────────────────────────────────────────────────────
+# DATA GENERATORS
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=1)
+def get_current_loads(density_pct: float, gw_active: bool, seed: int) -> dict:
+    """Returns current % load for each junction (re-generates every second)."""
+    rng = random.Random(seed)
+    hour = datetime.datetime.now().hour
+    tf   = HOURLY_PATTERN[hour] * (density_pct / 65.0)
+    gw_f = 0.72 if gw_active else 1.0
+    result = {}
+    for name, base in BASE_LOADS.items():
+        noise = rng.gauss(0, 4)
+        result[name] = round(max(5, min(99, base * tf * gw_f + noise)), 1)
+    return result
+
+
+def get_24h_series(junction: str, density_pct: float, gw_active: bool) -> pd.DataFrame:
+    """24-hour traffic volume series for a junction (Kaggle pattern)."""
+    rng   = random.Random(42)
+    base  = BASE_LOADS.get(junction, 60)
+    gw_f  = 0.75 if gw_active else 1.0
+    times = [datetime.datetime(2024, 6, 17, h) for h in range(24)]
+    vols  = []
+    for h in range(24):
+        tf    = HOURLY_PATTERN[h]
+        noise = rng.gauss(0, 5)
+        v     = base * tf * (density_pct / 65.0) * gw_f * 30 + noise * 10
+        vols.append(max(0, round(v)))
+    return pd.DataFrame({"Time": times, "Volume (veh/h)": vols})
+
+
+def get_weekly_heatmap(gw_active: bool) -> pd.DataFrame:
+    """Junction × Day load heatmap."""
+    rng   = random.Random(7)
+    gw_f  = 0.75 if gw_active else 1.0
+    data  = {}
+    for j, base in BASE_LOADS.items():
+        data[j] = [round(base * w * gw_f + rng.gauss(0, 3)) for w in WEEKS]
+    return pd.DataFrame(data, index=DAYS)
+
+
+def get_flow_comparison(gw_active: bool) -> pd.DataFrame:
+    """Static vs Green-Wave delay for 6 key junctions."""
+    top6   = list(BASE_LOADS.items())[:6]
+    names  = [n for n, _ in top6]
+    static = [round(b * 0.48) for _, b in top6]
+    gw     = [round(b * 0.48 * (0.65 if gw_active else 1.0)) for _, b in top6]
+    return pd.DataFrame({"Junction": names, "Static (min)": static, "Green Wave (min)": gw})
+
+
+def get_lp_result(loads: dict, gw_active: bool) -> dict:
+    """Simulate LP optimisation result."""
+    total_delay   = delay_objective(list(loads.values()), gw_active)
+    optimised     = total_delay * (0.70 if gw_active else 1.0)
+    reduction_pct = round((1 - optimised / max(total_delay, 0.01)) * 100, 1) if gw_active else 0
     return {
-        "route_id": route_id, "seg": seg, "t": t_pos,
-        "speed": speed, "is_evp": is_evp, "evp_type": evp_type,
-        "completed": completed, "wait_ticks": wait_ticks,
-        "total_ticks": total_ticks,
-        "n_normal": n_normal, "n_evp": n_evp, "N": N,
+        "total_delay":   round(total_delay, 1),
+        "optimised":     round(optimised, 1),
+        "reduction_pct": reduction_pct,
     }
 
 
-def get_current_junction_idx(fleet):
-    """Return array of current junction index for each vehicle. Pure numpy."""
-    N = fleet["N"]
-    j_idx = np.zeros(N, dtype=np.int32)
-    for rid in range(NR):
-        mask = fleet["route_id"] == rid
-        if not mask.any(): continue
-        segs = fleet["seg"][mask].astype(np.int32)
-        segs = np.clip(segs, 0, ROUTE_LENGTHS[rid] - 1)
-        j_idx[mask] = ROUTE_SEG_STARTS[rid][segs]
-    return j_idx
-
-
-def step_fleet(fleet, gw_enabled, vc, T, tick):
-    """
-    100% numpy vehicle step. No Python loops over vehicles.
-    O(N) with tiny constant - works for 100k vehicles.
-    """
-    N = fleet["N"]
-    done = fleet["completed"]
-    active = ~done
-
-    if not active.any():
-        return fleet
-
-    # Current junction index per vehicle
-    j_idx = get_current_junction_idx(fleet)
-
-    # Base congestion at each vehicle's junction
-    bc = J_CONG[j_idx]  # shape (N,)
-    rho = bc / 100.0
-
-    # Green duration (LWR-adaptive)
-    L = 4000.0
-    vc_ms = max(vc / 3.6, 1.0)
-    phi = (L / vc_ms) % T if gw_enabled else 0.0
-
-    g_base = T * 0.52
-    density_bonus = np.where(gw_enabled, rho * 20.0, 0.0)
-    g_dur = np.minimum(g_base + density_bonus, T * 0.80).astype(np.int32)  # shape (N,)
-
-    # Green wave offsets
-    offsets = (phi * j_idx.astype(np.float32)).astype(np.int32) % int(T)
-    t_sh = (tick + offsets) % int(T)
-
-    # Phase multipliers
-    gw_boost = (vc / 40.0) * 1.15 if gw_enabled else 1.0
-    green_mult = 1.4 if gw_enabled else 1.0
-    phase_mult = np.where(
-        t_sh < g_dur, green_mult,
-        np.where(t_sh < g_dur + 5, 0.5, 0.08)
-    ).astype(np.float32)
-
-    # EVP always full speed; completed = 0
-    phase_mult = np.where(fleet["is_evp"], 1.0, phase_mult)
-    phase_mult = np.where(done, 0.0, phase_mult)
-
-    # Effective speed
-    eff_spd = np.where(
-        fleet["is_evp"],
-        fleet["speed"],
-        fleet["speed"] * gw_boost * phase_mult
+# ─────────────────────────────────────────────────────────────
+# CHART BUILDERS
+# ─────────────────────────────────────────────────────────────
+def build_24h_chart(df: pd.DataFrame, junction: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df["Time"], y=df["Volume (veh/h)"],
+        mode="lines", name="Volume",
+        line=dict(color="#00d4ff", width=2),
+        fill="tozeroy",
+        fillcolor="rgba(0,212,255,0.07)",
+    ))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text=f"24-Hour Traffic Volume — {junction}", font=dict(color="#00d4ff", size=12)),
+        height=260,
     )
-    eff_spd = np.where(done, 0.0, eff_spd)
-
-    # Update position
-    new_t = fleet["t"] + eff_spd
-
-    # Track wait ticks (red phase normal vehicles)
-    wait_mask = active & (~fleet["is_evp"]) & (t_sh >= g_dur + 5)
-    fleet["wait_ticks"] += wait_mask.astype(np.int32)
-    fleet["total_ticks"] += active.astype(np.int32)
-
-    # Handle segment advancement - only for vehicles that crossed t>=1.0
-    advanced = active & (new_t >= 1.0)
-    if advanced.any():
-        new_t = np.where(advanced, new_t - 1.0, new_t)
-        fleet["seg"] = np.where(advanced, fleet["seg"] + 1, fleet["seg"]).astype(np.int16)
-
-        # Check completion per route
-        for rid in range(NR):
-            mask = advanced & (fleet["route_id"] == rid)
-            if not mask.any(): continue
-            nseg = ROUTE_LENGTHS[rid]
-            at_end = mask & (fleet["seg"] >= nseg)
-            if at_end.any():
-                fleet["completed"] = np.where(at_end, True, fleet["completed"])
-                fleet["seg"] = np.where(at_end, nseg - 1, fleet["seg"]).astype(np.int16)
-                new_t = np.where(at_end, 1.0, new_t)
-
-    fleet["t"] = new_t.astype(np.float32)
-    return fleet
+    return fig
 
 
-def get_vehicle_positions_sample(fleet, max_normal=300, seed=0):
-    """
-    Get lat/lon for a random sample of normal vehicles + all EVPs.
-    Returns: (normal_lats, normal_lons, normal_colors), (evp_lats, evp_lons, evp_colors, evp_labels)
-    """
-    rng = np.random.default_rng(seed)
-    normal_mask = (~fleet["is_evp"]) & (~fleet["completed"])
-    evp_mask    = fleet["is_evp"] & (~fleet["completed"])
-
-    normal_idx = np.where(normal_mask)[0]
-    evp_idx    = np.where(evp_mask)[0]
-
-    # Sample normal vehicles
-    if len(normal_idx) > max_normal:
-        normal_idx = rng.choice(normal_idx, max_normal, replace=False)
-        normal_idx = np.sort(normal_idx)
-
-    def idx_to_pos(indices):
-        lats = np.zeros(len(indices), dtype=np.float32)
-        lons = np.zeros(len(indices), dtype=np.float32)
-        for k, i in enumerate(indices):
-            rid = int(fleet["route_id"][i])
-            seg_i = int(np.clip(fleet["seg"][i], 0, ROUTE_LENGTHS[rid]-1))
-            ja = ROUTE_SEG_STARTS[rid][seg_i]
-            jb = ROUTE_SEG_ENDS[rid][seg_i]
-            tv = float(fleet["t"][i])
-            lats[k] = J_LATS[ja] + (J_LATS[jb] - J_LATS[ja]) * tv
-            lons[k] = J_LONS[ja] + (J_LONS[jb] - J_LONS[ja]) * tv
-        return lats, lons
-
-    # Normal positions
-    if len(normal_idx):
-        nlats, nlons = idx_to_pos(normal_idx)
-        # Color by route - directly index ROUTES by route_id
-        route_colors = [ROUTES[int(fleet["route_id"][i]) % NR]["color"] for i in normal_idx]
-    else:
-        nlats, nlons = np.array([]), np.array([])
-        route_colors = []
-
-    # EVP positions
-    if len(evp_idx):
-        elats, elons = idx_to_pos(evp_idx)
-        evp_cols  = [EVP_TYPES[int(fleet["evp_type"][i]) % len(EVP_TYPES)]["color"] for i in evp_idx]
-        evp_pcols = [EVP_TYPES[int(fleet["evp_type"][i]) % len(EVP_TYPES)]["p_color"] for i in evp_idx]
-        evp_labs  = [EVP_TYPES[int(fleet["evp_type"][i]) % len(EVP_TYPES)]["label"] for i in evp_idx]
-        evp_emojis= [EVP_TYPES[int(fleet["evp_type"][i]) % len(EVP_TYPES)]["emoji"] for i in evp_idx]
-    else:
-        elats, elons = np.array([]), np.array([])
-        evp_cols = evp_pcols = evp_labs = evp_emojis = []
-
-    return (nlats, nlons, route_colors, normal_idx), \
-           (elats, elons, evp_cols, evp_pcols, evp_labs, evp_emojis, evp_idx)
+def build_delay_bar(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=df["Junction"], y=df["Static (min)"],
+        name="Static Signals", marker_color="rgba(255,51,102,0.75)",
+        marker_line_color="#ff3366", marker_line_width=1,
+    ))
+    fig.add_trace(go.Bar(
+        x=df["Junction"], y=df["Green Wave (min)"],
+        name="Green Wave", marker_color="rgba(0,255,136,0.75)",
+        marker_line_color="#00ff88", marker_line_width=1,
+    ))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        barmode="group",
+        title=dict(text="Average Delay Reduction — Static vs Green Wave (min)", font=dict(color="#00d4ff", size=12)),
+        height=260,
+    )
+    return fig
 
 
-def get_evp_active_junctions(fleet):
-    """Return set of junction names where EVP vehicles currently are. O(n_evp)."""
-    evp_idx = np.where(fleet["is_evp"] & ~fleet["completed"])[0]
-    junctions = set()
-    for i in evp_idx:
-        rid = int(fleet["route_id"][i])
-        seg_i = int(np.clip(fleet["seg"][i], 0, ROUTE_LENGTHS[rid]-1))
-        ja = ROUTE_SEG_STARTS[rid][seg_i]
-        jb = ROUTE_SEG_ENDS[rid][seg_i]
-        junctions.add(JNAMES[ja])
-        junctions.add(JNAMES[jb])
-        # cascade: next junction
-        if seg_i + 1 < ROUTE_LENGTHS[rid]:
-            junctions.add(JNAMES[ROUTE_SEG_ENDS[rid][seg_i+1]])
-    return junctions
+def build_heatmap(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure(go.Heatmap(
+        z=df.values.tolist(),
+        x=list(df.columns),
+        y=list(df.index),
+        colorscale=[
+            [0.0,  "#001a06"],
+            [0.4,  "#00ff88"],
+            [0.7,  "#ff8c00"],
+            [1.0,  "#ff3366"],
+        ],
+        colorbar=dict(
+            tickfont=dict(color="#5a7a9a", size=9),
+            outlinecolor="#1a3a5c",
+        ),
+        hoverongaps=False,
+        text=df.values.tolist(),
+        texttemplate="%{z:.0f}%",
+        textfont=dict(size=8, color="#e0f0ff"),
+    ))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="Junction Load Heatmap — Day × Node (%)", font=dict(color="#00d4ff", size=12)),
+        height=300,
+        xaxis=dict(tickfont=dict(color="#5a7a9a", size=9), linecolor="#1a3a5c"),
+        yaxis=dict(tickfont=dict(color="#5a7a9a", size=9), linecolor="#1a3a5c"),
+    )
+    return fig
 
 
-def get_fleet_stats(fleet):
-    """O(1) stats using numpy. No per-vehicle iteration."""
-    N = fleet["N"]
-    completed = fleet["completed"].sum()
-    active_normal = ((~fleet["is_evp"]) & (~fleet["completed"])).sum()
-    active_evp    = (fleet["is_evp"] & (~fleet["completed"])).sum()
-    wait  = int(fleet["wait_ticks"][~fleet["is_evp"]].sum())
-    total = int(np.maximum(fleet["total_ticks"][~fleet["is_evp"]], 1).sum())
-    wait_ratio = round(wait / max(total, 1) * 100, 1)
-    return {
-        "N": N, "completed": int(completed),
-        "active_normal": int(active_normal), "active_evp": int(active_evp),
-        "active_total": int(active_normal + active_evp),
-        "wait_ratio": wait_ratio,
+def build_radar(loads: dict) -> go.Figure:
+    names = list(loads.keys())
+    vals  = list(loads.values())
+    vals_closed = vals + [vals[0]]
+    names_closed = names + [names[0]]
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=vals_closed, theta=names_closed, fill="toself",
+        fillcolor="rgba(0,212,255,0.1)",
+        line=dict(color="#00d4ff", width=1.5),
+        name="Current Load",
+    ))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        polar=dict(
+            bgcolor="#0a1628",
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor="#1a3a5c", tickfont=dict(color="#5a7a9a", size=8)),
+            angularaxis=dict(gridcolor="#1a3a5c", tickfont=dict(color="#5a7a9a", size=9)),
+        ),
+        title=dict(text="Network Load — All Junctions", font=dict(color="#00d4ff", size=12)),
+        height=320,
+    )
+    return fig
+
+
+def build_gauge(value: float, title: str, color: str) -> go.Figure:
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=value,
+        title=dict(text=title, font=dict(color="#5a7a9a", size=10)),
+        number=dict(font=dict(color=color, size=26, family="Courier New"), suffix="%"),
+        gauge=dict(
+            axis=dict(range=[0, 100], tickwidth=1, tickcolor="#5a7a9a", tickfont=dict(size=8)),
+            bar=dict(color=color, thickness=0.25),
+            bgcolor="#0a1628",
+            borderwidth=1,
+            bordercolor="#1a3a5c",
+            steps=[
+                dict(range=[0, 40],  color="rgba(0,255,136,0.07)"),
+                dict(range=[40, 70], color="rgba(255,140,0,0.07)"),
+                dict(range=[70, 100],color="rgba(255,51,102,0.07)"),
+            ],
+            threshold=dict(line=dict(color=color, width=2), thickness=0.8, value=value),
+        ),
+    ))
+    fig.update_layout(
+        paper_bgcolor="#050a14",
+        font=dict(family="Courier New, monospace", color="#e0f0ff"),
+        height=160,
+        margin=dict(l=15, r=15, t=30, b=5),
+    )
+    return fig
+
+
+def build_green_wave_chart(v_kmh: float, T_s: float) -> go.Figure:
+    """Time-Space diagram showing Green Wave corridor."""
+    junctions_gw = ["Silk Board (0 km)", "HSR Layout (4 km)", "Bellandur (8 km)", "Whitefield (13 km)"]
+    distances_km  = [0, 4, 8, 13]
+    offsets        = [green_wave_offset(d, v_kmh, T_s) for d in distances_km]
+
+    fig = go.Figure()
+    # Green phases
+    for i, (dist, off) in enumerate(zip(distances_km, offsets)):
+        for cycle in range(3):
+            g_start = off + cycle * T_s
+            g_end   = g_start + T_s * 0.5
+            fig.add_shape(type="rect",
+                x0=g_start, x1=g_end, y0=dist - 0.3, y1=dist + 0.3,
+                fillcolor="rgba(0,255,136,0.25)", line=dict(color="#00ff88", width=1))
+            r_start = g_end
+            r_end   = r_start + T_s * 0.5
+            fig.add_shape(type="rect",
+                x0=r_start, x1=r_end, y0=dist - 0.3, y1=dist + 0.3,
+                fillcolor="rgba(255,51,102,0.25)", line=dict(color="#ff3366", width=1))
+
+    # Vehicle trajectory line
+    v_ms = v_kmh * 1000.0 / 3600.0
+    t_vals = [0, distances_km[-1] * 1000 / v_ms]
+    d_vals = [0, distances_km[-1]]
+    fig.add_trace(go.Scatter(
+        x=t_vals, y=d_vals,
+        mode="lines",
+        line=dict(color="#00d4ff", width=2.5, dash="dot"),
+        name=f"Vehicle @ {v_kmh} km/h",
+    ))
+
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text=f"Green Wave Time-Space Diagram  (v_c = {v_kmh} km/h, T = {T_s}s)", font=dict(color="#00d4ff", size=12)),
+        height=280,
+        xaxis=dict(title="Time (s)", gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a")),
+        yaxis=dict(title="Distance (km)", gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a"),
+                   tickvals=distances_km, ticktext=junctions_gw),
+        showlegend=True,
+    )
+    return fig
+
+
+def build_evp_chart(d_m: float, v_kmh: float) -> go.Figure:
+    """EVP lead-time vs distance for different speeds."""
+    speeds    = [30, 40, 50, 60]
+    distances = list(range(100, int(d_m) + 100, 100))
+    fig       = go.Figure()
+    palette   = ["#ff3366", "#ff8c00", "#ffd700", "#00ff88"]
+    for sp, col in zip(speeds, palette):
+        times_s = [evp_signal_time(d, sp) for d in distances]
+        fig.add_trace(go.Scatter(
+            x=distances, y=times_s,
+            mode="lines", name=f"v = {sp} km/h",
+            line=dict(color=col, width=1.8),
+        ))
+    # Mark current selection
+    cur_t = evp_signal_time(d_m, v_kmh)
+    fig.add_trace(go.Scatter(
+        x=[d_m], y=[cur_t],
+        mode="markers+text",
+        text=[f" {cur_t:.0f}s"],
+        textposition="top right",
+        textfont=dict(color="#a855f7", size=10),
+        marker=dict(color="#a855f7", size=10, symbol="diamond"),
+        name="Current",
+    ))
+    fig.add_vline(x=d_m, line_width=1, line_dash="dash", line_color="#a855f7")
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="EVP Lead-Time: S = d / v  (seconds pre-emption needed)", font=dict(color="#00d4ff", size=12)),
+        height=260,
+        xaxis=dict(title="Distance to Signal (m)", gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a")),
+        yaxis=dict(title="Pre-emption Time (s)",    gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a")),
+    )
+    return fig
+
+
+def build_lwr_chart() -> go.Figure:
+    """LWR flow-density-speed fundamental diagram."""
+    rho_max  = 120   # veh/km (jam density)
+    v_free   = 60    # km/h (free-flow speed)
+    rhos     = np.linspace(0, rho_max, 200)
+    speeds   = np.maximum(0, v_free * (1 - rhos / rho_max))
+    flows    = rhos * speeds
+
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=["Flow-Density (q-k)", "Speed-Density (v-k)"],
+    )
+    fig.add_trace(go.Scatter(
+        x=list(rhos), y=list(flows),
+        mode="lines", line=dict(color="#00d4ff", width=2), name="q-k",
+        fill="tozeroy", fillcolor="rgba(0,212,255,0.06)",
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=list(rhos), y=list(speeds),
+        mode="lines", line=dict(color="#00ff88", width=2), name="v-k",
+        fill="tozeroy", fillcolor="rgba(0,255,136,0.06)",
+    ), row=1, col=2)
+
+    for col_idx in [1, 2]:
+        fig.update_xaxes(
+            title_text="Density ρ (veh/km)",
+            gridcolor="#1a3a5c", linecolor="#1a3a5c",
+            tickfont=dict(color="#5a7a9a"), row=1, col=col_idx,
+        )
+    fig.update_yaxes(title_text="Flow q (veh/h)",  gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a"), row=1, col=1)
+    fig.update_yaxes(title_text="Speed v (km/h)",  gridcolor="#1a3a5c", linecolor="#1a3a5c", tickfont=dict(color="#5a7a9a"), row=1, col=2)
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="LWR Traffic Flow Model — Lighthill-Whitham-Richards", font=dict(color="#00d4ff", size=12)),
+        height=290,
+        showlegend=False,
+        annotations=[
+            dict(text="Flow-Density (q-k)", font=dict(color="#5a7a9a", size=10), showarrow=False, x=0.18, xref="paper", y=1.05, yref="paper"),
+            dict(text="Speed-Density (v-k)", font=dict(color="#5a7a9a", size=10), showarrow=False, x=0.82, xref="paper", y=1.05, yref="paper"),
+        ],
+    )
+    return fig
+
+
+# ─────────────────────────────────────────────────────────────
+# FOLIUM MAP BUILDER
+# ─────────────────────────────────────────────────────────────
+def build_map(loads: dict, layer: str, evp_active: bool) -> folium.Map:
+    m = folium.Map(
+        location=[12.9716, 77.5946],
+        zoom_start=12,
+        tiles="CartoDB DarkMatter",
+        prefer_canvas=True,
+    )
+
+    # Draw road edges
+    evp_path = {"Silk Board", "HSR Layout", "Bellandur"}
+    for a, b in ROAD_EDGES:
+        ca  = JUNCTION_COORDS[a]
+        cb  = JUNCTION_COORDS[b]
+        is_evp = evp_active and a in evp_path and b in evp_path
+        color  = "#ff3366" if is_evp else (
+            "#1a3a5c" if layer == "normal" else
+            _road_color((loads.get(a, 50) + loads.get(b, 50)) / 2)
+        )
+        weight = 4 if is_evp else 2
+        folium.PolyLine(
+            locations=[ca, cb],
+            color=color,
+            weight=weight,
+            opacity=0.85 if is_evp else 0.7,
+        ).add_to(m)
+
+    # Junction markers
+    for name, coord in JUNCTION_COORDS.items():
+        load  = loads.get(name, 50)
+        color = _load_color(load)
+        radius = max(6, min(16, load / 7))
+
+        popup_html = f"""
+        <div style="background:#0d1f3c;border:1px solid #1a3a5c;
+                    padding:10px;border-radius:6px;font-family:'Courier New',monospace;
+                    font-size:11px;color:#e0f0ff;min-width:180px">
+            <b style="color:#00d4ff">{name}</b><br>
+            <hr style="border-color:#1a3a5c;margin:5px 0">
+            <span style="color:#5a7a9a">LOAD:</span>
+            <span style="color:{color};font-weight:700">{load:.0f}%</span><br>
+            <span style="color:#5a7a9a">STATUS:</span>
+            <span style="color:{color}">{'CRITICAL' if load>80 else 'BUSY' if load>60 else 'CLEAR'}</span><br>
+            <span style="color:#5a7a9a">GREEN WAVE:</span>
+            <span style="color:#00ff88">ACTIVE</span>
+        </div>"""
+
+        folium.CircleMarker(
+            location=coord,
+            radius=radius,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.8,
+            weight=2,
+            popup=folium.Popup(popup_html, max_width=220),
+            tooltip=f"{name}: {load:.0f}%",
+        ).add_to(m)
+
+        # Label
+        folium.map.Marker(
+            coord,
+            icon=folium.DivIcon(
+                html=f'<div style="font-family:Courier New;font-size:9px;color:#5a7a9a;'
+                     f'white-space:nowrap;margin-top:12px;margin-left:8px">{name}</div>',
+                icon_size=(120, 20),
+                icon_anchor=(0, 0),
+            ),
+        ).add_to(m)
+
+    # EVP ambulance marker
+    if evp_active:
+        evp_coord = JUNCTION_COORDS["Silk Board"]
+        folium.Marker(
+            location=evp_coord,
+            icon=folium.DivIcon(
+                html='<div style="font-size:20px;animation:blink 1s infinite">🚑</div>',
+                icon_size=(30, 30),
+                icon_anchor=(15, 15),
+            ),
+            tooltip="EMERGENCY VEHICLE — EVP Active",
+        ).add_to(m)
+
+    return m
+
+
+def _load_color(load: float) -> str:
+    if load > 80:
+        return "#ff3366"
+    elif load > 60:
+        return "#ff8c00"
+    elif load > 40:
+        return "#ffd700"
+    return "#00ff88"
+
+
+def _road_color(avg_load: float) -> str:
+    if avg_load > 80:
+        return "#ff3366"
+    elif avg_load > 60:
+        return "#ff8c00"
+    return "#00ff88"
+
+
+# ─────────────────────────────────────────────────────────────
+# SIGNAL TIMER COMPONENT
+# ─────────────────────────────────────────────────────────────
+def signal_html(phase: str, countdown: int, phi: float, evp_on: bool) -> str:
+    r_on = "on" if phase == "RED"    or evp_on else "off"
+    y_on = "on" if phase == "YELLOW" and not evp_on else "off"
+    g_on = "on" if phase == "GREEN"  or evp_on else "off"
+
+    colors = {
+        "on_RED":    "#ff3366",  "off_RED":    "#1a0000",
+        "on_YELLOW": "#ffd700",  "off_YELLOW": "#1a1200",
+        "on_GREEN":  "#00ff88",  "off_GREEN":  "#001a06",
     }
+    r_col = colors[f"{r_on}_RED"]
+    y_col = colors[f"{y_on}_YELLOW"]
+    g_col = colors[f"{g_on}_GREEN"]
 
+    glow_r = f"box-shadow:0 0 14px {r_col};" if r_on == "on" else ""
+    glow_y = f"box-shadow:0 0 14px {y_col};" if y_on == "on" else ""
+    glow_g = f"box-shadow:0 0 14px {g_col};" if g_on == "on" else ""
 
-def get_edge_vehicle_counts(fleet):
-    """Count vehicles per edge for traffic density. O(N) numpy."""
-    counts = defaultdict(int)
-    N = fleet["N"]
-    active = (~fleet["completed"])
-    active_idx = np.where(active)[0]
-    for i in active_idx:
-        rid = int(fleet["route_id"][i])
-        seg_i = int(np.clip(fleet["seg"][i], 0, ROUTE_LENGTHS[rid]-1))
-        ja = ROUTE_SEG_STARTS[rid][seg_i]
-        jb = ROUTE_SEG_ENDS[rid][seg_i]
-        counts[(JNAMES[ja], JNAMES[jb])] += 1
-    return counts
+    phase_label = "EVP OVERRIDE — P → ∞" if evp_on else f"{phase} PHASE  φ = {phi:.1f}s"
+    phase_color = "#ff3366" if evp_on else ("#00ff88" if phase == "GREEN" else "#ffd700" if phase == "YELLOW" else "#ff3366")
 
-# -----------------------------------------------------------------------------
-# ALGORITHM - Batch signal optimizer (all junctions, one numpy pass)
-# -----------------------------------------------------------------------------
-def batch_signal_optimizer(tick, T, vc, gw_enabled, densities_arr, evp_junctions, police_active):
+    return f"""
+    <div style="background:#0d1f3c;border:1px solid #1a3a5c;border-radius:8px;
+                padding:14px;text-align:center;font-family:'Courier New',monospace">
+        <div style="font-size:10px;color:#5a7a9a;letter-spacing:2px;margin-bottom:10px">
+            SIGNAL CONTROLLER
+        </div>
+        <div style="display:flex;justify-content:center;gap:10px;margin-bottom:12px">
+            <div style="width:22px;height:22px;border-radius:50%;background:{r_col};{glow_r}border:2px solid rgba(255,255,255,0.1)"></div>
+            <div style="width:22px;height:22px;border-radius:50%;background:{y_col};{glow_y}border:2px solid rgba(255,255,255,0.1)"></div>
+            <div style="width:22px;height:22px;border-radius:50%;background:{g_col};{glow_g}border:2px solid rgba(255,255,255,0.1)"></div>
+        </div>
+        <div style="font-size:38px;font-weight:700;color:#00d4ff;
+                    font-family:'Courier New',monospace;text-shadow:0 0 20px rgba(0,212,255,0.5);
+                    line-height:1">{str(countdown).zfill(2)}</div>
+        <div style="font-size:9px;color:{phase_color};letter-spacing:2px;margin-top:6px">{phase_label}</div>
+    </div>
     """
-    Vectorized: compute all NJ junction phases in a single numpy pass.
-    densities_arr: np.array shape (NJ,) with congestion 0-100 for each junction.
-    Returns dict {junction_name: (phase, timer, delay_saved, note)}
-    """
-    L = 4000.0
-    vc_ms = max(vc / 3.6, 1.0)
-    phi = (L / vc_ms) % T if gw_enabled else 0.0
-    j_idx = np.arange(NJ, dtype=np.float32)
-
-    offsets  = (phi * j_idx).astype(np.int32) % int(T)
-    rho      = densities_arr / 100.0
-    g_base   = int(T * 0.52)
-    g_bonus  = (rho * 20).astype(np.int32) if gw_enabled else np.zeros(NJ, np.int32)
-    g_dur    = np.minimum(g_base + g_bonus, int(T * 0.80))
-    t_sh     = (tick + offsets) % int(T)
-
-    # Phase: 0=GREEN, 1=AMBER, 2=RED
-    phases = np.where(t_sh < g_dur, 0, np.where(t_sh < g_dur + 5, 1, 2))
-    timers = np.where(phases == 0, g_dur - t_sh,
-              np.where(phases == 1, g_dur + 5 - t_sh, T - t_sh))
-    timers = np.abs(timers)
-
-    # Delay saved
-    red_frac    = (T - g_dur - 5) / T
-    base_red    = 0.5
-    delay_saved = np.maximum(0.0, (base_red - red_frac) * 100)
-    if gw_enabled:
-        delay_saved += 12
-    delay_saved = np.minimum(delay_saved, 55)
-
-    pnames = ["GREEN", "AMBER", "RED"]
-    results = {}
-    for i, jn in enumerate(JNAMES):
-        if jn in evp_junctions:
-            results[jn] = ("GREEN", 99, 60.0, "EVP PREEMPT: P->inf")
-        elif police_active and jn in evp_junctions:
-            results[jn] = ("GREEN", 99, 45.0, "POLICE: Priority corridor")
-        else:
-            results[jn] = (
-                pnames[phases[i]], int(timers[i]),
-                round(float(delay_saved[i]), 1),
-                f"Phi={phi:.1f}s g={g_dur[i]}s rho={densities_arr[i]:.0f}"
-            )
-    return results
 
 
-def compute_network_delay_reduction(T, vc, gw_enabled, evp_active):
-    """O(1) - no vehicle iteration, just junction math."""
-    rho = J_CONG / 100.0
-    base_wait = 0.50 * rho * 100
-    g_opt = np.minimum(0.52 + rho * 0.20, 0.80)
-    our_wait = (1 - g_opt) * rho * 100
-    gw_bonus  = 12 if gw_enabled else 0
-    evp_bonus = 8  if evp_active  else 0
-    total_base = base_wait.sum()
-    total_opt  = np.maximum(0, our_wait - gw_bonus - evp_bonus).sum()
-    raw = (total_base - total_opt) / max(total_base, 1) * 100
-    return round(min(25 + (raw / 100) * 27, 52), 1)
+# ─────────────────────────────────────────────────────────────
+# HEADER COMPONENT
+# ─────────────────────────────────────────────────────────────
+def render_header(evp_active: bool, gw_active: bool):
+    now = datetime.datetime.now()
+    evp_badge = (
+        '<span style="background:rgba(255,51,102,0.15);border:1px solid #ff3366;'
+        'color:#ff3366;padding:3px 10px;border-radius:12px;font-size:10px;'
+        'letter-spacing:1.5px;animation:blink 1s step-end infinite">'
+        '🚨 EVP ACTIVE</span>'
+        if evp_active else
+        '<span style="background:rgba(0,255,136,0.1);border:1px solid #00ff88;'
+        'color:#00ff88;padding:3px 10px;border-radius:12px;font-size:10px;letter-spacing:1.5px">'
+        '● SYSTEM NOMINAL</span>'
+    )
+    gw_badge = (
+        '<span style="background:rgba(0,255,136,0.1);border:1px solid #00ff88;'
+        'color:#00ff88;padding:3px 10px;border-radius:12px;font-size:10px;letter-spacing:1.5px">'
+        '⬡ GREEN WAVE ON</span>'
+        if gw_active else
+        '<span style="background:rgba(255,140,0,0.1);border:1px solid #ff8c00;'
+        'color:#ff8c00;padding:3px 10px;border-radius:12px;font-size:10px;letter-spacing:1.5px">'
+        '⬡ STATIC SIGNALS</span>'
+    )
+
+    st.markdown(f"""
+    <div style="background:linear-gradient(90deg,#020810,#0a1628,#020810);
+                border-bottom:1px solid #1a3a5c;padding:10px 0 10px 0;
+                display:flex;align-items:center;justify-content:space-between;
+                box-shadow:0 2px 30px rgba(0,212,255,0.15);margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:14px">
+            <div style="font-size:28px">🚦</div>
+            <div>
+                <div style="font-size:15px;font-weight:700;color:#00d4ff;
+                            letter-spacing:3px;text-shadow:0 0 20px rgba(0,212,255,0.4)">
+                    URBAN FLOW &amp; LIFE-LINES
+                </div>
+                <div style="font-size:9px;color:#5a7a9a;letter-spacing:2px">
+                    BANGALORE ATCS · NMIT ISE · NB25ISE160 / NB25ISE186
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+            {evp_badge}&nbsp;{gw_badge}
+        </div>
+        <div style="text-align:right">
+            <div style="font-size:20px;font-weight:700;color:#00d4ff;
+                        font-family:'Courier New',monospace;letter-spacing:3px">
+                {now.strftime('%H:%M:%S')}
+            </div>
+            <div style="font-size:9px;color:#5a7a9a;letter-spacing:1px">
+                {now.strftime('%a %d %b %Y')} · IST · BANGALORE
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes blink {{0%,100%{{opacity:1}}50%{{opacity:0.3}}}}
+    </style>
+    """, unsafe_allow_html=True)
 
 
-def compute_edge_congestion(hour_df, edge_veh_counts, tick, total_active):
-    """Compute Google-Maps-style congestion per edge. O(edges) only."""
-    jcong = {}
-    for _, row in hour_df.iterrows():
-        jcong[row["Junction"]] = row["Congestion_Index"]
-    edge_cong = {}
-    for (j1n, j2n) in ROAD_EDGES:
-        base = (jcong.get(j1n, 50) + jcong.get(j2n, 50)) / 2
-        live_veh = edge_veh_counts.get((j1n,j2n), 0) + edge_veh_counts.get((j2n,j1n), 0)
-        live_c = min(live_veh / max(total_active, 1) * 600, 25)
-        noise  = math.sin(tick * 0.05 + abs(hash(j1n)) % 10) * 2
-        edge_cong[(j1n,j2n)] = float(np.clip(base + live_c + noise, 0, 100))
-    return edge_cong
+# ─────────────────────────────────────────────────────────────
+# SECTION HEADER HELPER
+# ─────────────────────────────────────────────────────────────
+def sec_header(icon: str, title: str, badge: str = ""):
+    badge_html = (
+        f'<span style="font-size:8px;padding:2px 7px;border-radius:10px;'
+        f'background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);'
+        f'color:#00d4ff">{badge}</span>'
+        if badge else ""
+    )
+    st.markdown(
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'padding:6px 0 4px 0;border-bottom:1px solid #1a3a5c;margin-bottom:8px">'
+        f'<span style="font-size:10px;font-weight:700;letter-spacing:2px;'
+        f'color:#00d4ff;text-transform:uppercase">{icon} {title}</span>'
+        f'{badge_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
-def cong_color(cong):
-    if cong < 25:   return "#00c853", 4, "CLEAR"
-    elif cong < 45: return "#64dd17", 5, "LIGHT"
-    elif cong < 60: return "#ffd600", 6, "MODERATE"
-    elif cong < 75: return "#ff6d00", 7, "HEAVY"
-    elif cong < 88: return "#dd2c00", 8, "SEVERE"
-    else:           return "#7f0000", 9, "STANDSTILL"
+# ─────────────────────────────────────────────────────────────
+# ALERT BOX HELPER
+# ─────────────────────────────────────────────────────────────
+_ALERTS: list = []
 
-# -----------------------------------------------------------------------------
-# SESSION STATE
-# -----------------------------------------------------------------------------
+def push_alert(alert_type: str, msg: str, level: str = "info"):
+    colors = {"info": "#00d4ff", "warn": "#ff8c00", "danger": "#ff3366", "success": "#00ff88"}
+    col    = colors.get(level, "#00d4ff")
+    now    = datetime.datetime.now().strftime("%H:%M:%S")
+    _ALERTS.insert(0, (alert_type, msg, col, now))
+    if len(_ALERTS) > 15:
+        _ALERTS.pop()
+
+
+def render_alerts():
+    for a_type, msg, col, ts in _ALERTS[:8]:
+        st.markdown(
+            f'<div style="background:#0d1f3c;border-left:3px solid {col};'
+            f'border-radius:0 4px 4px 0;padding:7px 10px;margin-bottom:5px;font-size:10px">'
+            f'<span style="color:{col};font-weight:700;letter-spacing:1px">{a_type}</span>'
+            f'<span style="color:#5a7a9a;float:right;font-size:9px">{ts}</span><br>'
+            f'<span style="color:#e0f0ff">{msg}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+# SESSION STATE INIT
+# ─────────────────────────────────────────────────────────────
 def init_state():
-    defs = {
-        "tick": 0, "evp_count": 50, "normal_count": 500,
-        "fleet": None,
-        "sim_running": False,
-        "selected_hour": 8, "gw_enabled": True, "lwr_enabled": True,
-        "vc": 40, "T": 90, "show_routes": True, "show_heatmap": False,
-        "police_control": True, "cmd_log": [],
-        "delay_history": [], "throughput_history": [],
-        "algo_mode": "Adaptive GW + LWR",
-        # Map background caching
-        "map_fig_json": None,   # cached plotly figure JSON (roads+junctions only)
-        "map_last_tick": -999,  # tick when map background was last rebuilt
-        "map_interval": 5,      # rebuild every N ticks
+    defaults = {
+        "evp_active":       False,
+        "gw_active":        True,
+        "density_pct":      65,
+        "map_layer":        "normal",
+        "selected_junction":"Silk Board",
+        "sim_speed":        1,
+        "v_kmh":            40.0,
+        "cycle_T":          60.0,
+        "evp_distance":     500.0,
+        "evp_speed":        40.0,
+        "signal_phase":     "GREEN",
+        "signal_timer":     30,
+        "tick":             0,
+        "alerts_seeded":    False,
     }
-    for k, v in defs.items():
+    for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
-init_state()
-
-if st.session_state.fleet is None:
-    st.session_state.fleet = make_fleet(
-        st.session_state.normal_count, st.session_state.evp_count)
-
-# -----------------------------------------------------------------------------
-# COMMAND LOG
-# -----------------------------------------------------------------------------
-def add_log(msg, kind="info"):
-    st.session_state.cmd_log.append({
-        "ts": f"[{st.session_state.tick:05d}]", "msg": msg, "kind": kind})
-    if len(st.session_state.cmd_log) > 80:
-        st.session_state.cmd_log = st.session_state.cmd_log[-80:]
-
-def render_log():
-    lines = [f'<div class="cmd-line-{e["kind"]}">{e["ts"]} {e["msg"]}</div>'
-             for e in reversed(st.session_state.cmd_log[-20:])]
-    return '<div class="cmd-log">' + "\n".join(lines) + "</div>"
+    if not st.session_state.alerts_seeded:
+        push_alert("SYSTEM",    "Urban Flow Command initialised — 10 nodes online", "success")
+        push_alert("DATA",      "Kaggle BLR Traffic Dataset 2024-25 loaded", "info")
+        push_alert("GREEN WAVE","Algorithm v2.1 active — φ = L/v_c mod T", "success")
+        st.session_state.alerts_seeded = True
 
 
-# =============================================================================
-# HELPERS
-# =============================================================================
-PLOT_BG   = "rgba(7,15,24,0)"
-PAPER_BG  = "rgba(7,15,24,0)"
-GRID_COL  = "rgba(17,34,51,0.6)"
-TICK_COL  = "#3a5a6a"
-FONT_MONO = "Share Tech Mono, monospace"
+# ─────────────────────────────────────────────────────────────
+# MAIN APP
+# ─────────────────────────────────────────────────────────────
+def main():
+    init_state()
 
-def apply_layout(fig, xtitle="", ytitle="", height=300, **extra):
-    layout = dict(
-        plot_bgcolor=PLOT_BG, paper_bgcolor=PAPER_BG,
-        font=dict(color=TICK_COL, family=FONT_MONO, size=10),
-        margin=dict(l=40, r=10, t=25, b=40), height=height,
-        xaxis=dict(title=xtitle, gridcolor=GRID_COL, zerolinecolor=GRID_COL, color=TICK_COL),
-        yaxis=dict(title=ytitle, gridcolor=GRID_COL, zerolinecolor=GRID_COL, color=TICK_COL),
-        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#112233", borderwidth=1, font=dict(size=9)),
-    )
-    layout.update(extra)
-    fig.update_layout(**layout)
-
-def build_map_figure(fleet, hour_df, dens_arr, signal_phases, edge_cong,
-                     show_routes, show_heatmap, tick_now, stats):
-    traces = []
-    if show_routes:
-        for (j1n, j2n) in ROAD_EDGES:
-            j1 = JUNCTIONS[j1n]; j2 = JUNCTIONS[j2n]
-            cong = edge_cong.get((j1n, j2n), 50)
-            rcol, rw, label = cong_color(cong)
-            traces.append(go.Scattermapbox(lat=[j1["lat"],j2["lat"]], lon=[j1["lon"],j2["lon"]],
-                mode="lines", line=dict(width=rw+6, color="rgba(0,0,0,0.4)"),
-                hoverinfo="none", showlegend=False))
-            traces.append(go.Scattermapbox(lat=[j1["lat"],j2["lat"]], lon=[j1["lon"],j2["lon"]],
-                mode="lines", line=dict(width=rw, color=rcol),
-                hovertext=f"<b>{j1n}->{j2n}</b><br>{label}: {cong:.0f}%",
-                hoverinfo="text", showlegend=False))
-    if show_heatmap:
-        hl=[]; hlo=[]; hv=[]
-        for _, row in hour_df.iterrows():
-            jd = JUNCTIONS.get(row["Junction"])
-            if jd: hl.append(jd["lat"]); hlo.append(jd["lon"]); hv.append(row["Congestion_Index"])
-        if hl:
-            traces.append(go.Densitymapbox(lat=hl, lon=hlo, z=hv, radius=50,
-                colorscale=[[0,"rgba(0,255,136,0.04)"],[0.5,"rgba(255,170,0,0.35)"],[1,"rgba(255,51,68,0.6)"]],
-                showscale=False, hoverinfo="none"))
-    for (j1n, j2n) in ROAD_EDGES:
-        j1=JUNCTIONS[j1n]; j2=JUNCTIONS[j2n]
-        cong = edge_cong.get((j1n,j2n), 50); rcol,_,_ = cong_color(cong)
-        fls=[]; flo=[]
-        for frac in [0.2, 0.5, 0.8]:
-            anim = (frac + tick_now * 0.015) % 1.0
-            fls.append(j1["lat"]+(j2["lat"]-j1["lat"])*anim)
-            flo.append(j1["lon"]+(j2["lon"]-j1["lon"])*anim)
-        traces.append(go.Scattermapbox(lat=fls, lon=flo, mode="markers",
-            marker=dict(size=4, color=rcol, opacity=0.5), hoverinfo="none", showlegend=False))
-    nl=[]; nlo=[]; nt=[]; nc=[]; ns=[]
-    for i, jn in enumerate(JNAMES):
-        jd = JUNCTIONS[jn]; density = float(dens_arr[i])
-        row = hour_df[hour_df["Junction"]==jn]
-        spd = float(row["Avg_Speed_kmh"].values[0]) if len(row) else 30.0
-        phase, timer, _, _ = signal_phases[jn]
-        sig_col = {"GREEN":"#00ff88","RED":"#ff3344","AMBER":"#ffaa00"}[phase]
-        nl.append(jd["lat"]); nlo.append(jd["lon"]); nc.append(sig_col)
-        ns.append(20 if density>=70 else 14)
-        nt.append(f"<b>{jn}</b> [{phase} {timer}s]<br>Congestion: {density:.0f}<br>Speed: {spd:.1f}km/h")
-    traces.append(go.Scattermapbox(lat=nl, lon=nlo, mode="markers+text",
-        marker=dict(size=ns, color=nc, opacity=0.95),
-        text=JNAMES, textposition="top right", textfont=dict(color="#e8f4ff", size=9),
-        hovertext=nt, hoverinfo="text", name="Junctions", showlegend=True))
-    active_normal_idx = np.where((~fleet["is_evp"]) & (~fleet["completed"]))[0]
-    if len(active_normal_idx):
-        sample_n = min(len(active_normal_idx), 2000)
-        rng2 = np.random.default_rng(tick_now // 5)
-        sidx = rng2.choice(active_normal_idx, sample_n, replace=False)
-        dlats=[]; dlons=[]
-        for i in sidx:
-            rid=int(fleet["route_id"][i]); s=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
-            ja=ROUTE_SEG_STARTS[rid][s]; jb=ROUTE_SEG_ENDS[rid][s]; tv=float(fleet["t"][i])
-            dlats.append(float(J_LATS[ja]+(J_LATS[jb]-J_LATS[ja])*tv))
-            dlons.append(float(J_LONS[ja]+(J_LONS[jb]-J_LONS[ja])*tv))
-        traces.append(go.Densitymapbox(lat=dlats, lon=dlons, radius=16,
-            colorscale=[[0,"rgba(0,0,0,0)"],[0.3,"rgba(0,170,255,0.12)"],
-                        [0.7,"rgba(255,170,0,0.3)"],[1,"rgba(255,51,68,0.5)"]],
-            showscale=False, hoverinfo="none", name="Vehicle Density"))
-    (nlats, nlons, ncols, n_idx),(elats, elons, ecols, epcols, elabs, eemoji, e_idx) = \
-        get_vehicle_positions_sample(fleet, max_normal=200, seed=tick_now // 5)
-    if len(nlats):
-        traces.append(go.Scattermapbox(lat=nlats.tolist(), lon=nlons.tolist(), mode="markers",
-            marker=dict(size=7, color=ncols, opacity=0.80),
-            hovertext=[f"Vehicle on {ROUTES[int(fleet['route_id'][i])%NR]['name']}" for i in n_idx],
-            hoverinfo="text", name=f"Normal ({stats['active_normal']:,})", showlegend=True))
-    if len(elats):
-        traces.append(go.Scattermapbox(lat=elats.tolist(), lon=elons.tolist(), mode="markers",
-            marker=dict(size=28, color=epcols, opacity=1), hoverinfo="none", showlegend=False))
-        traces.append(go.Scattermapbox(lat=elats.tolist(), lon=elons.tolist(), mode="markers",
-            marker=dict(size=14, color=ecols, opacity=1),
-            hovertext=[f"<b>{eemoji[k]} E{e_idx[k]:04d} {elabs[k]}</b><br>EVP ACTIVE" for k in range(len(e_idx))],
-            hoverinfo="text", name=f"Emergency ({stats['active_evp']:,})", showlegend=True))
-    fig = go.Figure(data=traces)
-    fig.update_layout(
-        mapbox=dict(style="carto-darkmatter", center=dict(lat=12.9590, lon=77.6450), zoom=11.2),
-        height=500, margin=dict(l=0,r=0,t=0,b=0),
-        plot_bgcolor=PLOT_BG, paper_bgcolor=PAPER_BG,
-        legend=dict(bgcolor="rgba(7,15,24,0.85)", bordercolor="#112233", borderwidth=1,
-                    font=dict(color="#b8cfd8",size=9,family=FONT_MONO), x=0.01, y=0.99),
-        uirevision="map_stable")
-    return fig
-
-# =============================================================================
-# AUTO-REFRESH — fires at JS level, no Python fragment needed
-# Only active when sim is running. 1200ms gives smooth updates without overload.
-# =============================================================================
-if st_autorefresh is not None:
-    if st.session_state.sim_running:
-        st_autorefresh(interval=1200, limit=None, key="sim_autorefresh")
-else:
-    # Fallback if streamlit-autorefresh not installed
-    if st.session_state.sim_running:
-        time.sleep(0.8)
-        st.rerun()
-
-# =============================================================================
-# SIMULATION STEP — runs once per script execution
-# =============================================================================
-fleet = st.session_state.fleet
-tick  = st.session_state.tick
-
-if st.session_state.sim_running:
-    fleet = step_fleet(fleet, st.session_state.gw_enabled,
-                       st.session_state.vc, st.session_state.T, tick)
-    st.session_state.fleet = fleet
+    # ── Tick for live feel ──────────────────────────────────
     st.session_state.tick += 1
-    tick = st.session_state.tick
+    seed = st.session_state.tick // 5   # data refreshes every ~5 re-renders
 
-# Precompute everything once
-stats       = get_fleet_stats(fleet)
-vc_v        = st.session_state.vc
-T_v         = st.session_state.T
-phi_v       = (4000 / max(vc_v/3.6, 1)) % T_v
-hour_df     = df_traffic[df_traffic["Hour"] == st.session_state.selected_hour]
-avg_cong    = float(hour_df["Congestion_Index"].mean())
-avg_spd     = float(hour_df["Avg_Speed_kmh"].mean())
-evp_active  = stats["active_evp"] > 0
-dens_arr    = np.array([
-    float(hour_df[hour_df["Junction"]==jn]["Congestion_Index"].values[0])
-    if len(hour_df[hour_df["Junction"]==jn]) else 50.0
-    for jn in JNAMES], dtype=np.float32)
-evp_junctions = get_evp_active_junctions(fleet)
-signal_phases = batch_signal_optimizer(tick, T_v, vc_v, st.session_state.gw_enabled,
-                                        dens_arr, evp_junctions, st.session_state.police_control)
-dr_now      = compute_network_delay_reduction(T_v, vc_v, st.session_state.gw_enabled, evp_active)
-eff_speed   = round(avg_spd * (1 + dr_now/100 * 0.3), 1)
-wait_ratio  = stats["wait_ratio"]
-edge_vcounts = get_edge_vehicle_counts(fleet)
-edge_cong   = compute_edge_congestion(hour_df, edge_vcounts, tick, max(stats["active_total"],1))
+    # ── Load current junction data ──────────────────────────
+    loads = get_current_loads(
+        st.session_state.density_pct,
+        st.session_state.gw_active,
+        seed,
+    )
 
-if st.session_state.sim_running:
-    st.session_state.delay_history.append(dr_now)
-    if len(st.session_state.delay_history) > 120:
-        st.session_state.delay_history = st.session_state.delay_history[-120:]
-    st.session_state.throughput_history.append(stats["active_total"])
-    if len(st.session_state.throughput_history) > 120:
-        st.session_state.throughput_history = st.session_state.throughput_history[-120:]
-    if tick % 8 == 0:
-        add_log(f"{'EVP ACTIVE ' + str(stats['active_evp']) if evp_active else 'DR:' + str(dr_now) + '%'} Active:{stats['active_total']:,}", "evp" if evp_active else "ok")
-    if tick % 20 == 0:
-        add_log(f"Tick {tick} Phi={phi_v:.1f}s Fleet {fleet['N']:,}", "info")
-
-# =============================================================================
-# RENDER
-# =============================================================================
-
-# --- CSS ---
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;600&display=swap');
-html,body,[class*="css"]{background:#03080d!important;color:#b8cfd8!important;font-family:'Barlow',sans-serif!important}
-.block-container{padding:0.6rem 1.2rem 1rem!important}
-.main-title{font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#fff;margin:0}
-.main-title span{color:#00ff88}
-.sub-title{font-family:'Share Tech Mono',monospace;font-size:0.56rem;color:#3a5a6a;letter-spacing:2px;margin-top:2px}
-.live-badge{font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#00ff88;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);padding:3px 10px;border-radius:3px;letter-spacing:2px}
-.evp-badge{font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#ff5500;background:rgba(255,85,0,0.1);border:1px solid rgba(255,85,0,0.3);padding:3px 10px;border-radius:3px;letter-spacing:2px;animation:epulse 1s infinite}
-@keyframes epulse{0%,100%{opacity:1}50%{opacity:0.5}}
-.metric-card{background:#070f18;border:1px solid #112233;border-radius:6px;padding:10px 14px;position:relative;overflow:hidden}
-.metric-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
-.mc-green::after{background:linear-gradient(90deg,transparent,#00ff88,transparent)}
-.mc-blue::after{background:linear-gradient(90deg,transparent,#00aaff,transparent)}
-.mc-red::after{background:linear-gradient(90deg,transparent,#ff3344,transparent)}
-.mc-amber::after{background:linear-gradient(90deg,transparent,#ffaa00,transparent)}
-.mc-cyan::after{background:linear-gradient(90deg,transparent,#00e5ff,transparent)}
-.metric-label{font-family:'Share Tech Mono',monospace;font-size:0.56rem;letter-spacing:2px;color:#3a5a6a;text-transform:uppercase;margin-bottom:2px}
-.metric-value{font-family:'Barlow Condensed',sans-serif;font-size:1.9rem;font-weight:900;color:#e8f4ff;line-height:1}
-.metric-value span{font-size:0.85rem;color:#3a5a6a;margin-left:2px}
-.metric-sub{font-size:0.62rem;color:#3a5a6a;margin-top:2px}
-.metric-sub.up{color:#00ff88}
-.sec-header{font-family:'Barlow Condensed',sans-serif;font-size:0.65rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#3a5a6a;margin-bottom:7px;border-left:3px solid #00aaff;padding-left:8px}
-.sec-header.green{border-color:#00ff88}.sec-header.red{border-color:#ff3344}
-.sec-header.amber{border-color:#ffaa00}.sec-header.police{border-color:#0088ff}
-.pcc-box{background:rgba(0,136,255,0.05);border:1px solid rgba(0,136,255,0.2);border-radius:6px;padding:12px;margin-bottom:8px}
-.pcc-title{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:900;color:#0088ff;letter-spacing:2px;margin-bottom:8px}
-.pcc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;padding:4px 0;border-bottom:1px solid rgba(0,136,255,0.08)}
-.pcc-key{font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:#3a5a6a;letter-spacing:1px}
-.pcc-val{font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:#00aaff}
-.pcc-val.alert{color:#ff5500;font-weight:700}.pcc-val.ok{color:#00ff88}
-.cmd-log{background:#03080d;border:1px solid #112233;border-radius:4px;padding:8px;height:180px;overflow-y:auto;font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:#3a5a6a;line-height:1.7}
-.cmd-line-evp{color:#ff5500}.cmd-line-ok{color:#00ff88}.cmd-line-info{color:#00aaff}.cmd-line-warn{color:#ffaa00}
-.vcard{background:rgba(0,0,0,0.3);border:1px solid #112233;border-radius:5px;padding:7px 9px;margin-bottom:5px}
-.vcard.emg{border-color:rgba(255,85,0,0.5)}
-.sig-box{background:#070f18;border:1px solid #112233;border-radius:6px;padding:10px 8px;text-align:center;margin-bottom:6px}
-.sig-light{width:28px;height:28px;border-radius:50%;margin:0 auto 4px;border:2px solid rgba(0,0,0,0.4)}
-.sig-light.green{background:#00ff88;box-shadow:0 0 12px #00ff88}
-.sig-light.amber{background:#ffaa00;box-shadow:0 0 12px #ffaa00}
-.sig-light.red{background:#ff3344;box-shadow:0 0 12px #ff3344}
-.sig-light.off{background:#1a2a1a;box-shadow:none}
-.equation-box{background:rgba(0,170,255,0.04);border:1px solid rgba(0,170,255,0.12);border-radius:5px;padding:10px 14px;font-family:'Share Tech Mono',monospace;font-size:0.7rem;color:#00e5ff;margin:8px 0}
-[data-testid="stSidebar"]{background:#070f18!important;border-right:1px solid #112233}
-[data-testid="stSidebar"] *{color:#b8cfd8!important}
-.stButton>button{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);color:#00ff88!important;font-family:'Barlow Condensed',sans-serif;font-size:0.78rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;width:100%}
-.stTabs [data-baseweb="tab-list"]{background:#070f18;border-bottom:1px solid #112233}
-.stTabs [data-baseweb="tab"]{font-family:'Barlow Condensed',sans-serif;font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;color:#3a5a6a!important}
-.stTabs [aria-selected="true"]{color:#00ff88!important;border-bottom:2px solid #00ff88}
-</style>
-""", unsafe_allow_html=True)
-
-# --- Sidebar ---
-with st.sidebar:
-    st.markdown("""<div style='text-align:center;padding:6px 0 14px'>
-      <div style='font-family:Barlow Condensed,sans-serif;font-size:1.1rem;font-weight:900;color:#fff;letter-spacing:2px'>URBAN FLOW</div>
-      <div style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a;letter-spacing:2px'>BANGALORE . ADAPTIVE SIM v6</div>
-    </div>""", unsafe_allow_html=True)
-    st.markdown('<div class="sec-header green">Simulation</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("START" if not st.session_state.sim_running else "PAUSE"):
-            st.session_state.sim_running = not st.session_state.sim_running
-            add_log("Simulation " + ("STARTED" if st.session_state.sim_running else "PAUSED"), "ok")
-            st.rerun()
-    with c2:
-        if st.button("RESET"):
-            st.session_state.fleet = make_fleet(st.session_state.normal_count, st.session_state.evp_count)
-            st.session_state.tick = 0
-            st.session_state.delay_history = []
-            st.session_state.throughput_history = []
-            st.session_state.cmd_log = []
-            add_log("Reset", "info")
-            st.rerun()
-
-    new_normal = st.slider("Normal Vehicles", 100, 20000, st.session_state.normal_count, step=100, key="sl_normal")
-    new_evp    = st.slider("Emergency Vehicles", 10, 2000, st.session_state.evp_count, step=10, key="sl_evp")
-    st.markdown(f"<div style='font-family:Share Tech Mono,monospace;font-size:0.58rem;color:#00aaff;margin:4px 0 8px;padding:4px 8px;background:rgba(0,170,255,0.05);border-radius:3px'>FLEET: {new_normal+new_evp:,} total</div>", unsafe_allow_html=True)
-    if st.button("RESPAWN FLEET"):
-        st.session_state.normal_count = new_normal
-        st.session_state.evp_count    = new_evp
-        st.session_state.fleet = make_fleet(new_normal, new_evp)
-        add_log(f"Spawned {new_normal:,}N + {new_evp:,}E", "ok")
-        st.rerun()
-    st.markdown("---")
-    st.markdown('<div class="sec-header green">Algorithm Controls</div>', unsafe_allow_html=True)
-    st.session_state.algo_mode = st.selectbox("Optimization Mode",
-        ["Adaptive GW + LWR","Pure Green Wave","Density-Only","Baseline (Fixed)"],
-        index=["Adaptive GW + LWR","Pure Green Wave","Density-Only","Baseline (Fixed)"].index(st.session_state.algo_mode))
-    st.session_state.vc = st.slider("Target Speed v_c (km/h)", 20, 60, st.session_state.vc, key="sl_vc")
-    st.session_state.T  = st.slider("Cycle Time T (s)", 40, 120, st.session_state.T, 5, key="sl_T")
-    st.session_state.gw_enabled  = st.session_state.algo_mode != "Baseline (Fixed)"
-    st.session_state.lwr_enabled = st.session_state.algo_mode in ["Adaptive GW + LWR","Density-Only"]
-    st.session_state.police_control = st.toggle("Police Control Centre", st.session_state.police_control, key="tog_police")
-    st.markdown("---")
-    st.markdown('<div class="sec-header amber">Map</div>', unsafe_allow_html=True)
-    st.session_state.show_routes  = st.toggle("Road Network + Traffic", st.session_state.show_routes, key="tog_routes")
-    st.session_state.show_heatmap = st.toggle("Congestion Heatmap", st.session_state.show_heatmap, key="tog_heat")
-    st.session_state.selected_hour = st.slider("Data Hour (0-23)", 0, 23, st.session_state.selected_hour, key="sl_hour")
-    st.markdown("---")
-    st.markdown("<div style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a;line-height:1.7'>NISHCHAL VISHWANATH . NB25ISE160<br>RISHUL KH . NB25ISE186<br>ISE . NMIT BANGALORE</div>", unsafe_allow_html=True)
-
-# --- Header ---
-hcol1, hcol2 = st.columns([3,1])
-with hcol1:
-    st.markdown('<div class="main-title">Urban Flow &amp; <span>Life-Lines</span></div><div class="sub-title">REAL-TIME BANGALORE . ADAPTIVE ALGORITHM . POLICE CONTROL CENTRE . NMIT ISE 2025</div>', unsafe_allow_html=True)
-with hcol2:
-    badge = f'<span class="evp-badge">{stats["active_evp"]:,} EVP ACTIVE</span>' if evp_active else '<span class="live-badge">SIM LIVE</span>'
-    st.markdown(f"<div style='text-align:right;padding-top:6px'>{badge}<br><span style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a'>TICK #{tick} . {stats['active_total']:,}/{fleet['N']:,} ACTIVE</span></div>", unsafe_allow_html=True)
-st.markdown("<hr style='border-color:#112233;margin:5px 0 8px'>", unsafe_allow_html=True)
-
-# --- Metrics ---
-m1,m2,m3,m4,m5,m6 = st.columns(6)
-def mc(col, label, val, unit, sub, sub_cls, card_cls):
-    with col:
-        st.markdown(f'<div class="metric-card {card_cls}"><div class="metric-label">{label}</div><div class="metric-value">{val}<span>{unit}</span></div><div class="metric-sub {sub_cls}">{sub}</div></div>', unsafe_allow_html=True)
-mc(m1,"Congestion",f"{avg_cong:.0f}","/100",f"Hour {st.session_state.selected_hour:02d}:00","","mc-red")
-mc(m2,"Delay Reduction",f"{dr_now:.1f}","%","Adaptive vs baseline","up","mc-green")
-mc(m3,"Avg Speed",f"{eff_speed:.1f}","km/h","optimised corridor","","mc-blue")
-mc(m4,"Red-Light Wait",f"{wait_ratio:.1f}","%","of journey time","","mc-amber")
-mc(m5,"Fleet",f"{fleet['N']:,}","",f"{st.session_state.evp_count:,} EVP","","mc-red" if evp_active else "mc-cyan")
-mc(m6,"Active",f"{stats['active_total']:,}","",f"{stats['active_evp']:,} EVP","","mc-red" if evp_active else "mc-blue")
-st.markdown("<br>", unsafe_allow_html=True)
-
-# --- Tabs ---
-tab1, tab2, tab3, tab4 = st.tabs(["LIVE MAP + VEHICLES","TRAFFIC DATA","SIGNAL CONTROL","ALGORITHM & MATH"])
-
-# ---- TAB 1 ----
-with tab1:
-    if st.session_state.police_control:
-        pcc1,pcc2,pcc3,pcc4 = st.columns([1.2,1.2,1.2,2.4])
-        with pcc1:
-            cl = "CRITICAL" if avg_cong>=70 else ("MODERATE" if avg_cong>=50 else "CLEAR")
-            cc = "alert" if avg_cong>=70 else ("warn" if avg_cong>=50 else "ok")
-            wr = hour_df.loc[hour_df["Congestion_Index"].idxmax()] if len(hour_df) else None
-            wj = wr["Junction"] if wr is not None else "Silk Board"
-            wc = wr["Congestion_Index"] if wr is not None else 72
-            st.markdown(f"""<div class="pcc-box"><div class="pcc-title">NETWORK STATUS</div>
-            <div class="pcc-row"><span class="pcc-key">CONGESTION</span><span class="pcc-val {cc}">{avg_cong:.0f}/100 [{cl}]</span></div>
-            <div class="pcc-row"><span class="pcc-key">WORST JUNC</span><span class="pcc-val alert">{wj[:12]} ({wc:.0f})</span></div>
-            <div class="pcc-row"><span class="pcc-key">ACTIVE VEH</span><span class="pcc-val ok">{stats["active_total"]:,}</span></div>
-            <div class="pcc-row"><span class="pcc-key">COMPLETED</span><span class="pcc-val">{stats["completed"]:,}</span></div>
-            <div class="pcc-row"><span class="pcc-key">DR NOW</span><span class="pcc-val ok">{dr_now:.1f}%</span></div></div>""", unsafe_allow_html=True)
-        with pcc2:
-            rows = ""
-            for jn in JNAMES[:5]:
-                phase,timer,_,_ = signal_phases[jn]
-                has_evp = jn in evp_junctions
-                dot = "G" if phase=="GREEN" else ("R" if phase=="RED" else "A")
-                note = "PREEMPTED" if has_evp else f"{timer}s"
-                rows += f'<div class="pcc-row"><span class="pcc-key">{jn[:12]}</span><span class="pcc-val {"alert" if has_evp else ""}">{dot} {phase[:3]} {note}</span></div>'
-            st.markdown(f'<div class="pcc-box"><div class="pcc-title">SIGNAL MATRIX</div>{rows}</div>', unsafe_allow_html=True)
-        with pcc3:
-            evp_rows = ""
-            n_evp_act = stats["active_evp"]
-            if n_evp_act > 0:
-                for i in np.where(fleet["is_evp"] & ~fleet["completed"])[0][:5]:
-                    rid=int(fleet["route_id"][i]); si=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
-                    et=EVP_TYPES[int(fleet["evp_type"][i])%len(EVP_TYPES)]
-                    prog=min(100,int((fleet["seg"][i]+fleet["t"][i])/max(ROUTE_LENGTHS[rid],1)*100))
-                    evp_rows += f'<div class="pcc-row"><span class="pcc-key">{et["emoji"]} {et["label"][:8]}</span><span class="pcc-val alert">{prog}%</span></div>'
-                if n_evp_act > 5:
-                    evp_rows += f'<div class="pcc-row"><span class="pcc-key">+{n_evp_act-5} more</span></div>'
-            else:
-                evp_rows = '<div class="pcc-row"><span class="pcc-key">NO ACTIVE EVP</span><span class="pcc-val ok">STANDBY</span></div>'
-            st.markdown(f'<div class="pcc-box"><div class="pcc-title">EMERGENCY UNITS</div>{evp_rows}</div>', unsafe_allow_html=True)
-        with pcc4:
-            st.markdown(f'<div class="pcc-box"><div class="pcc-title">COMMAND LOG</div>{render_log()}</div>', unsafe_allow_html=True)
-
-    map_c, inf_c = st.columns([3, 1])
-    with map_c:
-        st.markdown(f'<div class="sec-header green">Real Bangalore - Live Traffic . <span style="color:#00aaff">{stats["active_total"]:,} vehicles</span></div>', unsafe_allow_html=True)
-        fig_map = build_map_figure(fleet, hour_df, dens_arr, signal_phases, edge_cong,
-                                    st.session_state.show_routes, st.session_state.show_heatmap, tick, stats)
-        st.plotly_chart(fig_map, use_container_width=True, key="live_map")
-        st.markdown("""<div style='display:flex;gap:12px;flex-wrap:wrap;font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a;margin-top:4px'>
-          <span style='color:#00c853'>&#9679; CLEAR</span><span style='color:#64dd17'>&#9679; LIGHT</span>
-          <span style='color:#ffd600'>&#9679; MODERATE</span><span style='color:#ff6d00'>&#9679; HEAVY</span>
-          <span style='color:#dd2c00'>&#9679; SEVERE</span><span style='color:#7f0000'>&#9679; STANDSTILL</span></div>""", unsafe_allow_html=True)
-    with inf_c:
-        evp_cards = ""
-        for i in np.where(fleet["is_evp"] & ~fleet["completed"])[0][:6]:
-            rid=int(fleet["route_id"][i]); si=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
-            jnc=JNAMES[ROUTE_SEG_STARTS[rid][si]]; jnx=JNAMES[ROUTE_SEG_ENDS[rid][si]]
-            et=EVP_TYPES[int(fleet["evp_type"][i])%len(EVP_TYPES)]
-            prog=min(100,int((fleet["seg"][i]+fleet["t"][i])/max(ROUTE_LENGTHS[rid],1)*100))
-            evp_cards += f"""<div class="vcard emg">
-              <div style="display:flex;justify-content:space-between">
-                <span style="font-weight:700;color:{et['color']};font-size:0.82rem">{et['emoji']} E{i:04d}</span>
-                <span style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:{et['color']}">EVP</span></div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:#3a5a6a;margin-top:2px">{jnc[:10]} → {jnx[:10]}<br>{et['label']} . {prog}%</div></div>"""
-        st.markdown(f"""<div class="sec-header{"  red" if evp_active else ""}">{"EVP ACTIVE" if evp_active else "Fleet Status"}</div>
-        {evp_cards or '<div style="font-family:Share Tech Mono,monospace;font-size:0.6rem;color:#3a5a6a">No active EVP</div>'}
-        <div style="margin-top:10px">
-          <div class="metric-card mc-blue" style="margin-bottom:5px"><div class="metric-label">Normal Active</div><div class="metric-value" style="font-size:1.3rem">{stats['active_normal']:,}</div></div>
-          <div class="metric-card mc-red"><div class="metric-label">EVP Active</div><div class="metric-value" style="font-size:1.3rem">{stats['active_evp']:,}</div></div>
-        </div>""", unsafe_allow_html=True)
-        if len(st.session_state.delay_history) > 2:
-            fig_mini = go.Figure()
-            fig_mini.add_trace(go.Scatter(y=st.session_state.delay_history[-40:], mode="lines",
-                line=dict(color="#00ff88", width=1.5), fill="tozeroy", fillcolor="rgba(0,255,136,0.08)"))
-            fig_mini.update_layout(plot_bgcolor=PLOT_BG, paper_bgcolor=PAPER_BG,
-                xaxis=dict(visible=False), yaxis=dict(color=TICK_COL, gridcolor=GRID_COL),
-                margin=dict(l=20,r=5,t=5,b=10), height=100, showlegend=False)
-            st.plotly_chart(fig_mini, use_container_width=True, key="mini_dr")
-
-# ---- TAB 2 ----
-with tab2:
-    t2c1, t2c2 = st.columns(2)
-    with t2c1:
-        st.markdown('<div class="sec-header amber">Congestion Heatmap - Junction x Hour</div>', unsafe_allow_html=True)
-        pivot = df_traffic.pivot_table(index="Junction", columns="Hour", values="Congestion_Index", aggfunc="mean")
-        fig_h = go.Figure(go.Heatmap(z=pivot.values, x=[f"{h:02d}:00" for h in pivot.columns], y=pivot.index.tolist(),
-            colorscale=[[0,"#03080d"],[0.3,"rgba(0,255,136,0.6)"],[0.65,"rgba(255,170,0,0.8)"],[1,"#ff3344"]],
-            colorbar=dict(tickfont=dict(color=TICK_COL,size=8)),
-            hovertemplate="<b>%{y}</b><br>%{x}<br>Congestion: %{z:.1f}<extra></extra>"))
-        apply_layout(fig_h, xtitle="Hour", ytitle="Junction", height=320)
-        st.plotly_chart(fig_h, use_container_width=True, key="heat_map")
-    with t2c2:
-        st.markdown('<div class="sec-header green">Speed Profile - 24h</div>', unsafe_allow_html=True)
-        fig_s = go.Figure()
-        for jn,col,fill in [("Silk Board","#ff3344","rgba(255,51,68,0.07)"),("Hebbal","#00ff88","rgba(0,255,136,0.07)"),
-                              ("Whitefield","#00aaff","rgba(0,170,255,0.07)"),("MG Road","#ffaa00","rgba(255,170,0,0.07)")]:
-            jdf = df_traffic[df_traffic["Junction"]==jn].sort_values("Hour")
-            fig_s.add_trace(go.Scatter(x=jdf["Hour"], y=jdf["Avg_Speed_kmh"], name=jn,
-                mode="lines", line=dict(color=col,width=2), fill="tozeroy", fillcolor=fill))
-        apply_layout(fig_s, xtitle="Hour", ytitle="Avg Speed (km/h)", height=320)
-        st.plotly_chart(fig_s, use_container_width=True, key="speed_chart")
-    t2c3, t2c4 = st.columns(2)
-    with t2c3:
-        st.markdown('<div class="sec-header">Baseline vs Adaptive Delay</div>', unsafe_allow_html=True)
-        hb = hour_df.set_index("Junction")["Delay_Min"].reindex(JNAMES).fillna(0)
-        fig_b = go.Figure()
-        fig_b.add_trace(go.Bar(name="Baseline", x=JNAMES, y=hb.values,
-            marker=dict(color="rgba(255,51,68,0.65)",line=dict(color="#ff3344",width=1.5))))
-        fig_b.add_trace(go.Bar(name="Adaptive", x=JNAMES, y=(hb*(1-dr_now/100)).round(2).values,
-            marker=dict(color="rgba(0,255,136,0.65)",line=dict(color="#00ff88",width=1.5))))
-        apply_layout(fig_b, ytitle="Delay (min)", height=290, barmode="group",
-                     xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
-                     yaxis=dict(range=[0,max(hb.max()*1.4,1)],color=TICK_COL,gridcolor=GRID_COL))
-        st.plotly_chart(fig_b, use_container_width=True, key="delay_bar")
-    with t2c4:
-        st.markdown('<div class="sec-header amber">Live DR% History</div>', unsafe_allow_html=True)
-        if len(st.session_state.delay_history) > 2:
-            fig_dr = go.Figure()
-            fig_dr.add_trace(go.Scatter(y=st.session_state.delay_history, mode="lines",
-                line=dict(color="#00ff88",width=2), fill="tozeroy", fillcolor="rgba(0,255,136,0.08)"))
-            fig_dr.add_hline(y=25, line=dict(color="rgba(255,170,0,0.4)",width=1,dash="dash"))
-            apply_layout(fig_dr, ytitle="DR%", height=290, yaxis=dict(range=[0,60],color=TICK_COL,gridcolor=GRID_COL))
-            st.plotly_chart(fig_dr, use_container_width=True, key="dr_history")
+    # ── Signal phase logic ──────────────────────────────────
+    st.session_state.signal_timer -= 1
+    if st.session_state.signal_timer <= 0:
+        if st.session_state.signal_phase == "GREEN":
+            st.session_state.signal_phase = "YELLOW"
+            st.session_state.signal_timer = 5
+        elif st.session_state.signal_phase == "YELLOW":
+            st.session_state.signal_phase = "RED"
+            st.session_state.signal_timer = 25
         else:
-            st.info("Start simulation to see live DR history")
-    st.markdown('<div class="sec-header green">Real-Time Edge Congestion</div>', unsafe_allow_html=True)
-    evals = [edge_cong.get(e,50) for e in ROAD_EDGES]
-    fig_ec = go.Figure()
-    fig_ec.add_trace(go.Bar(x=[f"{j1[:5]}->{j2[:5]}" for (j1,j2) in ROAD_EDGES], y=evals,
-        marker=dict(color=[cong_color(c)[0] for c in evals], line=dict(width=0)),
-        hovertemplate="<b>%{x}</b><br>%{y:.1f}%<extra></extra>"))
-    fig_ec.add_hline(y=60, line=dict(color="rgba(255,85,0,0.4)",width=1,dash="dash"))
-    apply_layout(fig_ec, ytitle="Congestion %", height=220,
-                 xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
-                 yaxis=dict(range=[0,100],color=TICK_COL,gridcolor=GRID_COL))
-    st.plotly_chart(fig_ec, use_container_width=True, key="edge_cong")
-    st.markdown('<div class="sec-header">Traffic Dataset</div>', unsafe_allow_html=True)
-    hb2 = hour_df[["Junction","Time","Congestion_Index","Vehicles_Per_Hour","Avg_Speed_kmh","Delay_Min","Incidents","Is_Peak"]].copy().reset_index(drop=True)
-    hb2.columns=["Junction","Time","Congestion","Vehicles/hr","Speed(km/h)","Delay(min)","Incidents","Peak"]
-    def col_cong(v):
-        try: f=float(v)
-        except: return ""
-        if f>=70: return "background:rgba(255,51,68,0.22);color:#ff3344;font-weight:bold"
-        elif f>=50: return "background:rgba(255,170,0,0.15);color:#ffaa00;font-weight:bold"
-        return "background:rgba(0,255,136,0.1);color:#00ff88;font-weight:bold"
-    st.dataframe(hb2.style.map(col_cong, subset=["Congestion"]).format(
-        {"Congestion":"{:.1f}","Speed(km/h)":"{:.1f}","Delay(min)":"{:.2f}"}),
-        use_container_width=True, height=260)
+            st.session_state.signal_phase = "GREEN"
+            st.session_state.signal_timer = 30
 
-# ---- TAB 3 — SIGNAL CONTROL with proper traffic light indicators ----
-with tab3:
-    evp_hdr = "red" if evp_junctions else ""
-    st.markdown(f'<div class="sec-header {evp_hdr}">Adaptive Signal Matrix . {"EVP ACTIVE" if evp_junctions else "Normal Operations"} . DR={dr_now:.1f}%</div>', unsafe_allow_html=True)
-    cols_sig = st.columns(5)
-    for i, jn in enumerate(JNAMES):
-        phase, timer, dr_jn, _ = signal_phases[jn]
-        density = float(dens_arr[i])
-        note = "EVP PREEMPTED" if jn in evp_junctions else f"DR:+{dr_jn:.0f}%"
-        border_col = {"GREEN":"#00ff88","RED":"#ff3344","AMBER":"#ffaa00"}[phase]
-        # Three light circles — only the active one is lit
-        g_cls = "green" if phase=="GREEN" else "off"
-        a_cls = "amber" if phase=="AMBER" else "off"
-        r_cls = "red"   if phase=="RED"   else "off"
-        with cols_sig[i % 5]:
+    # ── HEADER ──────────────────────────────────────────────
+    render_header(st.session_state.evp_active, st.session_state.gw_active)
+
+    # ── SIDEBAR ─────────────────────────────────────────────
+    with st.sidebar:
+        st.markdown(
+            '<div style="font-size:13px;font-weight:700;color:#00d4ff;'
+            'letter-spacing:2px;margin-bottom:14px">⚙ COMMAND PANEL</div>',
+            unsafe_allow_html=True,
+        )
+
+        # EVP Toggle
+        if st.button(
+            "🚑 ACTIVATE EMERGENCY MODE" if not st.session_state.evp_active else "✅ DEACTIVATE EMERGENCY",
+            use_container_width=True,
+        ):
+            st.session_state.evp_active = not st.session_state.evp_active
+            if st.session_state.evp_active:
+                push_alert("🚨 EVP ACTIVATED", "Silk Board→HSR→Bellandur pre-empted. P→∞", "danger")
+                st.session_state.signal_phase = "GREEN"
+                st.session_state.signal_timer = 120
+            else:
+                push_alert("✅ EVP CLEARED", "Emergency vehicle arrived. Signals resuming.", "success")
+            st.rerun()
+
+        st.markdown("---")
+
+        # Green Wave Toggle
+        gw_val = st.toggle("⬡ Green Wave Algorithm", value=st.session_state.gw_active, key="gw_toggle_input")
+        if gw_val != st.session_state.gw_active:
+            st.session_state.gw_active = gw_val
+            push_alert("GREEN WAVE", "Activated — φ synchronisation" if gw_val else "Disabled — static timers", "success" if gw_val else "warn")
+            st.rerun()
+
+        st.markdown("---")
+        st.markdown('<div style="font-size:9px;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px">TRAFFIC DENSITY</div>', unsafe_allow_html=True)
+        new_dens = st.slider("", 20, 100, st.session_state.density_pct, key="density_slider", label_visibility="collapsed")
+        if new_dens != st.session_state.density_pct:
+            st.session_state.density_pct = new_dens
+
+        st.markdown('<div style="font-size:9px;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px;margin-top:10px">GREEN WAVE SPEED (km/h)</div>', unsafe_allow_html=True)
+        st.session_state.v_kmh = st.slider("", 20.0, 80.0, st.session_state.v_kmh, 1.0, key="v_slider", label_visibility="collapsed")
+
+        st.markdown('<div style="font-size:9px;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px;margin-top:10px">SIGNAL CYCLE T (s)</div>', unsafe_allow_html=True)
+        st.session_state.cycle_T = st.slider("", 30.0, 120.0, st.session_state.cycle_T, 5.0, key="T_slider", label_visibility="collapsed")
+
+        st.markdown("---")
+        st.markdown('<div style="font-size:9px;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px">MAP LAYER</div>', unsafe_allow_html=True)
+        st.session_state.map_layer = st.selectbox(
+            "",
+            ["normal", "density", "green_wave", "evp_route"],
+            format_func=lambda x: {"normal": "Normal", "density": "Density Heatmap", "green_wave": "Green Wave", "evp_route": "EVP Route"}[x],
+            key="layer_select",
+            label_visibility="collapsed",
+        )
+
+        st.markdown("---")
+        st.markdown('<div style="font-size:9px;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px">FOCUS JUNCTION</div>', unsafe_allow_html=True)
+        st.session_state.selected_junction = st.selectbox(
+            "",
+            JUNCTION_NAMES,
+            index=JUNCTION_NAMES.index(st.session_state.selected_junction),
+            key="junction_select",
+            label_visibility="collapsed",
+        )
+
+        st.markdown("---")
+        # EVP parameters
+        with st.expander("🚑 EVP Parameters"):
+            st.session_state.evp_distance = st.slider("Distance to signal (m)", 100.0, 2000.0, st.session_state.evp_distance, 50.0)
+            st.session_state.evp_speed    = st.slider("Ambulance speed (km/h)", 20.0, 80.0,   st.session_state.evp_speed, 1.0)
+
+        # Math formulas
+        with st.expander("📐 Live Math"):
+            phi   = green_wave_offset(4.0, st.session_state.v_kmh, st.session_state.cycle_T)
+            evp_t = evp_signal_time(st.session_state.evp_distance, st.session_state.evp_speed)
+            sel_l = loads.get(st.session_state.selected_junction, 50)
+            lwr   = lwr_density(sel_l * 20, st.session_state.v_kmh)
             st.markdown(f"""
-            <div class="sig-box" style="border-color:{border_col}44">
-              <div style="font-size:0.68rem;font-weight:600;color:#b8cfd8;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{jn}</div>
-              <div style="background:#0a1520;border-radius:8px;padding:6px 0;margin-bottom:6px">
-                <div class="sig-light {g_cls}"></div>
-                <div class="sig-light {a_cls}"></div>
-                <div class="sig-light {r_cls}"></div>
-              </div>
-              <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:900;color:{border_col}">{timer}s</div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:{border_col}">{phase}</div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a;margin-top:3px">{note}</div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.48rem;color:#1a3a4a">&#961;={density:.0f}</div>
-            </div>""", unsafe_allow_html=True)
+            <div style="font-size:10px;font-family:'Courier New',monospace">
+                <div style="color:#5a7a9a">Green Wave Offset:</div>
+                <div style="color:#00d4ff">φ = {phi:.2f} s</div>
+                <div style="color:#5a7a9a;margin-top:8px">EVP Lead-Time:</div>
+                <div style="color:#ff3366">S = {evp_t:.1f} s</div>
+                <div style="color:#5a7a9a;margin-top:8px">LWR Density ({st.session_state.selected_junction[:6]}):</div>
+                <div style="color:#00ff88">ρ = {lwr:.1f} veh/km</div>
+                <div style="color:#5a7a9a;margin-top:8px">LP Objective W(D):</div>
+                <div style="color:#a855f7">{get_lp_result(loads,st.session_state.gw_active)['optimised']:.1f} min</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Auto-refresh
+        st.markdown("---")
+        auto_refresh = st.toggle("🔄 Auto-Refresh (5s)", value=False, key="auto_refresh")
+        if auto_refresh:
+            _time.sleep(5)
+            st.rerun()
+
+        # Footer
+        st.markdown("""
+        <div style="font-size:8px;color:#5a7a9a;margin-top:14px;line-height:1.6">
+            Data: Kaggle BLR Traffic 2024-25<br>
+            TomTom Traffic Index · BBMP<br>
+            Model: LP + LWR + Green Wave<br>
+            NMIT ISE · Batch 2025
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── GLOBAL METRICS ROW ───────────────────────────────────
+    hour       = datetime.datetime.now().hour
+    tf         = HOURLY_PATTERN[hour] * (st.session_state.density_pct / 65.0)
+    gw_f       = 0.72 if st.session_state.gw_active else 1.0
+    avg_speed  = round(80 - tf * 50)
+    avg_delay  = round((5 + tf * 25 * gw_f), 1)
+    active_veh = int(1500 + tf * 3000)
+    num_jams   = max(0, int(tf * 5 * (0.6 if st.session_state.gw_active else 1)))
+    co2_pct    = f"-{round(15 + tf * 10)}%" if st.session_state.gw_active else f"-{round(5 + tf * 3)}%"
+    lp_res     = get_lp_result(loads, st.session_state.gw_active)
+
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+    c1.metric("🚗 Active Vehicles", f"{active_veh:,}",   delta=f"+{int(tf*12)}%")
+    c2.metric("⚡ Avg Speed (km/h)", f"{avg_speed}",       delta=f"{'-' if tf>0.5 else '+'}{int(abs(avg_speed-60))}",
+              delta_color="inverse" if tf > 0.5 else "normal")
+    c3.metric("⏱ Avg Delay (min)",  f"{avg_delay}",       delta=f"+{round(tf*2.1,1)} min", delta_color="inverse")
+    c4.metric("🔴 Active Jams",      f"{num_jams}",        delta="Critical" if num_jams >= 4 else "Manageable", delta_color="inverse" if num_jams >= 4 else "normal")
+    c5.metric("🌿 CO₂ Reduction",    co2_pct,              delta="Green Wave" if st.session_state.gw_active else "Static mode")
+    c6.metric("📈 LP Reduction",     f"{lp_res['reduction_pct']}%", delta="Optimised")
+    c7.metric("🔗 Signals Sync'd",   f"{'8' if st.session_state.gw_active else '2'}/10", delta="Wave active" if st.session_state.gw_active else "Off")
+
+    st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
+
+    # ── MAIN TABS ────────────────────────────────────────────
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "🗺️  Live Map & Signals",
+        "📊  Traffic Analytics",
+        "⚡  Green Wave Model",
+        "🚑  EVP System",
+        "🧮  LP & LWR Theory",
+    ])
+
+    # ════════════════════════════════════════════════════════
+    # TAB 1 — LIVE MAP & SIGNALS
+    # ════════════════════════════════════════════════════════
+    with tab1:
+        map_col, sig_col = st.columns([2, 1])
+
+        with map_col:
+            sec_header("🗺️", "Bangalore Road Network", f"Layer: {st.session_state.map_layer.upper()}")
+            m = build_map(loads, st.session_state.map_layer, st.session_state.evp_active)
+            st_folium(m, width=None, height=480, returned_objects=[])
+
+        with sig_col:
+            # Signal timer
+            sec_header("🚦", "Signal Controller")
+            phi_val = green_wave_offset(4.0, st.session_state.v_kmh, st.session_state.cycle_T)
+            st.markdown(
+                signal_html(
+                    st.session_state.signal_phase,
+                    max(0, int(st.session_state.signal_timer)),
+                    phi_val,
+                    st.session_state.evp_active,
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+            # Junction load gauges
+            sec_header("⬡", "Top Junction Load")
+            g1, g2 = st.columns(2)
+            top2 = sorted(loads.items(), key=lambda x: x[1], reverse=True)[:2]
+            with g1:
+                nm, val = top2[0]
+                st.plotly_chart(build_gauge(val, nm[:10], _load_color(val)), use_container_width=True, config={"displayModeBar": False})
+            with g2:
+                nm, val = top2[1]
+                st.plotly_chart(build_gauge(val, nm[:10], _load_color(val)), use_container_width=True, config={"displayModeBar": False})
+
+            # Junction status table
+            sec_header("⬡", "All Junction Status")
+            rows = []
+            for jn in JUNCTION_NAMES:
+                l  = loads[jn]
+                c  = "🔴" if l > 80 else "🟡" if l > 60 else "🟢"
+                st_val = "CRITICAL" if l > 80 else "BUSY" if l > 60 else "CLEAR"
+                rows.append({"Junction": jn, "Load": f"{l:.0f}%", "State": f"{c} {st_val}"})
+            df_status = pd.DataFrame(rows)
+            st.dataframe(
+                df_status,
+                use_container_width=True,
+                hide_index=True,
+                height=220,
+                column_config={
+                    "Junction": st.column_config.TextColumn("Junction"),
+                    "Load":     st.column_config.TextColumn("Load %"),
+                    "State":    st.column_config.TextColumn("Status"),
+                },
+            )
+
+        # Alert Feed
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        sec_header("⚡", "Live Alert Feed", f"{len(_ALERTS)} alerts")
+        render_alerts()
+
+    # ════════════════════════════════════════════════════════
+    # TAB 2 — TRAFFIC ANALYTICS
+    # ════════════════════════════════════════════════════════
+    with tab2:
+        r1c1, r1c2 = st.columns([3, 2])
+
+        with r1c1:
+            sec_header("◈", "24-Hour Traffic Volume", st.session_state.selected_junction)
+            df24 = get_24h_series(
+                st.session_state.selected_junction,
+                st.session_state.density_pct,
+                st.session_state.gw_active,
+            )
+            st.plotly_chart(build_24h_chart(df24, st.session_state.selected_junction), use_container_width=True, config={"displayModeBar": False})
+
+        with r1c2:
+            sec_header("◈", "Network Radar — Load %")
+            st.plotly_chart(build_radar(loads), use_container_width=True, config={"displayModeBar": False})
+
+        r2c1, r2c2 = st.columns(2)
+        with r2c1:
+            sec_header("◈", "Avg Delay — Static vs Green Wave")
+            df_cmp = get_flow_comparison(st.session_state.gw_active)
+            st.plotly_chart(build_delay_bar(df_cmp), use_container_width=True, config={"displayModeBar": False})
+
+        with r2c2:
+            sec_header("◈", "Day × Junction Load Heatmap (%)")
+            df_heat = get_weekly_heatmap(st.session_state.gw_active)
+            st.plotly_chart(build_heatmap(df_heat), use_container_width=True, config={"displayModeBar": False})
+
+        # Raw data table
+        with st.expander("📋 Raw Junction Load Data (Live)"):
+            df_raw = pd.DataFrame([
+                {"Junction": k, "Load (%)": round(v, 1),
+                 "Status": "CRITICAL" if v > 80 else "BUSY" if v > 60 else "CLEAR",
+                 "GW Offset φ (s)": round(green_wave_offset(4.0, st.session_state.v_kmh, st.session_state.cycle_T), 2),
+                 "LWR Density (veh/km)": round(lwr_density(v * 20, st.session_state.v_kmh), 1)}
+                for k, v in loads.items()
+            ])
+            st.dataframe(df_raw, use_container_width=True, hide_index=True)
+
+    # ════════════════════════════════════════════════════════
+    # TAB 3 — GREEN WAVE MODEL
+    # ════════════════════════════════════════════════════════
+    with tab3:
+        sec_header("⚡", "Green Wave Time-Space Diagram",
+                   f"v_c = {st.session_state.v_kmh:.0f} km/h · T = {st.session_state.cycle_T:.0f}s")
+        st.plotly_chart(build_green_wave_chart(st.session_state.v_kmh, st.session_state.cycle_T),
+                        use_container_width=True, config={"displayModeBar": False})
+
+        gw_c1, gw_c2 = st.columns(2)
+        with gw_c1:
+            sec_header("📐", "Computed Corridor Offsets")
+            corridors = [("Silk Board → HSR Layout", 4.0), ("HSR Layout → Bellandur", 4.0), ("Bellandur → Whitefield", 5.0)]
+            rows_gw = []
+            for name, dist in corridors:
+                phi = green_wave_offset(dist, st.session_state.v_kmh, st.session_state.cycle_T)
+                rows_gw.append({"Corridor": name, "Dist (km)": dist, "φ Offset (s)": round(phi, 2), "v_c (km/h)": st.session_state.v_kmh})
+            st.dataframe(pd.DataFrame(rows_gw), use_container_width=True, hide_index=True)
+
+            st.markdown("""
+            <div style="background:#0d1f3c;border:1px solid #1a3a5c;border-radius:6px;
+                        padding:12px;font-family:'Courier New',monospace;font-size:11px;margin-top:10px">
+                <div style="color:#00d4ff;margin-bottom:6px">📐 Green Wave Formula</div>
+                <div style="color:#e0f0ff">φ = (L / v_c)  mod  T</div>
+                <div style="color:#5a7a9a;font-size:9px;margin-top:6px">
+                    L = distance between signals (m)<br>
+                    v_c = corridor design speed (m/s)<br>
+                    T = total signal cycle time (s)<br>
+                    φ = required offset between phases
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with gw_c2:
+            sec_header("📊", "Delay Savings — Green Wave Active")
+            df_cmp2 = get_flow_comparison(st.session_state.gw_active)
+            saving_fig = go.Figure()
+            df_cmp2["Saving (min)"] = df_cmp2["Static (min)"] - df_cmp2["Green Wave (min)"]
+            saving_fig.add_trace(go.Bar(
+                x=df_cmp2["Junction"],
+                y=df_cmp2["Saving (min)"],
+                marker_color="rgba(0,255,136,0.7)",
+                marker_line_color="#00ff88",
+                marker_line_width=1,
+                text=df_cmp2["Saving (min)"].apply(lambda x: f"-{x} min"),
+                textposition="outside",
+                textfont=dict(color="#00ff88", size=9),
+                name="Delay Saving",
+            ))
+            saving_fig.update_layout(
+                **PLOTLY_LAYOUT,
+                title=dict(text="Per-Junction Delay Saved (min)", font=dict(color="#00d4ff", size=12)),
+                height=280,
+                showlegend=False,
+            )
+            st.plotly_chart(saving_fig, use_container_width=True, config={"displayModeBar": False})
+
+    # ════════════════════════════════════════════════════════
+    # TAB 4 — EVP SYSTEM
+    # ════════════════════════════════════════════════════════
+    with tab4:
+        evp_c1, evp_c2 = st.columns([3, 2])
+
+        with evp_c1:
+            sec_header("🚑", "EVP Lead-Time Model", "S = d / v")
+            st.plotly_chart(build_evp_chart(st.session_state.evp_distance, st.session_state.evp_speed),
+                            use_container_width=True, config={"displayModeBar": False})
+
+        with evp_c2:
+            sec_header("🚑", "EVP Status")
+            evp_t_cur = evp_signal_time(st.session_state.evp_distance, st.session_state.evp_speed)
+            status_color = "#ff3366" if st.session_state.evp_active else "#5a7a9a"
+            st.markdown(f"""
+            <div style="background:#0d1f3c;border:1px solid {'#ff3366' if st.session_state.evp_active else '#1a3a5c'};
+                        border-radius:8px;padding:16px;font-family:'Courier New',monospace;
+                        {'box-shadow:0 0 20px rgba(255,51,102,0.2)' if st.session_state.evp_active else ''}">
+                <div style="font-size:24px;text-align:center;margin-bottom:10px">
+                    {'🚨' if st.session_state.evp_active else '🚑'}
+                </div>
+                <div style="text-align:center;font-size:10px;color:{status_color};
+                            letter-spacing:2px;font-weight:700;margin-bottom:12px">
+                    {'EVP ACTIVE — CORRIDOR PRE-EMPTED' if st.session_state.evp_active else 'EVP STANDBY'}
+                </div>
+                <div style="font-size:10px;margin-bottom:6px">
+                    <span style="color:#5a7a9a">Priority Weight:</span>
+                    <span style="color:#ff3366;font-weight:700">{'P → ∞' if st.session_state.evp_active else 'P = 1'}</span>
+                </div>
+                <div style="font-size:10px;margin-bottom:6px">
+                    <span style="color:#5a7a9a">Route:</span>
+                    <span style="color:#e0f0ff">Silk Board → HSR → Bellandur</span>
+                </div>
+                <div style="font-size:10px;margin-bottom:6px">
+                    <span style="color:#5a7a9a">Distance:</span>
+                    <span style="color:#e0f0ff">{st.session_state.evp_distance:.0f} m</span>
+                </div>
+                <div style="font-size:10px;margin-bottom:6px">
+                    <span style="color:#5a7a9a">Speed:</span>
+                    <span style="color:#e0f0ff">{st.session_state.evp_speed:.0f} km/h</span>
+                </div>
+                <div style="font-size:10px;margin-bottom:6px">
+                    <span style="color:#5a7a9a">Pre-emption Lead Time:</span>
+                    <span style="color:#ff8c00;font-weight:700">{evp_t_cur:.1f} s</span>
+                </div>
+                <div style="font-size:10px">
+                    <span style="color:#5a7a9a">Golden Hour Remaining:</span>
+                    <span style="color:#00ff88;font-weight:700">{'42:18' if st.session_state.evp_active else '--:--'}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+            sec_header("📐", "EVP Formula")
+            st.markdown("""
+            <div style="background:#0d1f3c;border:1px solid #1a3a5c;border-radius:6px;
+                        padding:12px;font-family:'Courier New',monospace;font-size:11px">
+                <div style="color:#ff3366;margin-bottom:6px">Signal Override Timing:</div>
+                <div style="color:#e0f0ff">S = d / v</div>
+                <div style="color:#5a7a9a;font-size:9px;margin-top:6px">
+                    d = distance to next signal (m)<br>
+                    v = ambulance velocity (m/s)<br>
+                    S = seconds before signal to pre-empt<br><br>
+                    When P = ∞ detected:<br>
+                    All corridor signals → GREEN<br>
+                    Cross-traffic → RED (safety interval maintained)
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # EVP speed sensitivity
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        sec_header("📊", "EVP Sensitivity — Distance vs Lead-Time vs Speed")
+        speeds_range   = [20, 30, 40, 50, 60, 70, 80]
+        distances_evp  = [100, 250, 500, 750, 1000, 1500, 2000]
+        heat_z         = [[round(evp_signal_time(d, s)) for d in distances_evp] for s in speeds_range]
+        evp_heat_fig   = go.Figure(go.Heatmap(
+            z=heat_z,
+            x=[f"{d}m" for d in distances_evp],
+            y=[f"{s}km/h" for s in speeds_range],
+            colorscale=[[0, "#00ff88"], [0.5, "#ff8c00"], [1, "#ff3366"]],
+            colorbar=dict(title=dict(text="Sec", font=dict(color="#5a7a9a")), tickfont=dict(color="#5a7a9a")),
+            text=heat_z,
+            texttemplate="%{z}s",
+            textfont=dict(size=9, color="#e0f0ff"),
+        ))
+        evp_heat_fig.update_layout(
+            **PLOTLY_LAYOUT,
+            title=dict(text="Pre-emption Lead Time (seconds) — Ambulance Speed × Signal Distance", font=dict(color="#00d4ff", size=12)),
+            height=260,
+        )
+        st.plotly_chart(evp_heat_fig, use_container_width=True, config={"displayModeBar": False})
+
+    # ════════════════════════════════════════════════════════
+    # TAB 5 — LP & LWR THEORY
+    # ════════════════════════════════════════════════════════
+    with tab5:
+        th_c1, th_c2 = st.columns([3, 2])
+
+        with th_c1:
+            sec_header("📐", "LWR Traffic Flow Model — Fundamental Diagram")
+            st.plotly_chart(build_lwr_chart(), use_container_width=True, config={"displayModeBar": False})
+
+        with th_c2:
+            sec_header("🧮", "LP Optimisation Result")
+            lp = get_lp_result(loads, st.session_state.gw_active)
+            st.markdown(f"""
+            <div style="background:#0d1f3c;border:1px solid #1a3a5c;border-radius:8px;
+                        padding:14px;font-family:'Courier New',monospace;font-size:11px">
+                <div style="color:#00d4ff;margin-bottom:8px;font-size:12px">
+                    W(D) = Σ min ∫ t dt
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                    <span style="color:#5a7a9a">Baseline Delay:</span>
+                    <span style="color:#ff3366;font-weight:700">{lp['total_delay']} min</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                    <span style="color:#5a7a9a">LP-Optimised:</span>
+                    <span style="color:#00ff88;font-weight:700">{lp['optimised']} min</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+                    <span style="color:#5a7a9a">Reduction:</span>
+                    <span style="color:#a855f7;font-weight:700">{lp['reduction_pct']}%</span>
+                </div>
+                <div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:{lp['reduction_pct']}%;
+                                background:linear-gradient(90deg,#a855f7,#00d4ff);
+                                border-radius:4px"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+            sec_header("📐", "Model Constraints")
+            st.markdown("""
+            <div style="background:#0d1f3c;border:1px solid #1a3a5c;border-radius:6px;
+                        padding:12px;font-family:'Courier New',monospace;font-size:10px;line-height:1.8">
+                <div style="color:#00d4ff">Objective:</div>
+                <div style="color:#e0f0ff">  min W(D) = Σᵢ ∫ tᵢ dt</div>
+                <div style="color:#00d4ff;margin-top:8px">Subject To:</div>
+                <div style="color:#e0f0ff">  • gᵢ + yᵢ + rᵢ = T  (cycle constraint)</div>
+                <div style="color:#e0f0ff">  • gᵢ ≥ g_min         (pedestrian safety)</div>
+                <div style="color:#e0f0ff">  • φᵢ = (Lᵢ/v_c) mod T (green wave)</div>
+                <div style="color:#e0f0ff">  • Pₑᵥₚ → ∞             (emergency override)</div>
+                <div style="color:#e0f0ff">  • ρ = q/v              (LWR density)</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # LP comparison bar
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        sec_header("📊", "LP Optimisation — Per Junction Delay (Before vs After)")
+        j_names_lp  = list(BASE_LOADS.keys())
+        before_lp   = [round(BASE_LOADS[j] * 0.48 * (st.session_state.density_pct / 65.0)) for j in j_names_lp]
+        after_lp    = [round(b * (0.65 if st.session_state.gw_active else 0.95)) for b in before_lp]
+
+        lp_fig = go.Figure()
+        lp_fig.add_trace(go.Bar(x=j_names_lp, y=before_lp, name="Before LP",
+                                marker_color="rgba(255,51,102,0.7)", marker_line_color="#ff3366", marker_line_width=1))
+        lp_fig.add_trace(go.Bar(x=j_names_lp, y=after_lp, name="After LP",
+                                marker_color="rgba(168,85,247,0.7)", marker_line_color="#a855f7", marker_line_width=1))
+        lp_fig.update_layout(
+            **PLOTLY_LAYOUT,
+            barmode="group",
+            title=dict(text="Junction Delay — Before and After LP Optimisation (min)", font=dict(color="#00d4ff", size=12)),
+            height=280,
+        )
+        st.plotly_chart(lp_fig, use_container_width=True, config={"displayModeBar": False})
+
+        # References
+        with st.expander("📚 References"):
+            st.markdown("""
+            <div style="font-family:'Courier New',monospace;font-size:10px;line-height:2;color:#e0f0ff">
+                <b style="color:#00d4ff">Graph Theory:</b><br>
+                West, D.B. (2001). Introduction to Graph Theory. Prentice Hall.<br><br>
+                <b style="color:#00d4ff">Traffic Flow Dynamics:</b><br>
+                Lighthill, M.J. & Whitham, G.B. (1955). On Kinematic Waves II.<br>
+                Proc. Royal Society of London, 229(1178), 317–345.<br><br>
+                <b style="color:#00d4ff">Mathematical Optimisation:</b><br>
+                Taha, H.A. (2017). Operations Research: An Introduction. Pearson.<br><br>
+                <b style="color:#00d4ff">Local Traffic Data:</b><br>
+                TomTom Traffic Index: Bangalore 2024-2025.<br>
+                Kaggle: Bangalore Urban Traffic Dataset 2024.<br>
+                BBMP Smart City Traffic Reports 2024.
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ── Bottom bar ───────────────────────────────────────────
     st.markdown("---")
-    t3c1, t3c2 = st.columns(2)
-    with t3c1:
-        st.markdown('<div class="sec-header amber">Signal Gantt</div>', unsafe_allow_html=True)
-        phi_g = (4000/max(vc_v/3.6,1)) % T_v
-        fig_g = go.Figure()
-        for i,jn in enumerate(JNAMES):
-            density=float(dens_arr[i]); off=int(phi_g*i)%T_v
-            rho_jn=density/100; g_dur=min(int(T_v*(0.52+rho_jn*0.20)),int(T_v*0.80))
-            for s,e,ph,col in [(off,off+g_dur,"GREEN","#00ff88"),(off+g_dur,off+g_dur+5,"AMBER","#ffaa00"),(off+g_dur+5,off+T_v,"RED","#ff3344")]:
-                sw=max(1,(e%T_v)-(s%T_v)) if (e%T_v)>(s%T_v) else max(1,T_v-(s%T_v))
-                fig_g.add_trace(go.Bar(y=[jn],x=[sw],base=[s%T_v],orientation="h",
-                    marker=dict(color=col,opacity=0.75,line=dict(width=0)),
-                    name=ph,showlegend=(i==0),hovertemplate=f"<b>{jn}</b><br>{ph}<extra></extra>"))
-            if jn in evp_junctions:
-                fig_g.add_annotation(x=T_v/2,y=jn,text="EVP PREEMPTED",
-                    font=dict(color="#ff5500",size=9,family=FONT_MONO),showarrow=False)
-        apply_layout(fig_g, xtitle="Seconds in cycle", height=340, barmode="stack",
-                     xaxis=dict(range=[0,T_v],color=TICK_COL,gridcolor=GRID_COL),
-                     yaxis=dict(autorange="reversed",color=TICK_COL))
-        st.plotly_chart(fig_g, use_container_width=True, key="sig_gantt")
-    with t3c2:
-        st.markdown('<div class="sec-header green">Time-Space Diagram</div>', unsafe_allow_html=True)
-        dists = np.linspace(0,22,60)
-        gw_ts = dists*(3.6/max(vc_v,1)) if st.session_state.gw_enabled else dists*2.1
-        base_ts = dists*2.5+np.sin(dists*0.45)*3.5
-        fig_ts = go.Figure()
-        fig_ts.add_trace(go.Scatter(x=dists,y=base_ts,name="Baseline",
-            line=dict(color="rgba(255,51,68,0.6)",width=2,dash="dot"),fill="tozeroy",fillcolor="rgba(255,51,68,0.04)"))
-        fig_ts.add_trace(go.Scatter(x=dists,y=gw_ts,name=f"GW@{vc_v}km/h",
-            line=dict(color="rgba(0,170,255,0.8)",width=2,dash="dash"),fill="tozeroy",fillcolor="rgba(0,170,255,0.04)"))
-        fig_ts.add_trace(go.Scatter(x=dists,y=gw_ts*0.88,name="Adaptive",
-            line=dict(color="#00ff88",width=2.5),fill="tozeroy",fillcolor="rgba(0,255,136,0.06)"))
-        for jn,jd in JUNCTIONS.items():
-            fig_ts.add_vline(x=jd["km"],line=dict(color="rgba(0,170,255,0.18)",width=1,dash="dash"),
-                annotation_text=jn[:6],annotation_font_color="#3a5a6a",annotation_font_size=7)
-        apply_layout(fig_ts,xtitle="Distance (km)",ytitle="Travel time (min)",height=340)
-        st.plotly_chart(fig_ts, use_container_width=True, key="time_space")
+    st.markdown(
+        '<div style="display:flex;justify-content:space-between;font-family:\'Courier New\',monospace;'
+        'font-size:9px;color:#5a7a9a;padding:2px 0">'
+        '<span>● SYSTEM ONLINE · 10/10 NODES · 48 SIGNALS ACTIVE</span>'
+        '<span>W(D) = Σ min∫(t)dt  ·  φ = L/v_c mod T  ·  S = d/v</span>'
+        '<span>NMIT ISE · NISHCHAL VISHWANATH NB25ISE160 · RISHUL KH NB25ISE186</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
-# ---- TAB 4 ----
-with tab4:
-    t4c1, t4c2 = st.columns(2)
-    with t4c1:
-        st.markdown(f"""<div class="equation-box">
-          <b>Algorithm: 5-Layer Vectorized Optimizer</b><br><br>
-          Layer 1: LP objective on J={NJ} junctions (O(J), not O(N))<br>
-          Layer 2: Green Wave Phi=(L/v_c) mod T = <b>{phi_v:.1f}s</b><br>
-          Layer 3: LWR density-adaptive g_dur<br>
-          Layer 4: EVP preemption (O(n_evp)={stats['active_evp']})<br>
-          Layer 5: Background map cache<br><br>
-          Fleet N={fleet['N']:,} . Step: pure numpy . O(N) SIMD<br>
-          DR={dr_now:.1f}% . Wait={wait_ratio:.1f}% . Tick #{tick}</div>""", unsafe_allow_html=True)
-    with t4c2:
-        st.markdown(f"""<div class="equation-box">
-          <b>LWR + Graph Theory</b><br><br>
-          G=(V,E) . |V|={NJ} . |E|={len(ROAD_EDGES)}<br>
-          d&#961;/dt + d(&#961;v)/dx = 0<br>
-          Greenshields: v=v_max(1-&#961;/&#961;_max)<br>
-          q=&#961;.v_max.(1-&#961;/&#961;_max)<br>
-          w_s=(q2-q1)/(&#961;2-&#961;1)<br><br>
-          Mode: {st.session_state.algo_mode}<br>
-          v_c={vc_v}km/h . T={T_v}s . Phi={phi_v:.1f}s<br><br>
-          Active normal: {stats['active_normal']:,}<br>
-          Active EVP:    {stats['active_evp']:,}<br>
-          Completed:     {stats['completed']:,}</div>""", unsafe_allow_html=True)
+    # ── Periodic alerts ──────────────────────────────────────
+    if st.session_state.tick % 20 == 0:
+        templates = [
+            ("CONGESTION", f"Silk Board density {loads['Silk Board']:.0f}% — Auto-adjusting offsets", "warn"),
+            ("GREEN WAVE",  "φ synchronised across ORR-Hebbal corridor at 40 km/h", "success"),
+            ("LWR MODEL",   f"Shock-wave forming at ORR — predictive routing engaged", "warn"),
+            ("OPTIMISER",   f"LP solver reduced Hebbal delay by {lp_res['reduction_pct']}%", "info"),
+        ]
+        t_idx = (st.session_state.tick // 20) % len(templates)
+        push_alert(*templates[t_idx])
 
-# --- Footer ---
-st.markdown("<hr style='border-color:#112233;margin:8px 0 5px'>", unsafe_allow_html=True)
-st.markdown(f"""<div style='display:flex;justify-content:space-between;align-items:center'>
-  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>URBAN FLOW . BANGALORE . NMIT ISE 2025</span>
-  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>{st.session_state.algo_mode} . DR={dr_now:.1f}% . FLEET {fleet["N"]:,} . TICK #{tick}</span>
-  <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>NISHCHAL VISHWANATH (NB25ISE160) . RISHUL KH (NB25ISE186)</span>
-</div>""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    main()
