@@ -93,4 +93,3 @@ if st.button("▶️ Initialize Real-Time Grid Feed"):
         # Using stable Mapbox Road style to prevent JavaScript errors
         map_placeholder.pydeck_chart(pdk.Deck(
             map_style='mapbox://styles/mapbox/dark-
-        
