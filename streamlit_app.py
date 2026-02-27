@@ -8,9 +8,9 @@ from scipy.optimize import minimize
 # --- 1. CORE MATH & OPTIMIZATION (NMIT PoC Logic) ---
 class PoliceCommandLogic:
     def __init__(self):
-        # Total cycle time T = 120s
+        # Total cycle time T = 120s [cite: 44]
         self.cycle_time = 120 
-        # Bangalore road network coordinates
+        # Bangalore road network coordinates [cite: 27]
         self.intersections = {
             "Silk Board": {"pos": [77.6238, 12.9177], "idx": 0},
             "HSR Layout": {"pos": [77.6450, 12.9100], "idx": 1},
@@ -18,11 +18,12 @@ class PoliceCommandLogic:
         }
 
     def solve_delay_objective(self, densities, em_indices):
-        """Minimize total delay W while establishing Zero-Delay paths for emergency vehicles"""
+        """Minimize total delay W while establishing Zero-Delay paths [cite: 23, 38]"""
         def objective_func(x):
             weights = np.ones(len(densities))
             for idx in em_indices: 
-                weights[idx] = 1000000 # EVP Priority Weight P -> Infinity
+                weights[idx] = 1000000 # EVP Priority Weight P -> Infinity [cite: 42]
+            # W = sum(density * weight / green_time) [cite: 38]
             return np.sum((densities * weights) / x)
 
         constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.cycle_time})
@@ -34,26 +35,26 @@ class PoliceCommandLogic:
 st.set_page_config(page_title="Bangalore Traffic Command Center", layout="wide")
 st.title("🏙️ Bangalore Active Grid Control: Police Dashboard")
 
-# Initialize vehicular flow simulation (LWR Model)
+# Initialize vehicular flow simulation (LWR Model) [cite: 29]
 if 'vehicles' not in st.session_state:
     st.session_state.vehicles = pd.DataFrame({
         'lon': np.random.uniform(77.62, 77.68, 150),
         'lat': np.random.uniform(12.91, 12.93, 150),
-        'speed': np.random.uniform(0.0002, 0.0005, 150)
+        'speed': np.random.uniform(0.0002, 0.0005, 150) # Target vc [cite: 45]
     })
 
 logic = PoliceCommandLogic()
 
-# Sidebar: Dispatch & Control
+# Sidebar: Dispatch & Control [cite: 31, 32]
 st.sidebar.header("🚨 Emergency Dispatch")
 em_active = st.sidebar.multiselect("Active Emergency Corridors", list(logic.intersections.keys()))
 em_indices = [logic.intersections[name]["idx"] for name in em_active]
 
-# Processing Layer
+# Processing Layer [cite: 33]
 densities = np.array([50, 30, 45])
 optimized_signals = logic.solve_delay_objective(densities, em_indices)
 
-# Performance Metrics based on project goals
+# Performance Metrics based on project goals [cite: 76, 90, 94]
 col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("Commuter Delay Reduction", f"{30 if em_active else 25}%", delta="Target Met")
@@ -67,7 +68,7 @@ map_placeholder = st.empty()
 
 if st.button("▶️ Initialize Real-Time Grid Feed"):
     while True:
-        # Update positions simulating fluid flow dynamics
+        # Update positions simulating fluid flow dynamics [cite: 29]
         st.session_state.vehicles['lon'] += st.session_state.vehicles['speed']
         st.session_state.vehicles['lat'] += st.session_state.vehicles['speed'] * 0.2
         
@@ -75,7 +76,7 @@ if st.button("▶️ Initialize Real-Time Grid Feed"):
         st.session_state.vehicles.loc[st.session_state.vehicles['lon'] > 77.68, 'lon'] = 77.62
         st.session_state.vehicles.loc[st.session_state.vehicles['lat'] > 12.93, 'lat'] = 12.91
 
-        # Calculate signal states
+        # Calculate signal states [cite: 34, 43]
         signals = []
         for name, data in logic.intersections.items():
             is_green = data["idx"] in em_indices or (int(time.time()*2) % 4 > 1)
@@ -90,6 +91,10 @@ if st.button("▶️ Initialize Real-Time Grid Feed"):
         s_layer = pdk.Layer("ScatterplotLayer", pd.DataFrame(signals), 
                             get_position='pos', get_color='color', get_radius=180)
 
-        # Using stable Mapbox Road style to prevent JavaScript errors
+        # Using stable Mapbox style string to prevent Syntax and JavaScript errors
         map_placeholder.pydeck_chart(pdk.Deck(
-            map_style='mapbox://styles/mapbox/dark-
+            map_style='mapbox://styles/mapbox/dark-v10', 
+            initial_view_state=pdk.ViewState(longitude=77.6450, latitude=12.9177, zoom=13, pitch=45),
+            layers=[v_layer, s_layer]
+        ))
+        time.sleep(0.05)
