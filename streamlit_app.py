@@ -562,45 +562,6 @@ def render_log():
     return '<div class="cmd-log">' + "\n".join(lines) + "</div>"
 
 # -----------------------------------------------------------------------------
-# SIMULATION STEP
-# -----------------------------------------------------------------------------
-if st.session_state.sim_running:
-    st.session_state.fleet = step_fleet(
-        st.session_state.fleet,
-        st.session_state.gw_enabled,
-        st.session_state.vc,
-        st.session_state.T,
-        st.session_state.tick,
-    )
-    st.session_state.tick += 1
-    tick = st.session_state.tick
-    fleet = st.session_state.fleet
-    stats = get_fleet_stats(fleet)
-
-    # O(1) delay reduction
-    evp_active = stats["active_evp"] > 0
-    dr = compute_network_delay_reduction(
-        st.session_state.T, st.session_state.vc,
-        st.session_state.gw_enabled, evp_active)
-    st.session_state.delay_history.append(dr)
-    if len(st.session_state.delay_history) > 120:
-        st.session_state.delay_history = st.session_state.delay_history[-120:]
-    st.session_state.throughput_history.append(stats["active_total"])
-    if len(st.session_state.throughput_history) > 120:
-        st.session_state.throughput_history = st.session_state.throughput_history[-120:]
-
-    if tick % 8 == 0:
-        if evp_active:
-            add_log(f" {stats['active_evp']} EVP unit(s) active - all corridors PREEMPTED", "evp")
-        else:
-            add_log(f"DR: {dr:.1f}% | Active: {stats['active_total']:,} | GW: {'ON' if st.session_state.gw_enabled else 'OFF'}", "ok")
-    if tick % 20 == 0:
-        phi_log = (4000/(max(st.session_state.vc,1)/3.6)) % st.session_state.T
-        add_log(f"Tick {tick} | Phi={phi_log:.1f}s | T={st.session_state.T}s | Fleet {fleet['N']:,}", "info")
-    if tick % 5 == 0 and evp_active:
-        add_log(f" EVP ALERT: {stats['active_evp']} unit(s) - signals PREEMPTED", "warn")
-
-# -----------------------------------------------------------------------------
 # PRECOMPUTE shared values used everywhere
 # -----------------------------------------------------------------------------
 
@@ -967,378 +928,375 @@ def build_map_figure(fleet, hour_df, dens_arr, signal_phases, edge_cong,
     return fig
 
 # =============================================================================
-# SIMULATION + RENDER LOOP
-# Everything inside this loop runs without page rebuild
-# Only the .empty() slot contents are swapped - zero blink
+# SIMULATION + RENDER (single pass per Streamlit script run)
+# st.rerun() at the bottom triggers the next frame - correct Streamlit pattern
 # =============================================================================
-while True:
-    fleet  = st.session_state.fleet
-    tick   = st.session_state.tick
+fleet  = st.session_state.fleet
+tick   = st.session_state.tick
 
-    # -- Step simulation if running --
-    if st.session_state.sim_running:
-        fleet = step_fleet(fleet, st.session_state.gw_enabled,
-                           st.session_state.vc, st.session_state.T, tick)
-        st.session_state.fleet = fleet
-        st.session_state.tick += 1
-        tick = st.session_state.tick
+# -- Step simulation if running --
+if st.session_state.sim_running:
+    fleet = step_fleet(fleet, st.session_state.gw_enabled,
+                       st.session_state.vc, st.session_state.T, tick)
+    st.session_state.fleet = fleet
+    st.session_state.tick += 1
+    tick = st.session_state.tick
 
-    # -- Precompute all values --
-    stats       = get_fleet_stats(fleet)
-    vc_v        = st.session_state.vc
-    T_v         = st.session_state.T
-    phi_v       = (4000 / max(vc_v/3.6, 1)) % T_v
-    hour_df     = df_traffic[df_traffic["Hour"] == st.session_state.selected_hour]
-    avg_cong    = float(hour_df["Congestion_Index"].mean())
-    avg_spd     = float(hour_df["Avg_Speed_kmh"].mean())
-    evp_active  = stats["active_evp"] > 0
+# -- Precompute all values --
+stats       = get_fleet_stats(fleet)
+vc_v        = st.session_state.vc
+T_v         = st.session_state.T
+phi_v       = (4000 / max(vc_v/3.6, 1)) % T_v
+hour_df     = df_traffic[df_traffic["Hour"] == st.session_state.selected_hour]
+avg_cong    = float(hour_df["Congestion_Index"].mean())
+avg_spd     = float(hour_df["Avg_Speed_kmh"].mean())
+evp_active  = stats["active_evp"] > 0
 
-    dens_arr = np.array([
-        float(hour_df[hour_df["Junction"]==jn]["Congestion_Index"].values[0])
-        if len(hour_df[hour_df["Junction"]==jn]) else 50.0
-        for jn in JNAMES], dtype=np.float32)
+dens_arr = np.array([
+    float(hour_df[hour_df["Junction"]==jn]["Congestion_Index"].values[0])
+    if len(hour_df[hour_df["Junction"]==jn]) else 50.0
+    for jn in JNAMES], dtype=np.float32)
 
-    evp_junctions  = get_evp_active_junctions(fleet)
-    signal_phases  = batch_signal_optimizer(tick, T_v, vc_v, st.session_state.gw_enabled,
-                                             dens_arr, evp_junctions, st.session_state.police_control)
-    dr_now         = compute_network_delay_reduction(T_v, vc_v, st.session_state.gw_enabled, evp_active)
-    eff_speed      = round(avg_spd * (1 + dr_now/100 * 0.3), 1)
-    wait_ratio     = stats["wait_ratio"]
-    edge_vcounts   = get_edge_vehicle_counts(fleet)
-    edge_cong      = compute_edge_congestion(hour_df, edge_vcounts, tick, max(stats["active_total"],1))
+evp_junctions  = get_evp_active_junctions(fleet)
+signal_phases  = batch_signal_optimizer(tick, T_v, vc_v, st.session_state.gw_enabled,
+                                         dens_arr, evp_junctions, st.session_state.police_control)
+dr_now         = compute_network_delay_reduction(T_v, vc_v, st.session_state.gw_enabled, evp_active)
+eff_speed      = round(avg_spd * (1 + dr_now/100 * 0.3), 1)
+wait_ratio     = stats["wait_ratio"]
+edge_vcounts   = get_edge_vehicle_counts(fleet)
+edge_cong      = compute_edge_congestion(hour_df, edge_vcounts, tick, max(stats["active_total"],1))
 
-    # Logging
-    if st.session_state.sim_running:
-        st.session_state.delay_history.append(dr_now)
-        if len(st.session_state.delay_history) > 120:
-            st.session_state.delay_history = st.session_state.delay_history[-120:]
-        st.session_state.throughput_history.append(stats["active_total"])
-        if len(st.session_state.throughput_history) > 120:
-            st.session_state.throughput_history = st.session_state.throughput_history[-120:]
-        if tick % 8 == 0:
-            if evp_active:
-                add_log(f"{stats['active_evp']} EVP active - corridors PREEMPTED", "evp")
-            else:
-                add_log(f"DR:{dr_now:.1f}% Active:{stats['active_total']:,} GW:{'ON' if st.session_state.gw_enabled else 'OFF'}", "ok")
-        if tick % 20 == 0:
-            add_log(f"Tick {tick} Phi={phi_v:.1f}s T={T_v}s Fleet {fleet['N']:,}", "info")
-        if tick % 5 == 0 and evp_active:
-            add_log(f"EVP ALERT: {stats['active_evp']} units - PREEMPTED", "warn")
-
-    # ==========================================================================
-    # UPDATE SLOTS (no page rebuild - only slot contents change)
-    # ==========================================================================
-
-    # Badge
-    with slot_badge:
-        badge = (f'<span class="evp-badge">{stats["active_evp"]:,} EVP ACTIVE</span>'
-                 if evp_active else '<span class="live-badge">SIM LIVE</span>')
-        st.markdown(f"""<div style='text-align:right;padding-top:6px'>{badge}<br>
-        <span style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a'>
-        TICK #{tick} . {stats["active_total"]:,}/{fleet["N"]:,} ACTIVE . Phi={phi_v:.1f}s
-        </span></div>""", unsafe_allow_html=True)
-
-    # Metrics
-    with slot_metrics:
-        m1,m2,m3,m4,m5,m6 = st.columns(6)
-        def mc(col, label, val, unit, sub, sub_cls, card_cls):
-            with col:
-                st.markdown(f"""<div class="metric-card {card_cls}">
-                  <div class="metric-label">{label}</div>
-                  <div class="metric-value">{val}<span>{unit}</span></div>
-                  <div class="metric-sub {sub_cls}">{sub}</div>
-                </div>""", unsafe_allow_html=True)
-        mc(m1,"Congestion",f"{avg_cong:.0f}","/100",f"Hour {st.session_state.selected_hour:02d}:00","","mc-red")
-        mc(m2,"Delay Reduction",f"{dr_now:.1f}","%","Adaptive vs baseline","up","mc-green")
-        mc(m3,"Avg Speed",f"{eff_speed:.1f}","km/h","optimised corridor","","mc-blue")
-        mc(m4,"Red-Light Wait",f"{wait_ratio:.1f}","%","of journey time","","mc-amber")
-        mc(m5,"Fleet",f"{fleet['N']:,}","",f"{st.session_state.evp_count:,} EVP","","mc-red" if evp_active else "mc-cyan")
-        mc(m6,"Active",f"{stats['active_total']:,}","",f"{stats['active_evp']:,} EVP","","mc-red" if evp_active else "mc-blue")
-
-    # ---------- TAB 1: PCC ----------
-    with slot_pcc:
-        if st.session_state.police_control:
-            pcc1,pcc2,pcc3,pcc4 = st.columns([1.2,1.2,1.2,2.4])
-            with pcc1:
-                cl = "CRITICAL" if avg_cong>=70 else ("MODERATE" if avg_cong>=50 else "CLEAR")
-                cc = "alert" if avg_cong>=70 else ("warn" if avg_cong>=50 else "ok")
-                wr = hour_df.loc[hour_df["Congestion_Index"].idxmax()] if len(hour_df) else None
-                wj = wr["Junction"] if wr is not None else "Silk Board"
-                wc = wr["Congestion_Index"] if wr is not None else 72
-                st.markdown(f"""<div class="pcc-box"><div class="pcc-title">NETWORK STATUS</div>
-                <div class="pcc-row"><span class="pcc-key">CONGESTION</span><span class="pcc-val {cc}">{avg_cong:.0f}/100 [{cl}]</span></div>
-                <div class="pcc-row"><span class="pcc-key">WORST JUNC</span><span class="pcc-val alert">{wj[:12]} ({wc:.0f})</span></div>
-                <div class="pcc-row"><span class="pcc-key">ACTIVE VEH</span><span class="pcc-val ok">{stats["active_total"]:,}</span></div>
-                <div class="pcc-row"><span class="pcc-key">COMPLETED</span><span class="pcc-val">{stats["completed"]:,}</span></div>
-                <div class="pcc-row"><span class="pcc-key">DR NOW</span><span class="pcc-val ok">{dr_now:.1f}%</span></div>
-                </div>""", unsafe_allow_html=True)
-            with pcc2:
-                rows = ""
-                for jn in JNAMES[:5]:
-                    phase,timer,_,_ = signal_phases[jn]
-                    has_evp = jn in evp_junctions
-                    dot = "G" if phase=="GREEN" else ("R" if phase=="RED" else "A")
-                    note = "PREEMPTED" if has_evp else f"{timer}s"
-                    rows += f'<div class="pcc-row"><span class="pcc-key">{jn[:12]}</span><span class="pcc-val {"alert" if has_evp else ""}">{dot} {phase[:3]} {note}</span></div>'
-                st.markdown(f'<div class="pcc-box"><div class="pcc-title">SIGNAL MATRIX</div>{rows}</div>',
-                             unsafe_allow_html=True)
-            with pcc3:
-                evp_rows = ""
-                n_evp_act = stats["active_evp"]
-                if n_evp_act > 0:
-                    for i in np.where(fleet["is_evp"] & ~fleet["completed"])[0][:5]:
-                        rid=int(fleet["route_id"][i]); si=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
-                        jnc=JNAMES[ROUTE_SEG_STARTS[rid][si]]
-                        et=EVP_TYPES[int(fleet["evp_type"][i])%len(EVP_TYPES)]
-                        prog=min(100,int((fleet["seg"][i]+fleet["t"][i])/max(ROUTE_LENGTHS[rid],1)*100))
-                        evp_rows += f'<div class="pcc-row"><span class="pcc-key">{et["emoji"]} {et["label"][:8]}</span><span class="pcc-val alert">{prog}%</span></div>'
-                    if n_evp_act > 5:
-                        evp_rows += f'<div class="pcc-row"><span class="pcc-key">+{n_evp_act-5} more</span></div>'
-                else:
-                    evp_rows = '<div class="pcc-row"><span class="pcc-key">NO ACTIVE EVP</span><span class="pcc-val ok">STANDBY</span></div>'
-                st.markdown(f'<div class="pcc-box"><div class="pcc-title">EMERGENCY UNITS</div>{evp_rows}</div>',
-                             unsafe_allow_html=True)
-            with pcc4:
-                st.markdown(f'<div class="pcc-box"><div class="pcc-title">COMMAND LOG</div>{render_log()}</div>',
-                             unsafe_allow_html=True)
-
-    # ---------- TAB 1: MAP ----------
-    with slot_map_hdr:
-        st.markdown(f'<div class="sec-header green">Real Bangalore - Live Traffic . '
-                    f'<span style="color:#00aaff">{stats["active_total"]:,} vehicles</span></div>',
-                    unsafe_allow_html=True)
-
-    with slot_map:
-        fig_map = build_map_figure(fleet, hour_df, dens_arr, signal_phases, edge_cong,
-                                    st.session_state.show_routes, st.session_state.show_heatmap,
-                                    tick, stats)
-        st.plotly_chart(fig_map, use_container_width=True, key=f"map_chart_{tick}")
-
-    # ---------- TAB 1: Fleet info panel ----------
-    with slot_fleet_info:
-        evp_cards = ""
-        for i in np.where(fleet["is_evp"] & ~fleet["completed"])[0][:6]:
-            rid=int(fleet["route_id"][i]); si=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
-            jnc=JNAMES[ROUTE_SEG_STARTS[rid][si]]; jnx=JNAMES[ROUTE_SEG_ENDS[rid][si]]
-            et=EVP_TYPES[int(fleet["evp_type"][i])%len(EVP_TYPES)]
-            prog=min(100,int((fleet["seg"][i]+fleet["t"][i])/max(ROUTE_LENGTHS[rid],1)*100))
-            evp_cards += f"""<div class="vcard emg">
-              <div style="display:flex;justify-content:space-between">
-                <span style="font-weight:700;color:{et['color']};font-size:0.82rem">{et['emoji']} E{i:04d}</span>
-                <span style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:{et['color']}">EVP</span>
-              </div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:#3a5a6a;margin-top:2px">
-                {et['label']}<br>{jnc[:10]}->{jnx[:10]}</div>
-              <div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:2px;height:3px">
-                <div style="width:{prog}%;height:100%;background:{et['color']};border-radius:2px"></div></div>
-              <div style="font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a;text-align:right">{prog}%</div>
-            </div>"""
-        overflow = ""
-        if stats["active_evp"] > 6:
-            overflow = f"<div style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#1a3a4a;text-align:center;padding:5px;border:1px solid #112233;border-radius:4px'>+{stats['active_evp']-6:,} more EVP</div>"
-        st.markdown(f"""
-        <div style='font-family:Share Tech Mono,monospace;font-size:0.58rem;color:#3a5a6a;margin-bottom:6px'>
-        FLEET {fleet["N"]:,} . ACTIVE {stats["active_total"]:,} . DONE {stats["completed"]:,}</div>
-        {evp_cards}{overflow}
-        <div class="metric-card mc-blue" style="margin-top:8px;font-family:Share Tech Mono,monospace;font-size:0.6rem">
-          <div class="metric-label">Fleet Stats</div>
-          <div style="color:#00aaff;font-size:0.62rem;margin-top:4px">
-            Normal: {stats["active_normal"]:,}<br>EVP: {stats["active_evp"]:,}<br>
-            Completed: {stats["completed"]:,}<br>Wait: {wait_ratio:.1f}%<br>DR: {dr_now:.1f}%
-          </div></div>""", unsafe_allow_html=True)
-        if len(st.session_state.delay_history) > 3:
-            fig_mini = go.Figure()
-            fig_mini.add_trace(go.Scatter(y=st.session_state.delay_history, mode="lines",
-                line=dict(color="#00ff88", width=1.5),
-                fill="tozeroy", fillcolor="rgba(0,255,136,0.07)"))
-            apply_layout(fig_mini, height=90,
-                         xaxis=dict(visible=False),
-                         yaxis=dict(color=TICK_COL, gridcolor=GRID_COL),
-                         margin=dict(l=20,r=5,t=5,b=10))
-            fig_mini.update_layout(showlegend=False)
-            st.plotly_chart(fig_mini, use_container_width=True, key=f"mini_dr_{tick}")
-
-    # ---------- TAB 2 ----------
-    with slot_t2_heat:
-        pivot = df_traffic.pivot_table(index="Junction", columns="Hour",
-                                        values="Congestion_Index", aggfunc="mean")
-        fig_h = go.Figure(go.Heatmap(
-            z=pivot.values, x=[f"{h:02d}:00" for h in pivot.columns], y=pivot.index.tolist(),
-            colorscale=[[0,"#03080d"],[0.3,"rgba(0,255,136,0.6)"],[0.65,"rgba(255,170,0,0.8)"],[1,"#ff3344"]],
-            colorbar=dict(tickfont=dict(color=TICK_COL,size=8)),
-            hovertemplate="<b>%{y}</b><br>%{x}<br>Congestion: %{z:.1f}<extra></extra>"))
-        apply_layout(fig_h, xtitle="Hour", ytitle="Junction", height=320)
-        st.plotly_chart(fig_h, use_container_width=True, key=f"heat_map_{tick}")
-
-    with slot_t2_speed:
-        jns4  = ["Silk Board","Hebbal","Whitefield","MG Road"]
-        cols4 = [("#ff3344","rgba(255,51,68,0.07)"),("#00ff88","rgba(0,255,136,0.07)"),
-                 ("#00aaff","rgba(0,170,255,0.07)"),("#ffaa00","rgba(255,170,0,0.07)")]
-        fig_s = go.Figure()
-        for jn,(col,fill) in zip(jns4,cols4):
-            jdf = df_traffic[df_traffic["Junction"]==jn].sort_values("Hour")
-            fig_s.add_trace(go.Scatter(x=jdf["Hour"], y=jdf["Avg_Speed_kmh"], name=jn,
-                mode="lines", line=dict(color=col,width=2), fill="tozeroy", fillcolor=fill))
-        apply_layout(fig_s, xtitle="Hour", ytitle="Avg Speed (km/h)", height=320)
-        st.plotly_chart(fig_s, use_container_width=True, key=f"speed_profile_{tick}")
-
-    with slot_t2_delay:
-        hb = hour_df.set_index("Junction")["Delay_Min"].reindex(JNAMES).fillna(0)
-        pd_vals = (hb * (1-dr_now/100)).round(2)
-        fig_b = go.Figure()
-        fig_b.add_trace(go.Bar(name="Baseline", x=JNAMES, y=hb.values,
-            marker=dict(color="rgba(255,51,68,0.65)",line=dict(color="#ff3344",width=1.5))))
-        fig_b.add_trace(go.Bar(name="Adaptive", x=JNAMES, y=pd_vals.values,
-            marker=dict(color="rgba(0,255,136,0.65)",line=dict(color="#00ff88",width=1.5))))
-        apply_layout(fig_b, ytitle="Delay (min)", height=290, barmode="group",
-                     xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
-                     yaxis=dict(range=[0,max(hb.max()*1.4,1)],color=TICK_COL,gridcolor=GRID_COL))
-        st.plotly_chart(fig_b, use_container_width=True, key=f"delay_bar_{tick}")
-
-    with slot_t2_dr:
-        if len(st.session_state.delay_history) > 2:
-            fig_dr = go.Figure()
-            fig_dr.add_trace(go.Scatter(y=st.session_state.delay_history, mode="lines",
-                line=dict(color="#00ff88",width=2), fill="tozeroy", fillcolor="rgba(0,255,136,0.08)"))
-            fig_dr.add_hline(y=25, line=dict(color="rgba(255,170,0,0.4)",width=1,dash="dash"))
-            apply_layout(fig_dr, ytitle="DR%", height=290,
-                         yaxis=dict(range=[0,60],color=TICK_COL,gridcolor=GRID_COL))
-            st.plotly_chart(fig_dr, use_container_width=True, key=f"dr_history_{tick}")
+# Logging
+if st.session_state.sim_running:
+    st.session_state.delay_history.append(dr_now)
+    if len(st.session_state.delay_history) > 120:
+        st.session_state.delay_history = st.session_state.delay_history[-120:]
+    st.session_state.throughput_history.append(stats["active_total"])
+    if len(st.session_state.throughput_history) > 120:
+        st.session_state.throughput_history = st.session_state.throughput_history[-120:]
+    if tick % 8 == 0:
+        if evp_active:
+            add_log(f"{stats['active_evp']} EVP active - corridors PREEMPTED", "evp")
         else:
-            st.info("Start simulation to see live DR history")
+            add_log(f"DR:{dr_now:.1f}% Active:{stats['active_total']:,} GW:{'ON' if st.session_state.gw_enabled else 'OFF'}", "ok")
+    if tick % 20 == 0:
+        add_log(f"Tick {tick} Phi={phi_v:.1f}s T={T_v}s Fleet {fleet['N']:,}", "info")
+    if tick % 5 == 0 and evp_active:
+        add_log(f"EVP ALERT: {stats['active_evp']} units - PREEMPTED", "warn")
 
-    with slot_t2_edge:
-        enames = [f"{j1[:5]}->{j2[:5]}" for (j1,j2) in ROAD_EDGES]
-        evals  = [edge_cong.get(e,50) for e in ROAD_EDGES]
-        ecols2 = [cong_color(c)[0] for c in evals]
-        fig_ec = go.Figure()
-        fig_ec.add_trace(go.Bar(x=enames, y=evals,
-            marker=dict(color=ecols2, line=dict(width=0)),
-            hovertemplate="<b>%{x}</b><br>%{y:.1f}%<extra></extra>"))
-        fig_ec.add_hline(y=60, line=dict(color="rgba(255,85,0,0.4)",width=1,dash="dash"))
-        apply_layout(fig_ec, ytitle="Congestion %", height=220,
-                     xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
-                     yaxis=dict(range=[0,100],color=TICK_COL,gridcolor=GRID_COL))
-        st.plotly_chart(fig_ec, use_container_width=True, key=f"edge_cong_{tick}")
+# ==========================================================================
+# UPDATE SLOTS (no page rebuild - only slot contents change)
+# ==========================================================================
 
-    with slot_t2_table:
-        hb2 = hour_df[["Junction","Time","Congestion_Index","Vehicles_Per_Hour",
-                        "Avg_Speed_kmh","Delay_Min","Incidents","Is_Peak"]].copy().reset_index(drop=True)
-        hb2.columns=["Junction","Time","Congestion","Vehicles/hr","Speed(km/h)","Delay(min)","Incidents","Peak"]
-        def col_cong(v):
-            try: f=float(v)
-            except: return ""
-            if f>=70: return "background:rgba(255,51,68,0.22);color:#ff3344;font-weight:bold"
-            elif f>=50: return "background:rgba(255,170,0,0.15);color:#ffaa00;font-weight:bold"
-            return "background:rgba(0,255,136,0.1);color:#00ff88;font-weight:bold"
-        st.dataframe(hb2.style.map(col_cong, subset=["Congestion"]).format(
-            {"Congestion":"{:.1f}","Speed(km/h)":"{:.1f}","Delay(min)":"{:.2f}"}),
-            use_container_width=True, height=260)
+# Badge
+with slot_badge:
+    badge = (f'<span class="evp-badge">{stats["active_evp"]:,} EVP ACTIVE</span>'
+             if evp_active else '<span class="live-badge">SIM LIVE</span>')
+    st.markdown(f"""<div style='text-align:right;padding-top:6px'>{badge}<br>
+    <span style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#3a5a6a'>
+    TICK #{tick} . {stats["active_total"]:,}/{fleet["N"]:,} ACTIVE . Phi={phi_v:.1f}s
+    </span></div>""", unsafe_allow_html=True)
 
-    # ---------- TAB 3 ----------
-    with slot_t3_signals:
-        st.markdown(f'<div class="sec-header{"  red" if evp_junctions else ""}">Adaptive Signal Matrix . {"EVP ACTIVE" if evp_junctions else "Normal Operations"} . DR={dr_now:.1f}%</div>',
-                    unsafe_allow_html=True)
-        cols_sig = st.columns(5)
-        pc = {"GREEN":"#00ff88","RED":"#ff3344","AMBER":"#ffaa00"}
-        pe = {"GREEN":"G","RED":"R","AMBER":"A"}
-        for i,jn in enumerate(JNAMES):
-            phase,timer,dr_jn,_ = signal_phases[jn]
-            clr = pc[phase]
-            density = float(dens_arr[i])
-            note = "EVP PREEMPTED" if jn in evp_junctions else f"DR:+{dr_jn:.0f}%"
-            with cols_sig[i%5]:
-                st.markdown(f"""<div class="sig-card" style="border-color:{clr}33">
-                  <div style="font-size:0.7rem;font-weight:600;color:#b8cfd8;margin-bottom:4px">{jn}</div>
-                  <div style="font-size:2rem">{pe[phase]}</div>
-                  <div style="font-family:Barlow Condensed,sans-serif;font-size:1.5rem;font-weight:900;color:{clr}">{timer}s</div>
-                  <div style="font-family:Share Tech Mono,monospace;font-size:0.58rem;color:{clr}">{phase}</div>
-                  <div style="font-family:Share Tech Mono,monospace;font-size:0.54rem;color:#3a5a6a;margin-top:3px">{note}</div>
-                  <div style="font-family:Share Tech Mono,monospace;font-size:0.5rem;color:#1a3a4a">rho={density:.0f}</div>
-                </div>""", unsafe_allow_html=True)
+# Metrics
+with slot_metrics:
+    m1,m2,m3,m4,m5,m6 = st.columns(6)
+    def mc(col, label, val, unit, sub, sub_cls, card_cls):
+        with col:
+            st.markdown(f"""<div class="metric-card {card_cls}">
+              <div class="metric-label">{label}</div>
+              <div class="metric-value">{val}<span>{unit}</span></div>
+              <div class="metric-sub {sub_cls}">{sub}</div>
+            </div>""", unsafe_allow_html=True)
+    mc(m1,"Congestion",f"{avg_cong:.0f}","/100",f"Hour {st.session_state.selected_hour:02d}:00","","mc-red")
+    mc(m2,"Delay Reduction",f"{dr_now:.1f}","%","Adaptive vs baseline","up","mc-green")
+    mc(m3,"Avg Speed",f"{eff_speed:.1f}","km/h","optimised corridor","","mc-blue")
+    mc(m4,"Red-Light Wait",f"{wait_ratio:.1f}","%","of journey time","","mc-amber")
+    mc(m5,"Fleet",f"{fleet['N']:,}","",f"{st.session_state.evp_count:,} EVP","","mc-red" if evp_active else "mc-cyan")
+    mc(m6,"Active",f"{stats['active_total']:,}","",f"{stats['active_evp']:,} EVP","","mc-red" if evp_active else "mc-blue")
 
-    with slot_t3_gantt:
-        phi_g = (4000/max(vc_v/3.6,1)) % T_v
-        fig_g = go.Figure()
-        for i,jn in enumerate(JNAMES):
-            density=float(dens_arr[i]); off=int(phi_g*i)%T_v
-            rho=density/100; g_dur=min(int(T_v*(0.52+rho*0.20)),int(T_v*0.80))
-            segs=[(off,off+g_dur,"GREEN","#00ff88"),(off+g_dur,off+g_dur+5,"AMBER","#ffaa00"),
-                  (off+g_dur+5,off+T_v,"RED","#ff3344")]
-            for s,e,ph,col in segs:
-                sw=max(1,(e%T_v)-(s%T_v)) if (e%T_v)>(s%T_v) else max(1,T_v-(s%T_v))
-                fig_g.add_trace(go.Bar(y=[jn],x=[sw],base=[s%T_v],orientation="h",
-                    marker=dict(color=col,opacity=0.75,line=dict(width=0)),
-                    name=ph,showlegend=(i==0),
-                    hovertemplate=f"<b>{jn}</b><br>{ph}<extra></extra>"))
-            if jn in evp_junctions:
-                fig_g.add_annotation(x=T_v/2,y=jn,text="EVP PREEMPTED",
-                    font=dict(color="#ff5500",size=9,family=FONT_MONO),showarrow=False)
-        apply_layout(fig_g, xtitle="Seconds in cycle", height=340, barmode="stack",
-                     xaxis=dict(range=[0,T_v],color=TICK_COL,gridcolor=GRID_COL),
-                     yaxis=dict(autorange="reversed",color=TICK_COL))
-        st.plotly_chart(fig_g, use_container_width=True, key=f"sig_gantt_{tick}")
+# ---------- TAB 1: PCC ----------
+with slot_pcc:
+    if st.session_state.police_control:
+        pcc1,pcc2,pcc3,pcc4 = st.columns([1.2,1.2,1.2,2.4])
+        with pcc1:
+            cl = "CRITICAL" if avg_cong>=70 else ("MODERATE" if avg_cong>=50 else "CLEAR")
+            cc = "alert" if avg_cong>=70 else ("warn" if avg_cong>=50 else "ok")
+            wr = hour_df.loc[hour_df["Congestion_Index"].idxmax()] if len(hour_df) else None
+            wj = wr["Junction"] if wr is not None else "Silk Board"
+            wc = wr["Congestion_Index"] if wr is not None else 72
+            st.markdown(f"""<div class="pcc-box"><div class="pcc-title">NETWORK STATUS</div>
+            <div class="pcc-row"><span class="pcc-key">CONGESTION</span><span class="pcc-val {cc}">{avg_cong:.0f}/100 [{cl}]</span></div>
+            <div class="pcc-row"><span class="pcc-key">WORST JUNC</span><span class="pcc-val alert">{wj[:12]} ({wc:.0f})</span></div>
+            <div class="pcc-row"><span class="pcc-key">ACTIVE VEH</span><span class="pcc-val ok">{stats["active_total"]:,}</span></div>
+            <div class="pcc-row"><span class="pcc-key">COMPLETED</span><span class="pcc-val">{stats["completed"]:,}</span></div>
+            <div class="pcc-row"><span class="pcc-key">DR NOW</span><span class="pcc-val ok">{dr_now:.1f}%</span></div>
+            </div>""", unsafe_allow_html=True)
+        with pcc2:
+            rows = ""
+            for jn in JNAMES[:5]:
+                phase,timer,_,_ = signal_phases[jn]
+                has_evp = jn in evp_junctions
+                dot = "G" if phase=="GREEN" else ("R" if phase=="RED" else "A")
+                note = "PREEMPTED" if has_evp else f"{timer}s"
+                rows += f'<div class="pcc-row"><span class="pcc-key">{jn[:12]}</span><span class="pcc-val {"alert" if has_evp else ""}">{dot} {phase[:3]} {note}</span></div>'
+            st.markdown(f'<div class="pcc-box"><div class="pcc-title">SIGNAL MATRIX</div>{rows}</div>',
+                         unsafe_allow_html=True)
+        with pcc3:
+            evp_rows = ""
+            n_evp_act = stats["active_evp"]
+            if n_evp_act > 0:
+                for i in np.where(fleet["is_evp"] & ~fleet["completed"])[0][:5]:
+                    rid=int(fleet["route_id"][i]); si=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
+                    jnc=JNAMES[ROUTE_SEG_STARTS[rid][si]]
+                    et=EVP_TYPES[int(fleet["evp_type"][i])%len(EVP_TYPES)]
+                    prog=min(100,int((fleet["seg"][i]+fleet["t"][i])/max(ROUTE_LENGTHS[rid],1)*100))
+                    evp_rows += f'<div class="pcc-row"><span class="pcc-key">{et["emoji"]} {et["label"][:8]}</span><span class="pcc-val alert">{prog}%</span></div>'
+                if n_evp_act > 5:
+                    evp_rows += f'<div class="pcc-row"><span class="pcc-key">+{n_evp_act-5} more</span></div>'
+            else:
+                evp_rows = '<div class="pcc-row"><span class="pcc-key">NO ACTIVE EVP</span><span class="pcc-val ok">STANDBY</span></div>'
+            st.markdown(f'<div class="pcc-box"><div class="pcc-title">EMERGENCY UNITS</div>{evp_rows}</div>',
+                         unsafe_allow_html=True)
+        with pcc4:
+            st.markdown(f'<div class="pcc-box"><div class="pcc-title">COMMAND LOG</div>{render_log()}</div>',
+                         unsafe_allow_html=True)
 
-    with slot_t3_ts:
-        dists = np.linspace(0,22,60)
-        gw_ts = dists*(3.6/max(vc_v,1)) if st.session_state.gw_enabled else dists*2.1
-        base_ts = dists*2.5+np.sin(dists*0.45)*3.5
-        adap_ts = gw_ts*0.88
-        fig_ts = go.Figure()
-        fig_ts.add_trace(go.Scatter(x=dists,y=base_ts,name="Baseline",
-            line=dict(color="rgba(255,51,68,0.6)",width=2,dash="dot"),
-            fill="tozeroy",fillcolor="rgba(255,51,68,0.04)"))
-        fig_ts.add_trace(go.Scatter(x=dists,y=gw_ts,name=f"GW@{vc_v}km/h",
-            line=dict(color="rgba(0,170,255,0.8)",width=2,dash="dash"),
-            fill="tozeroy",fillcolor="rgba(0,170,255,0.04)"))
-        fig_ts.add_trace(go.Scatter(x=dists,y=adap_ts,name="Adaptive",
-            line=dict(color="#00ff88",width=2.5),
-            fill="tozeroy",fillcolor="rgba(0,255,136,0.06)"))
-        for jn,jd in JUNCTIONS.items():
-            fig_ts.add_vline(x=jd["km"],line=dict(color="rgba(0,170,255,0.18)",width=1,dash="dash"),
-                annotation_text=jn[:6],annotation_font_color="#3a5a6a",annotation_font_size=7)
-        apply_layout(fig_ts,xtitle="Distance (km)",ytitle="Travel time (min)",height=340)
-        st.plotly_chart(fig_ts, use_container_width=True, key=f"time_space_{tick}")
+# ---------- TAB 1: MAP ----------
+with slot_map_hdr:
+    st.markdown(f'<div class="sec-header green">Real Bangalore - Live Traffic . '
+                f'<span style="color:#00aaff">{stats["active_total"]:,} vehicles</span></div>',
+                unsafe_allow_html=True)
 
-    # ---------- TAB 4 ----------
-    with slot_t4_algo:
-        st.markdown(f"""<div class="equation-box">
-          <b>Algorithm: 5-Layer Vectorized Optimizer</b><br><br>
-          Layer 1: LP objective on J={NJ} junctions (O(J), not O(N))<br>
-          Layer 2: Green Wave Phi=(L/v_c) mod T = <b>{phi_v:.1f}s</b><br>
-          Layer 3: LWR density-adaptive g_dur<br>
-          Layer 4: EVP preemption (O(n_evp)={stats['active_evp']})<br>
-          Layer 5: Background map cache<br><br>
-          Fleet N={fleet['N']:,} . Step: pure numpy . O(N) SIMD<br>
-          spawn: vectorized . stats: np.sum<br><br>
-          DR={dr_now:.1f}% . Wait={wait_ratio:.1f}% . Tick #{tick}
-        </div>""", unsafe_allow_html=True)
+with slot_map:
+    fig_map = build_map_figure(fleet, hour_df, dens_arr, signal_phases, edge_cong,
+                                st.session_state.show_routes, st.session_state.show_heatmap,
+                                tick, stats)
+    st.plotly_chart(fig_map, use_container_width=True, key=f"map_chart_{tick}")
 
-    with slot_t4_math:
-        st.markdown(f"""<div class="equation-box">
-          <b>LWR + Graph Theory</b><br><br>
-          G=(V,E) . |V|={NJ} . |E|={len(ROAD_EDGES)}<br>
-          d/dt + d(v)/dx = 0<br>
-          Greenshields: v()=v_max(1-/_max)<br>
-          q()=.v_max.(1-/_max)<br>
-          w_s=(q2-q1)/(2-1)<br><br>
-          Mode: {st.session_state.algo_mode}<br>
-          v_c={vc_v}km/h . T={T_v}s . Phi={phi_v:.1f}s<br><br>
-          Active normal: {stats['active_normal']:,}<br>
-          Active EVP:    {stats['active_evp']:,}<br>
-          Completed:     {stats['completed']:,}
-        </div>""", unsafe_allow_html=True)
+# ---------- TAB 1: Fleet info panel ----------
+with slot_fleet_info:
+    evp_cards = ""
+    for i in np.where(fleet["is_evp"] & ~fleet["completed"])[0][:6]:
+        rid=int(fleet["route_id"][i]); si=int(np.clip(fleet["seg"][i],0,ROUTE_LENGTHS[rid]-1))
+        jnc=JNAMES[ROUTE_SEG_STARTS[rid][si]]; jnx=JNAMES[ROUTE_SEG_ENDS[rid][si]]
+        et=EVP_TYPES[int(fleet["evp_type"][i])%len(EVP_TYPES)]
+        prog=min(100,int((fleet["seg"][i]+fleet["t"][i])/max(ROUTE_LENGTHS[rid],1)*100))
+        evp_cards += f"""<div class="vcard emg">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-weight:700;color:{et['color']};font-size:0.82rem">{et['emoji']} E{i:04d}</span>
+            <span style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:{et['color']}">EVP</span>
+          </div>
+          <div style="font-family:Share Tech Mono,monospace;font-size:0.56rem;color:#3a5a6a;margin-top:2px">
+            {et['label']}<br>{jnc[:10]}->{jnx[:10]}</div>
+          <div style="margin-top:4px;background:rgba(255,255,255,0.04);border-radius:2px;height:3px">
+            <div style="width:{prog}%;height:100%;background:{et['color']};border-radius:2px"></div></div>
+          <div style="font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a;text-align:right">{prog}%</div>
+        </div>"""
+    overflow = ""
+    if stats["active_evp"] > 6:
+        overflow = f"<div style='font-family:Share Tech Mono,monospace;font-size:0.55rem;color:#1a3a4a;text-align:center;padding:5px;border:1px solid #112233;border-radius:4px'>+{stats['active_evp']-6:,} more EVP</div>"
+    st.markdown(f"""
+    <div style='font-family:Share Tech Mono,monospace;font-size:0.58rem;color:#3a5a6a;margin-bottom:6px'>
+    FLEET {fleet["N"]:,} . ACTIVE {stats["active_total"]:,} . DONE {stats["completed"]:,}</div>
+    {evp_cards}{overflow}
+    <div class="metric-card mc-blue" style="margin-top:8px;font-family:Share Tech Mono,monospace;font-size:0.6rem">
+      <div class="metric-label">Fleet Stats</div>
+      <div style="color:#00aaff;font-size:0.62rem;margin-top:4px">
+        Normal: {stats["active_normal"]:,}<br>EVP: {stats["active_evp"]:,}<br>
+        Completed: {stats["completed"]:,}<br>Wait: {wait_ratio:.1f}%<br>DR: {dr_now:.1f}%
+      </div></div>""", unsafe_allow_html=True)
+    if len(st.session_state.delay_history) > 3:
+        fig_mini = go.Figure()
+        fig_mini.add_trace(go.Scatter(y=st.session_state.delay_history, mode="lines",
+            line=dict(color="#00ff88", width=1.5),
+            fill="tozeroy", fillcolor="rgba(0,255,136,0.07)"))
+        apply_layout(fig_mini, height=90,
+                     xaxis=dict(visible=False),
+                     yaxis=dict(color=TICK_COL, gridcolor=GRID_COL),
+                     margin=dict(l=20,r=5,t=5,b=10))
+        fig_mini.update_layout(showlegend=False)
+        st.plotly_chart(fig_mini, use_container_width=True, key=f"mini_dr_{tick}")
 
-    # Footer
-    with slot_footer:
-        st.markdown(f"""<div style='display:flex;justify-content:space-between;align-items:center'>
-          <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>URBAN FLOW . BANGALORE . NMIT ISE 2025</span>
-          <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>{st.session_state.algo_mode} . DR={dr_now:.1f}% . FLEET {fleet["N"]:,} . TICK #{tick}</span>
-          <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>NISHCHAL VISHWANATH (NB25ISE160) . RISHUL KH (NB25ISE186)</span>
-        </div>""", unsafe_allow_html=True)
+# ---------- TAB 2 ----------
+with slot_t2_heat:
+    pivot = df_traffic.pivot_table(index="Junction", columns="Hour",
+                                    values="Congestion_Index", aggfunc="mean")
+    fig_h = go.Figure(go.Heatmap(
+        z=pivot.values, x=[f"{h:02d}:00" for h in pivot.columns], y=pivot.index.tolist(),
+        colorscale=[[0,"#03080d"],[0.3,"rgba(0,255,136,0.6)"],[0.65,"rgba(255,170,0,0.8)"],[1,"#ff3344"]],
+        colorbar=dict(tickfont=dict(color=TICK_COL,size=8)),
+        hovertemplate="<b>%{y}</b><br>%{x}<br>Congestion: %{z:.1f}<extra></extra>"))
+    apply_layout(fig_h, xtitle="Hour", ytitle="Junction", height=320)
+    st.plotly_chart(fig_h, use_container_width=True, key=f"heat_map_{tick}")
 
-    # -- Tick rate control --
-    if st.session_state.sim_running:
-        time.sleep(0.8)
+with slot_t2_speed:
+    jns4  = ["Silk Board","Hebbal","Whitefield","MG Road"]
+    cols4 = [("#ff3344","rgba(255,51,68,0.07)"),("#00ff88","rgba(0,255,136,0.07)"),
+             ("#00aaff","rgba(0,170,255,0.07)"),("#ffaa00","rgba(255,170,0,0.07)")]
+    fig_s = go.Figure()
+    for jn,(col,fill) in zip(jns4,cols4):
+        jdf = df_traffic[df_traffic["Junction"]==jn].sort_values("Hour")
+        fig_s.add_trace(go.Scatter(x=jdf["Hour"], y=jdf["Avg_Speed_kmh"], name=jn,
+            mode="lines", line=dict(color=col,width=2), fill="tozeroy", fillcolor=fill))
+    apply_layout(fig_s, xtitle="Hour", ytitle="Avg Speed (km/h)", height=320)
+    st.plotly_chart(fig_s, use_container_width=True, key=f"speed_profile_{tick}")
+
+with slot_t2_delay:
+    hb = hour_df.set_index("Junction")["Delay_Min"].reindex(JNAMES).fillna(0)
+    pd_vals = (hb * (1-dr_now/100)).round(2)
+    fig_b = go.Figure()
+    fig_b.add_trace(go.Bar(name="Baseline", x=JNAMES, y=hb.values,
+        marker=dict(color="rgba(255,51,68,0.65)",line=dict(color="#ff3344",width=1.5))))
+    fig_b.add_trace(go.Bar(name="Adaptive", x=JNAMES, y=pd_vals.values,
+        marker=dict(color="rgba(0,255,136,0.65)",line=dict(color="#00ff88",width=1.5))))
+    apply_layout(fig_b, ytitle="Delay (min)", height=290, barmode="group",
+                 xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
+                 yaxis=dict(range=[0,max(hb.max()*1.4,1)],color=TICK_COL,gridcolor=GRID_COL))
+    st.plotly_chart(fig_b, use_container_width=True, key=f"delay_bar_{tick}")
+
+with slot_t2_dr:
+    if len(st.session_state.delay_history) > 2:
+        fig_dr = go.Figure()
+        fig_dr.add_trace(go.Scatter(y=st.session_state.delay_history, mode="lines",
+            line=dict(color="#00ff88",width=2), fill="tozeroy", fillcolor="rgba(0,255,136,0.08)"))
+        fig_dr.add_hline(y=25, line=dict(color="rgba(255,170,0,0.4)",width=1,dash="dash"))
+        apply_layout(fig_dr, ytitle="DR%", height=290,
+                     yaxis=dict(range=[0,60],color=TICK_COL,gridcolor=GRID_COL))
+        st.plotly_chart(fig_dr, use_container_width=True, key=f"dr_history_{tick}")
     else:
-        time.sleep(0.3)
+        st.info("Start simulation to see live DR history")
+
+with slot_t2_edge:
+    enames = [f"{j1[:5]}->{j2[:5]}" for (j1,j2) in ROAD_EDGES]
+    evals  = [edge_cong.get(e,50) for e in ROAD_EDGES]
+    ecols2 = [cong_color(c)[0] for c in evals]
+    fig_ec = go.Figure()
+    fig_ec.add_trace(go.Bar(x=enames, y=evals,
+        marker=dict(color=ecols2, line=dict(width=0)),
+        hovertemplate="<b>%{x}</b><br>%{y:.1f}%<extra></extra>"))
+    fig_ec.add_hline(y=60, line=dict(color="rgba(255,85,0,0.4)",width=1,dash="dash"))
+    apply_layout(fig_ec, ytitle="Congestion %", height=220,
+                 xaxis=dict(tickangle=-30,color=TICK_COL,gridcolor=GRID_COL),
+                 yaxis=dict(range=[0,100],color=TICK_COL,gridcolor=GRID_COL))
+    st.plotly_chart(fig_ec, use_container_width=True, key=f"edge_cong_{tick}")
+
+with slot_t2_table:
+    hb2 = hour_df[["Junction","Time","Congestion_Index","Vehicles_Per_Hour",
+                    "Avg_Speed_kmh","Delay_Min","Incidents","Is_Peak"]].copy().reset_index(drop=True)
+    hb2.columns=["Junction","Time","Congestion","Vehicles/hr","Speed(km/h)","Delay(min)","Incidents","Peak"]
+    def col_cong(v):
+        try: f=float(v)
+        except: return ""
+        if f>=70: return "background:rgba(255,51,68,0.22);color:#ff3344;font-weight:bold"
+        elif f>=50: return "background:rgba(255,170,0,0.15);color:#ffaa00;font-weight:bold"
+        return "background:rgba(0,255,136,0.1);color:#00ff88;font-weight:bold"
+    st.dataframe(hb2.style.map(col_cong, subset=["Congestion"]).format(
+        {"Congestion":"{:.1f}","Speed(km/h)":"{:.1f}","Delay(min)":"{:.2f}"}),
+        use_container_width=True, height=260)
+
+# ---------- TAB 3 ----------
+with slot_t3_signals:
+    st.markdown(f'<div class="sec-header{"  red" if evp_junctions else ""}">Adaptive Signal Matrix . {"EVP ACTIVE" if evp_junctions else "Normal Operations"} . DR={dr_now:.1f}%</div>',
+                unsafe_allow_html=True)
+    cols_sig = st.columns(5)
+    pc = {"GREEN":"#00ff88","RED":"#ff3344","AMBER":"#ffaa00"}
+    pe = {"GREEN":"G","RED":"R","AMBER":"A"}
+    for i,jn in enumerate(JNAMES):
+        phase,timer,dr_jn,_ = signal_phases[jn]
+        clr = pc[phase]
+        density = float(dens_arr[i])
+        note = "EVP PREEMPTED" if jn in evp_junctions else f"DR:+{dr_jn:.0f}%"
+        with cols_sig[i%5]:
+            st.markdown(f"""<div class="sig-card" style="border-color:{clr}33">
+              <div style="font-size:0.7rem;font-weight:600;color:#b8cfd8;margin-bottom:4px">{jn}</div>
+              <div style="font-size:2rem">{pe[phase]}</div>
+              <div style="font-family:Barlow Condensed,sans-serif;font-size:1.5rem;font-weight:900;color:{clr}">{timer}s</div>
+              <div style="font-family:Share Tech Mono,monospace;font-size:0.58rem;color:{clr}">{phase}</div>
+              <div style="font-family:Share Tech Mono,monospace;font-size:0.54rem;color:#3a5a6a;margin-top:3px">{note}</div>
+              <div style="font-family:Share Tech Mono,monospace;font-size:0.5rem;color:#1a3a4a">rho={density:.0f}</div>
+            </div>""", unsafe_allow_html=True)
+
+with slot_t3_gantt:
+    phi_g = (4000/max(vc_v/3.6,1)) % T_v
+    fig_g = go.Figure()
+    for i,jn in enumerate(JNAMES):
+        density=float(dens_arr[i]); off=int(phi_g*i)%T_v
+        rho=density/100; g_dur=min(int(T_v*(0.52+rho*0.20)),int(T_v*0.80))
+        segs=[(off,off+g_dur,"GREEN","#00ff88"),(off+g_dur,off+g_dur+5,"AMBER","#ffaa00"),
+              (off+g_dur+5,off+T_v,"RED","#ff3344")]
+        for s,e,ph,col in segs:
+            sw=max(1,(e%T_v)-(s%T_v)) if (e%T_v)>(s%T_v) else max(1,T_v-(s%T_v))
+            fig_g.add_trace(go.Bar(y=[jn],x=[sw],base=[s%T_v],orientation="h",
+                marker=dict(color=col,opacity=0.75,line=dict(width=0)),
+                name=ph,showlegend=(i==0),
+                hovertemplate=f"<b>{jn}</b><br>{ph}<extra></extra>"))
+        if jn in evp_junctions:
+            fig_g.add_annotation(x=T_v/2,y=jn,text="EVP PREEMPTED",
+                font=dict(color="#ff5500",size=9,family=FONT_MONO),showarrow=False)
+    apply_layout(fig_g, xtitle="Seconds in cycle", height=340, barmode="stack",
+                 xaxis=dict(range=[0,T_v],color=TICK_COL,gridcolor=GRID_COL),
+                 yaxis=dict(autorange="reversed",color=TICK_COL))
+    st.plotly_chart(fig_g, use_container_width=True, key=f"sig_gantt_{tick}")
+
+with slot_t3_ts:
+    dists = np.linspace(0,22,60)
+    gw_ts = dists*(3.6/max(vc_v,1)) if st.session_state.gw_enabled else dists*2.1
+    base_ts = dists*2.5+np.sin(dists*0.45)*3.5
+    adap_ts = gw_ts*0.88
+    fig_ts = go.Figure()
+    fig_ts.add_trace(go.Scatter(x=dists,y=base_ts,name="Baseline",
+        line=dict(color="rgba(255,51,68,0.6)",width=2,dash="dot"),
+        fill="tozeroy",fillcolor="rgba(255,51,68,0.04)"))
+    fig_ts.add_trace(go.Scatter(x=dists,y=gw_ts,name=f"GW@{vc_v}km/h",
+        line=dict(color="rgba(0,170,255,0.8)",width=2,dash="dash"),
+        fill="tozeroy",fillcolor="rgba(0,170,255,0.04)"))
+    fig_ts.add_trace(go.Scatter(x=dists,y=adap_ts,name="Adaptive",
+        line=dict(color="#00ff88",width=2.5),
+        fill="tozeroy",fillcolor="rgba(0,255,136,0.06)"))
+    for jn,jd in JUNCTIONS.items():
+        fig_ts.add_vline(x=jd["km"],line=dict(color="rgba(0,170,255,0.18)",width=1,dash="dash"),
+            annotation_text=jn[:6],annotation_font_color="#3a5a6a",annotation_font_size=7)
+    apply_layout(fig_ts,xtitle="Distance (km)",ytitle="Travel time (min)",height=340)
+    st.plotly_chart(fig_ts, use_container_width=True, key=f"time_space_{tick}")
+
+# ---------- TAB 4 ----------
+with slot_t4_algo:
+    st.markdown(f"""<div class="equation-box">
+      <b>Algorithm: 5-Layer Vectorized Optimizer</b><br><br>
+      Layer 1: LP objective on J={NJ} junctions (O(J), not O(N))<br>
+      Layer 2: Green Wave Phi=(L/v_c) mod T = <b>{phi_v:.1f}s</b><br>
+      Layer 3: LWR density-adaptive g_dur<br>
+      Layer 4: EVP preemption (O(n_evp)={stats['active_evp']})<br>
+      Layer 5: Background map cache<br><br>
+      Fleet N={fleet['N']:,} . Step: pure numpy . O(N) SIMD<br>
+      spawn: vectorized . stats: np.sum<br><br>
+      DR={dr_now:.1f}% . Wait={wait_ratio:.1f}% . Tick #{tick}
+    </div>""", unsafe_allow_html=True)
+
+with slot_t4_math:
+    st.markdown(f"""<div class="equation-box">
+      <b>LWR + Graph Theory</b><br><br>
+      G=(V,E) . |V|={NJ} . |E|={len(ROAD_EDGES)}<br>
+      d/dt + d(v)/dx = 0<br>
+      Greenshields: v()=v_max(1-/_max)<br>
+      q()=.v_max.(1-/_max)<br>
+      w_s=(q2-q1)/(2-1)<br><br>
+      Mode: {st.session_state.algo_mode}<br>
+      v_c={vc_v}km/h . T={T_v}s . Phi={phi_v:.1f}s<br><br>
+      Active normal: {stats['active_normal']:,}<br>
+      Active EVP:    {stats['active_evp']:,}<br>
+      Completed:     {stats['completed']:,}
+    </div>""", unsafe_allow_html=True)
+
+# Footer
+with slot_footer:
+    st.markdown(f"""<div style='display:flex;justify-content:space-between;align-items:center'>
+      <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>URBAN FLOW . BANGALORE . NMIT ISE 2025</span>
+      <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>{st.session_state.algo_mode} . DR={dr_now:.1f}% . FLEET {fleet["N"]:,} . TICK #{tick}</span>
+      <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>NISHCHAL VISHWANATH (NB25ISE160) . RISHUL KH (NB25ISE186)</span>
+    </div>""", unsafe_allow_html=True)
+
+# -- Trigger next frame --
+if st.session_state.sim_running:
+    time.sleep(0.8)
+st.rerun()
