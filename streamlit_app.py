@@ -63,5 +63,24 @@ map_placeholder = st.empty()
 
 if st.button("▶️ Initialize Real-Time Grid Feed"):
     while True:
-        # Update positions simulating vehicle flow
-        st.session_state.vehicles['lon'] += st.session_state
+        # FIXED: Corrected the mathematical update for vehicle flow
+        st.session_state.vehicles['lon'] += st.session_state.vehicles['speed']
+        st.session_state.vehicles['lat'] += st.session_state.vehicles['speed'] * 0.2
+        
+        # Reset vehicles for loop
+        st.session_state.vehicles.loc[st.session_state.vehicles['lon'] > 77.68, 'lon'] = 77.62
+        st.session_state.vehicles.loc[st.session_state.vehicles['lat'] > 12.93, 'lat'] = 12.91
+
+        # Signal states
+        signals = []
+        for name, data in logic.intersections.items():
+            is_green = data["idx"] in em_indices or (int(time.time()*2) % 4 > 1)
+            signals.append({
+                "pos": data["pos"],
+                "color": [0, 255, 0, 200] if is_green else [255, 0, 0, 200]
+            })
+
+        v_layer = pdk.Layer("ScatterplotLayer", st.session_state.vehicles, 
+                            get_position='[lon, lat]', get_color='[255, 255, 255, 150]', get_radius=30)
+        s_layer = pdk.Layer("ScatterplotLayer", pd.DataFrame(signals), 
+                            get_position='pos', get_color
