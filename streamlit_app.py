@@ -1296,7 +1296,7 @@ with slot_footer:
       <span style='font-family:Share Tech Mono,monospace;font-size:0.52rem;color:#3a5a6a'>NISHCHAL VISHWANATH (NB25ISE160) . RISHUL KH (NB25ISE186)</span>
     </div>""", unsafe_allow_html=True)
 
-# -- Trigger next frame --
+# -- Trigger next frame only when simulation is running --
 if st.session_state.sim_running:
     time.sleep(0.8)
-st.rerun()
+    st.rerun()
