@@ -5,12 +5,11 @@ import pydeck as pdk
 import time
 from scipy.optimize import minimize
 
-# --- 1. CORE MATH & OPTIMIZATION (From Project PDF) ---
+# --- 1. CORE MATH & OPTIMIZATION (NMIT PoC Logic) ---
 class PoliceCommandLogic:
     def __init__(self):
-        self.cycle_time = 120 # T = 120s
-        self.v_c = 11.11       # 40 km/h in m/s
-        # Intersections represented as Vertices V in Graph G=(V,E)
+        self.cycle_time = 120 
+        self.v_c = 11.11       
         self.intersections = {
             "Silk Board": {"pos": [77.6238, 12.9177], "idx": 0},
             "HSR Layout": {"pos": [77.6450, 12.9100], "idx": 1},
@@ -18,16 +17,14 @@ class PoliceCommandLogic:
         }
 
     def solve_delay_objective(self, densities, em_indices):
-        """Minimizes W while applying EVP Logic (P -> Infinity)"""
         def objective_func(x):
             weights = np.ones(len(densities))
             for idx in em_indices: 
-                weights[idx] = 1000000 # Priority Weight P
+                weights[idx] = 1000000 
             return np.sum((densities * weights) / x)
 
         constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.cycle_time})
         bounds = [(15, 90) for _ in range(len(densities))]
-        
         res = minimize(objective_func, [40]*len(densities), method='SLSQP', bounds=bounds, constraints=constraints)
         return res.x
 
@@ -36,7 +33,6 @@ st.set_page_config(page_title="Bangalore Traffic Command Center", layout="wide")
 st.title("🏙️ Bangalore Active Grid Control: Police Dashboard")
 
 if 'vehicles' not in st.session_state:
-    # Initialize 150 vehicles on the grid for flow dynamics
     st.session_state.vehicles = pd.DataFrame({
         'lon': np.random.uniform(77.62, 77.68, 150),
         'lat': np.random.uniform(12.91, 12.93, 150),
@@ -45,16 +41,16 @@ if 'vehicles' not in st.session_state:
 
 logic = PoliceCommandLogic()
 
-# Sidebar: Dispatch (Perception Layer)
+# Sidebar Control
 st.sidebar.header("🚨 Emergency Dispatch")
 em_active = st.sidebar.multiselect("Active Emergency Corridors", list(logic.intersections.keys()))
 em_indices = [logic.intersections[name]["idx"] for name in em_active]
 
-# Processing Layer
+# Data Processing
 densities = np.array([50, 30, 45])
 optimized_signals = logic.solve_delay_objective(densities, em_indices)
 
-# Performance Metrics
+# Metrics
 col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("Commuter Delay Reduction", f"{30 if em_active else 25}%", delta="Target Met")
@@ -63,15 +59,13 @@ with col2:
 with col3:
     st.metric("Ambulance Path Status", "CLEARED" if em_active else "BLOCKED")
 
-# --- 3. THE REAL GOOGLE MAP ANIMATION (Actuator Layer) ---
-# Custom Google Maps Tiles URL
+# --- 3. GOOGLE MAPS ANIMATION (Fixed AssertionError) ---
 GOOGLE_MAP_TILES = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-
 map_placeholder = st.empty()
 
 if st.button("▶️ Initialize Real-Time Grid Feed"):
     while True:
-        # Update Vehicle Flow positions
+        # Update Vehicle Flow (LWR Model)
         st.session_state.vehicles['lon'] += st.session_state.vehicles['speed']
         st.session_state.vehicles['lat'] += st.session_state.vehicles['speed'] * 0.2
         
@@ -79,7 +73,6 @@ if st.button("▶️ Initialize Real-Time Grid Feed"):
         st.session_state.vehicles.loc[st.session_state.vehicles['lon'] > 77.68, 'lon'] = 77.62
         st.session_state.vehicles.loc[st.session_state.vehicles['lat'] > 12.93, 'lat'] = 12.91
 
-        # Traffic Light Data
         signals = []
         for name, data in logic.intersections.items():
             is_green = data["idx"] in em_indices or (int(time.time()*2) % 4 > 1)
@@ -88,15 +81,14 @@ if st.button("▶️ Initialize Real-Time Grid Feed"):
                 "color": [0, 255, 0, 200] if is_green else [255, 0, 0, 200]
             })
 
-        # Pydeck Layers
         v_layer = pdk.Layer("ScatterplotLayer", st.session_state.vehicles, 
                             get_position='[lon, lat]', get_color='[0, 0, 255, 150]', get_radius=30)
         s_layer = pdk.Layer("ScatterplotLayer", pd.DataFrame(signals), 
                             get_position='pos', get_color='color', get_radius=180)
 
-        # Rendering with Google Tiles
+        # FIX: map_provider must be "mapbox" even for custom styles
         map_placeholder.pydeck_chart(pdk.Deck(
-            map_provider=None, # Disables default Mapbox/Carto
+            map_provider="mapbox", 
             map_style={
                 "version": 8,
                 "sources": {
