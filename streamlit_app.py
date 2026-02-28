@@ -921,16 +921,27 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
   margin-bottom:4px;text-transform:uppercase}
 .abv{font-family:'Orbitron',monospace;font-size:1.05rem;font-weight:700;line-height:1}
 .abs{font-family:'Share Tech Mono',monospace;font-size:0.44rem;color:#3a5570;margin-top:3px}
-.sc-card{background:var(--bg);border:1px solid #0d2040;border-radius:3px;
-  padding:6px;border-top:3px solid;margin-bottom:4px}
-.sc-name{font-family:'Share Tech Mono',monospace;font-size:0.48rem;color:#4a6880;margin-bottom:3px}
-.sc-state{font-family:'Orbitron',monospace;font-size:0.68rem;font-weight:700;margin-bottom:3px}
+/* ── REAL-TIME SIGNAL CARDS ── big, visible from far ── */
+.sc-card{background:#030d1a;border:1px solid #0d2040;border-radius:6px;
+  padding:8px 10px;border-left:5px solid;margin-bottom:6px;position:relative;overflow:hidden}
+.sc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.3}
+.sc-name{font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:700;
+  color:#a0c0d0;margin-bottom:4px;letter-spacing:1px;text-transform:uppercase}
+.sc-state{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:900;
+  line-height:1;letter-spacing:2px}
 .sc-sub{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:#3a5570;margin-bottom:2px}
-.sc-tmr{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:#3a5570}
-.sc-bar{height:3px;background:#0d2040;border-radius:2px;margin-top:4px;overflow:hidden}
-.sc-fill{height:100%;border-radius:2px;transition:width .5s}
-.sc-evp{animation:scp .6s infinite alternate}
-@keyframes scp{from{box-shadow:none}to{box-shadow:0 0 8px #ff224466}}
+.sc-tmr{font-family:'Orbitron',monospace;font-size:2.2rem;font-weight:900;
+  line-height:1;text-align:center;letter-spacing:3px;text-shadow:0 0 20px currentColor}
+.sc-bar{height:6px;background:#0d2040;border-radius:3px;margin-top:6px;overflow:hidden}
+.sc-fill{height:100%;border-radius:3px;transition:width .3s linear}
+.sc-stat-big{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;line-height:1}
+.sc-stat-label{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:#4a6880;
+  text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.sc-stat-cell{text-align:center;padding:5px 4px;background:#040f1e;border-radius:4px;
+  border:1px solid #0d2040}
+.sc-evp{animation:scp .4s infinite alternate}
+@keyframes scp{from{box-shadow:none;border-left-color:#ff2244}to{box-shadow:0 0 18px #ff224488;border-left-color:#ff6688}}
 .lp-box{background:var(--bg);border:1px solid #0d2040;border-radius:3px;
   padding:9px;font-family:'Share Tech Mono',monospace;font-size:0.57rem;
   color:#3a5570;line-height:2}
@@ -1384,8 +1395,11 @@ details.csec summary:hover{background:#0a1828}
     <div class="atab-content" id="rt2">
 
       <details class="csec" open>
-        <summary>&#x1F6A6; Intersection Signal States <span class="csec-badge live">LIVE</span></summary>
-        <div class="csec-body" style="padding:4px" id="sigpanel-major"></div>
+        <summary>&#x1F6A6; Real-Time Signal States <span class="csec-badge live">LIVE · 1s</span></summary>
+        <div class="csec-body" style="padding:6px">
+          <!-- Big real-time countdown clocks per junction -->
+          <div id="sigpanel-rt" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        </div>
       </details>
 
       <details class="csec" open>
@@ -2449,101 +2463,130 @@ function updateMetrics(){
     if(jlFree) jlFree.innerHTML=htmlFree||'';
   }
 
-  // Signal panel - Real LP + SCOOT + CTM stats per junction
+  // Signal panel – Real-time big-stat cards (visible from far) + detailed panels
   var sp=g('sigpanel');
-  var spMaj=g('sigpanel-major');
+  var spRT=g('sigpanel-rt');
   var spTiming=g('sigpanel-timing');
-  var html='', htmlMaj='', htmlTiming='';
-  var losColors={'A':'var(--green)','B':'var(--green)','C':'var(--yellow)','D':'var(--orange)','E':'var(--red)','F':'var(--red)'};
+  var html='', htmlRT='', htmlTiming='';
+  var losColors={'A':'#00ff88','B':'#00e070','C':'#ffd700','D':'#ff8c00','E':'#ff2244','F':'#ff0033'};
   var pi=CUR.pi;
   for(var i=0;i<SIG.length;i++){
     var s2=SIG[i];
-    var col2=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
+    var stateColor=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
     var pct=Math.round(s2.phase/s2.cycle*100);
     var remain=s2.state==='green'?Math.max(0,s2.gDur-s2.phase):Math.max(0,s2.cycle-s2.phase);
     var tl2=remain.toFixed(0)+'s '+(s2.state==='green'?'GO':(s2.state==='yellow'?'YLW':'WAIT'));
-    // Real LP values from Python solver
     var lam2=lp&&lp.lambda?lp.lambda[i].toFixed(3):'-';
     var x2num=lp&&lp.x?lp.x[i]:null;
     var x2=x2num!==null?x2num.toFixed(3):'-';
-    var xColor=x2num!==null?(x2num>.9?'var(--red)':x2num>.7?'var(--orange)':'var(--green)'):'#5a7590';
-    // Real Webster delay from LP (scaled by current algo/cycle modifiers)
+    var xColor=x2num!==null?(x2num>.9?'#ff2244':x2num>.7?'#ff8c00':'#00ff88'):'#5a7590';
     var dRaw=lp&&lp.delay?lp.delay[i]:null;
     var dScaled=dRaw!==null?Math.min(dRaw*algoDelayMul*cycleDelayMul,300):null;
-    var d2=dScaled!==null?dScaled.toFixed(1):'-';
-    var dColor=dScaled!==null?(dScaled>120?'var(--red)':dScaled>60?'var(--orange)':'var(--yellow)'):'#5a7590';
-    // Real LP green time
+    var d2=dScaled!==null?dScaled.toFixed(0):'-';
+    var dColor=dScaled!==null?(dScaled>120?'#ff2244':dScaled>80?'#ff8c00':dScaled>35?'#ffd700':'#00ff88'):'#5a7590';
     var gLp=lp&&lp.g?lp.g[i].toFixed(0):s2.gDur.toFixed(0);
-    // Real queue length estimate: Q ≈ q * (1-λ)^2 * C / (2*(1-λ*x)) — Webster queue
     var qRaw=lp&&lp.q_pcu?lp.q_pcu[i]/3600:0;
     var lamN=lp&&lp.lambda?lp.lambda[i]:0.5;
     var xN=lp&&lp.x?Math.min(lp.x[i],0.999):0.7;
     var queueLen=Math.round(qRaw*s2.cycle*(1-lamN)*(1-lamN)/(2*Math.max(1-lamN*xN,0.01)));
-    var queueLen=Math.max(0,Math.min(queueLen,99));
-    // SCOOT recommended cycle
+    queueLen=Math.max(0,Math.min(queueLen,99));
     var scoot=CUR.scoot&&CUR.scoot[i]?CUR.scoot[i]:null;
     var copt=scoot?scoot.C_opt.toFixed(0):'--';
     var crec=scoot?scoot.C_rec.toFixed(0):'--';
-    var scootAction=scoot?scoot.action:'--';
-    var scootCol=scootAction==='INCREMENT'?'var(--red)':scootAction==='DECREMENT'?'var(--green)':'var(--yellow)';
-    // PI contribution per junction
+    var scootAction=scoot?scoot.action:'HOLD';
+    var scootCol=scootAction==='INCREMENT'?'#ff2244':scootAction==='DECREMENT'?'#00ff88':'#ffd700';
     var piJ=pi&&pi.per_jct&&pi.per_jct[i]?pi.per_jct[i]:null;
     var co2J=piJ?piJ.co2_kph.toFixed(1):'--';
-    var fuelJ=piJ?piJ.fuel_lph.toFixed(1):'--';
-    // HCM LOS for this junction (from CTM if available)
-    var ctmJ=CUR.ctm?CUR.ctm.find(function(c){return c.edge&&(c.edge[0]===i||c.edge[1]===i);}):null;
-    var jLOS=ctmJ?ctmJ.los:'–';
-    var losCol=losColors[jLOS]||'var(--yellow)';
-    // O-D demand at this junction
+    var jLOS=lp&&lp.los?lp.los[i]:'-';
+    var losCol=losColors[jLOS]||'#ffd700';
     var odDemand=BACKEND.od_totals[i]?Math.round(BACKEND.od_totals[i]).toLocaleString():'--';
     var stateLabel=s2.evp?'EVP!':s2.state.toUpperCase();
-    // Full signal card with real stats
-    html+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-top-color:'+col2+'">'+
-      '<div class="sc-name" style="font-size:.5rem;color:#7090a0">'+JN[i].name+' &nbsp;<span style="font-size:.42rem;color:#3a5570">OD:'+odDemand+' PCU/hr</span></div>'+
-      '<div style="display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center;margin:3px 0">'+
-        '<div class="sc-state" style="color:'+col2+';font-size:.75rem">'+stateLabel+'</div>'+
-        '<div class="sc-bar"><div class="sc-fill" style="width:'+pct+'%;background:'+col2+'"></div></div>'+
+    var remainSec=remain.toFixed(0);
+
+    // ── BIG REAL-TIME CARD – 2-col grid, giant countdown ─────────────────
+    htmlRT+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-left-color:'+stateColor+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<div class="sc-name">'+JN[i].name+'</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#3a5570">OD:'+odDemand+'</div>'+
       '</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;font-family:Share Tech Mono,monospace;font-size:.46rem;margin-bottom:2px">'+
-        '<div><span style="color:#4a6880">g=</span><span style="color:var(--cyan)">'+gLp+'s</span></div>'+
-        '<div><span style="color:#4a6880">λ=</span><span style="color:var(--cyan)">'+lam2+'</span></div>'+
-        '<div><span style="color:#4a6880">x=</span><span style="color:'+xColor+'">'+x2+'</span></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+
+        '<div style="text-align:center;padding:4px 0">'+
+          '<div class="sc-state" style="color:'+stateColor+'">'+stateLabel+'</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:0.46rem;color:'+stateColor+';opacity:.65;margin-top:2px">g='+gLp+'s / C='+s2.cycle.toFixed(0)+'s</div>'+
+        '</div>'+
+        '<div style="text-align:center">'+
+          '<div class="sc-tmr" style="color:'+stateColor+'">'+remainSec+'</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#4a6880;margin-top:1px">sec remain</div>'+
+        '</div>'+
       '</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;font-family:Share Tech Mono,monospace;font-size:.46rem;margin-bottom:2px">'+
-        '<div><span style="color:#4a6880">d=</span><span style="color:'+dColor+'">'+d2+'s</span></div>'+
-        '<div><span style="color:#4a6880">Q≈</span><span style="color:var(--yellow)">'+queueLen+'veh</span></div>'+
-        '<div><span style="color:#4a6880">LOS=</span><span style="color:'+losCol+'">'+jLOS+'</span></div>'+
+      '<div class="sc-bar" style="margin-bottom:8px">'+
+        '<div class="sc-fill" style="width:'+pct+'%;background:'+stateColor+'"></div>'+
       '</div>'+
-      '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+tl2+' | SCOOT:'+crec+'s ('+scootAction.substring(0,3)+') | CO₂:'+co2J+'kg/hr</div>'+
-      '</div>';
-    // Major states panel - enhanced with real v/c and delay
-    htmlMaj+='<div style="display:grid;grid-template-columns:1fr 55px 50px 40px;align-items:center;'+
-      'padding:4px 6px;border-bottom:1px solid #0d2040;background:'+(s2.evp?'#150308':'transparent')+'">'+
-      '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:#5a7590">'+JN[i].name+'</div>'+
-      '<div style="font-family:Orbitron,monospace;font-size:.58rem;font-weight:700;color:'+col2+';text-align:right">'+stateLabel+'</div>'+
-      '<div style="font-family:Share Tech Mono,monospace;font-size:.48rem;color:'+xColor+';text-align:right">x='+x2+'</div>'+
-      '<div style="font-family:Share Tech Mono,monospace;font-size:.48rem;color:'+dColor+';text-align:right">'+d2+'s</div>'+
-      '</div>';
-    // Timing panel - expanded with SCOOT + queue + LOS + CO2
-    htmlTiming+='<div style="display:grid;grid-template-columns:80px 1fr 1fr;gap:3px;'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:'+xColor+'">'+x2+'</div>'+
+          '<div class="sc-stat-label">v/c</div>'+
+        '</div>'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:'+dColor+'">'+d2+'s</div>'+
+          '<div class="sc-stat-label">delay</div>'+
+        '</div>'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:#ff8c00">'+queueLen+'</div>'+
+          '<div class="sc-stat-label">queue</div>'+
+        '</div>'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:'+losCol+'">'+jLOS+'</div>'+
+          '<div class="sc-stat-label">LOS</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;margin-top:5px;'+
+        'font-family:Share Tech Mono,monospace;font-size:0.43rem;color:#3a5570">'+
+        '<span>SCOOT:'+crec+'s <span style="color:'+scootCol+'">'+scootAction+'</span></span>'+
+        '<span>CO2:'+co2J+' kg/hr</span>'+
+      '</div>'+
+    '</div>';
+
+    // Timing detail panel
+    htmlTiming+='<div style="display:grid;grid-template-columns:85px 1fr 1fr;gap:3px;'+
       'align-items:start;padding:5px 6px;border-bottom:1px solid #0d2040;'+
-      'font-family:Share Tech Mono,monospace;font-size:.46rem">'+
-      '<div style="color:#6a8090;font-size:.48rem">'+JN[i].name.substring(0,9)+'</div>'+
+      'font-family:Share Tech Mono,monospace;font-size:0.48rem">'+
+      '<div style="color:#6a8090;font-size:.5rem">'+JN[i].name.substring(0,9)+'</div>'+
       '<div>'+
         '<div><span style="color:#4a6880">g_LP=</span><span style="color:var(--cyan)">'+gLp+'s</span> '+
-             '<span style="color:#4a6880">C_opt=</span><span style="color:var(--yellow)">'+copt+'s</span></div>'+
-        '<div><span style="color:#4a6880">d=</span><span style="color:'+dColor+'">'+d2+'s/veh</span> '+
-             '<span style="color:#4a6880">Q≈</span><span style="color:var(--orange)">'+queueLen+'</span></div>'+
+             '<span style="color:#4a6880">C*=</span><span style="color:var(--yellow)">'+copt+'s</span></div>'+
+        '<div><span style="color:#4a6880">d=</span><span style="color:'+dColor+'">'+d2+'s</span> '+
+             '<span style="color:#4a6880">Q=</span><span style="color:var(--orange)">'+queueLen+'</span></div>'+
       '</div>'+
       '<div>'+
         '<div><span style="color:#4a6880">x=</span><span style="color:'+xColor+'">'+x2+'</span> '+
              '<span style="color:#4a6880">LOS=</span><span style="color:'+losCol+'">'+jLOS+'</span></div>'+
-        '<div style="color:'+scootCol+'">'+scootAction+' →'+crec+'s</div>'+
+        '<div style="color:'+stateColor+'">'+stateLabel+' '+remainSec+'s</div>'+
       '</div>'+
-      '</div>';
+    '</div>';
+
+    // Full detail card (collapsed section)
+    html+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-left-color:'+stateColor+'">'+
+      '<div class="sc-name">'+JN[i].name+' <small style="color:#3a5570;font-size:.4rem">OD:'+odDemand+' PCU/hr</small></div>'+
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center;margin:3px 0">'+
+        '<div class="sc-state" style="color:'+stateColor+';font-size:.9rem">'+stateLabel+'</div>'+
+        '<div class="sc-bar"><div class="sc-fill" style="width:'+pct+'%;background:'+stateColor+'"></div></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;font-family:Share Tech Mono,monospace;font-size:0.5rem;margin-bottom:2px">'+
+        '<div><span style="color:#4a6880">g=</span><span style="color:var(--cyan)">'+gLp+'s</span></div>'+
+        '<div><span style="color:#4a6880">lambda=</span><span style="color:var(--cyan)">'+lam2+'</span></div>'+
+        '<div><span style="color:#4a6880">x=</span><span style="color:'+xColor+'">'+x2+'</span></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;font-family:Share Tech Mono,monospace;font-size:0.5rem;margin-bottom:2px">'+
+        '<div><span style="color:#4a6880">d=</span><span style="color:'+dColor+'">'+d2+'s</span></div>'+
+        '<div><span style="color:#4a6880">Q=</span><span style="color:var(--yellow)">'+queueLen+'</span></div>'+
+        '<div><span style="color:#4a6880">LOS=</span><span style="color:'+losCol+'">'+jLOS+'</span></div>'+
+      '</div>'+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#3a5570">'+tl2+' | SCOOT:'+crec+'s ('+scootAction.substring(0,3)+') | CO2:'+co2J+'kg/hr</div>'+
+    '</div>';
   }
   if(sp) sp.innerHTML=html;
-  if(spMaj) spMaj.innerHTML=htmlMaj;
+  if(spRT) spRT.innerHTML=htmlRT;
   if(spTiming) spTiming.innerHTML=htmlTiming;
 }
 
@@ -2830,6 +2873,60 @@ function loop(ts){
       if(roadTick%3===0) drawRoads();
     }
     if(S.frame%30===0) updateMetrics();
+    if(S.frame%5===0){
+      // Real-time signal countdown – update sigpanel-rt every 5 frames (~3/sec)
+      var spRT2=g('sigpanel-rt');
+      if(spRT2&&spRT2.children.length===SIG.length){
+        var lp2=CUR.lp;
+        var algoMul2=S.algo==='fixed'?1.35:S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20):S.algo==='optimal'?(1-Math.min(S.booted/500,1)*0.35):S.algo==='webster'?(1-Math.min(S.booted/500,1)*0.15):1.0;
+        var C_opt2=lp2&&lp2.C_opt?lp2.C_opt:90;
+        var cyd2=1+Math.abs(S.cycle-C_opt2)/C_opt2*0.6;
+        var losC2={'A':'#00ff88','B':'#00e070','C':'#ffd700','D':'#ff8c00','E':'#ff2244','F':'#ff0033'};
+        for(var _i=0;_i<SIG.length;_i++){
+          var _s=SIG[_i];
+          var _card=spRT2.children[_i];
+          if(!_card) continue;
+          var _rem=_s.state==='green'?Math.max(0,_s.gDur-_s.phase):Math.max(0,_s.cycle-_s.phase);
+          var _col=_s.evp?'#ff2244':_s.state==='green'?'#00ff88':_s.state==='yellow'?'#ffd700':'#ff2244';
+          var _lbl=_s.evp?'EVP!':_s.state.toUpperCase();
+          var _pct=Math.round(_s.phase/_s.cycle*100);
+          var _x2=lp2&&lp2.x?lp2.x[_i]:0;
+          var _xCol=_x2>.9?'#ff2244':_x2>.7?'#ff8c00':'#00ff88';
+          var _dR=lp2&&lp2.delay?lp2.delay[_i]:null;
+          var _dS=_dR!==null?Math.min(_dR*algoMul2*cyd2,300):null;
+          var _dCol=_dS>120?'#ff2244':_dS>80?'#ff8c00':_dS>35?'#ffd700':'#00ff88';
+          var _los=lp2&&lp2.los?lp2.los[_i]:'-';
+          var _losc=losC2[_los]||'#ffd700';
+          var _gLp=lp2&&lp2.g?lp2.g[_i].toFixed(0):_s.gDur.toFixed(0);
+          var _lamN=lp2&&lp2.lambda?lp2.lambda[_i]:0.5;
+          var _xN=lp2&&lp2.x?Math.min(lp2.x[_i],0.999):0.7;
+          var _qR=lp2&&lp2.q_pcu?lp2.q_pcu[_i]/3600:0;
+          var _qL=Math.max(0,Math.min(Math.round(_qR*_s.cycle*(1-_lamN)*(1-_lamN)/(2*Math.max(1-_lamN*_xN,0.01))),99));
+          _card.style.borderLeftColor=_col;
+          _card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+            '<div class="sc-name">'+JN[_i].name+'</div>'+
+            '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#3a5570">'+_s.cycle.toFixed(0)+'s cycle</div>'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+
+            '<div style="text-align:center;padding:4px 0">'+
+              '<div class="sc-state" style="color:'+_col+'">'+_lbl+'</div>'+
+              '<div style="font-family:Share Tech Mono,monospace;font-size:0.46rem;color:'+_col+';opacity:.65;margin-top:2px">g='+_gLp+'s / C='+_s.cycle.toFixed(0)+'s</div>'+
+            '</div>'+
+            '<div style="text-align:center">'+
+              '<div class="sc-tmr" style="color:'+_col+'">'+_rem.toFixed(0)+'</div>'+
+              '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#4a6880;margin-top:1px">sec remain</div>'+
+            '</div>'+
+          '</div>'+
+          '<div class="sc-bar" style="margin-bottom:8px"><div class="sc-fill" style="width:'+_pct+'%;background:'+_col+'"></div></div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:'+_xCol+'">'+_x2.toFixed(3)+'</div><div class="sc-stat-label">v/c</div></div>'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:'+_dCol+'">'+(_dS!==null?_dS.toFixed(0):'--')+'s</div><div class="sc-stat-label">delay</div></div>'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:#ff8c00">'+_qL+'</div><div class="sc-stat-label">queue</div></div>'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:'+_losc+'">'+_los+'</div><div class="sc-stat-label">LOS</div></div>'+
+          '</div>';
+        }
+      }
+    }
     if(S.frame%60===0){renderLPTable();renderLWRTable();updateLWRChart();updateCTMDisplay();updatePlatoonDisplay();}
     if(S.frame%120===0) renderPIBox();
   }catch(err){console.warn('Loop:',err);}
