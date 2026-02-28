@@ -1012,8 +1012,8 @@ details.csec summary:hover{background:#0a1828}
             <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
           </div>
           <div class="ctrl">
-            <div class="clbl">Green Wave Speed <span id="lwav">40 km/h</span></div>
-            <input type="range" min="20" max="80" value="40" step="5" oninput="setWave(this.value)">
+            <div class="clbl">Free-Flow Speed <span id="lwav">40 km/h</span></div>
+            <input type="range" min="20" max="60" value="40" step="5" oninput="setWave(this.value)">
           </div>
           <div class="ctrl">
             <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
@@ -1637,26 +1637,46 @@ var SIG = JN.map(function(j,i) {
 var particles = [];
 var MAX_N = 650;
 
+// ── SPEED CONSTANTS (real km/h → progress/frame) ─────────────────────────────
+// 1 deg lat/lng ≈ 111 km at Bangalore lat (~13°)
+// progress/frame = kmh / (111 * 3600 * 60) / pathLen_deg
+// Regular urban arterial free-flow: 40 km/h  |  congested: 15-25 km/h
+// Emergency free-flow: 55 km/h (priority clearance)
+var KMH_TO_DEG_PER_S = 1.0 / (111.0 * 3600.0);  // 1 km/h in degrees/second
+var FPS = 60.0;                                    // target frame rate
+
+function edgeSpeedFactor(ei) {
+  // Returns the conversion: (1 km/h) = X progress-units/frame for this edge
+  var path = getEdgePath(ei);
+  var lenDeg = pathLen(path);                      // raw lat/lng degree length
+  if (lenDeg < 1e-9) return 0.00001;
+  return KMH_TO_DEG_PER_S / FPS / lenDeg;         // multiply by km/h to get prog/frame
+}
+
 function Particle(isE) {
   this.isE = isE;
   this.ei = Math.floor(Math.random()*ED.length);
   this.prog = Math.random();
   this.dir = Math.random()>.5?1:-1;
-  // Speed in path-length units per frame (calibrated to ~40 km/h equiv)
-  this.bspd = isE ? (0.006+Math.random()*.004) : (0.0010+Math.random()*.0008);
-  this.spd = this.bspd;
-  this.tspd = this.bspd;
+  this.laneIdx = Math.floor(Math.random()*3);
+  this.ph = Math.random()*Math.PI*2;
   this.state = 'moving';
   this.wt = 0;
   this.trail = [];
-  this.ph = Math.random()*Math.PI*2;
-  // Lane offset: positive = left side of road, negative = right
-  // dir=1 travels in "forward" direction → right lane offset
-  // dir=-1 travels in "backward" direction → left lane offset
-  this.laneIdx = Math.floor(Math.random()*3);  // 0,1,2 lane within direction
-  // O-D routing: pick a destination junction from OD matrix
+  // Target speed in km/h:
+  // Regular cars: 35-45 km/h free-flow (Bangalore urban arterial)
+  // Emergency:    50-60 km/h with priority clearance
+  this.targetKmh = isE ? (50 + Math.random()*10) : (32 + Math.random()*12);
+  this._refreshSpeed();
+  this.spd = this.bspd;
+  this.tspd = this.bspd;
   this.destJ = this._pickDest(this.dir===1?ED[this.ei][0]:ED[this.ei][1]);
 }
+
+Particle.prototype._refreshSpeed = function() {
+  // Recompute bspd whenever edge changes, so speed stays correct in real km/h
+  this.bspd = this.targetKmh * edgeSpeedFactor(this.ei);
+};
 
 Particle.prototype._pickDest = function(srcJ) {
   var row = BACKEND.od_matrix[srcJ] || [];
@@ -1703,18 +1723,25 @@ Particle.prototype.update = function(dt) {
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
     var stop = (!this.isE && distEnd<.15 && sig.state==='red' && !sig.evp);
 
+    // Speed scale: S.wave represents free-flow speed in km/h (default 40)
+    // Vehicles scale their speed relative to this green-wave speed setting
+    var waveScale = S.wave / 40.0;
+
     if(stop){
       this.tspd=0; this.state='stopped'; this.wt+=dt*.016;
     } else if(cong>.65 && !this.isE){
-      var f=Math.max(.05,1-(cong-.65)*2.8);
-      this.tspd=this.bspd*f*S.wave/40; this.state=cong>.85?'stopped':'slow';
+      // Congested: reduce speed proportionally, min ~10 km/h
+      var f=Math.max(.08, 1-(cong-.65)*2.5);
+      this.tspd=this.bspd*f*waveScale; this.state=cong>.85?'stopped':'slow';
       this.wt=Math.max(0,this.wt-dt*.01);
     } else {
-      this.tspd=this.bspd*S.wave/40; this.state='moving';
+      this.tspd=this.bspd*waveScale; this.state='moving';
       this.wt=Math.max(0,this.wt-dt*.05);
     }
-    if(this.isE){this.tspd=this.bspd*2.2; this.state='moving';}
-    this.spd+=(this.tspd-this.spd)*.13;
+    // Emergency vehicles ignore signals and congestion — run at full target speed
+    if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
+    // Smooth acceleration/deceleration
+    this.spd+=(this.tspd-this.spd)*.10;
     this.prog+=this.spd*this.dir*S.speed;
     if(this.isE){
       var p=this.pos();
@@ -1724,23 +1751,20 @@ Particle.prototype.update = function(dt) {
     if(this.prog>=1 || this.prog<=0){
       this.prog=this.prog>=1?0:1;
       var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
-      // O-D biased routing
       var conn=[];
       for(var i=0;i<ED.length;i++){
         if(i!==this.ei&&(ED[i][0]===ej||ED[i][1]===ej)) conn.push(i);
       }
       if(conn.length>0){
-        // Weight connections by OD demand toward destination
         var best=conn[0], bestW=0;
         for(var ci=0;ci<conn.length;ci++){
           var cj=ED[conn[ci]][0]===ej?ED[conn[ci]][1]:ED[conn[ci]][0];
           var od=BACKEND.od_matrix[ej][cj]||1;
           if(od>bestW||Math.random()<.3){bestW=od;best=conn[ci];}
         }
-        var pk=best;
-        this.ei=pk; this.dir=ED[pk][0]===ej?1:-1;
+        this.ei=best; this.dir=ED[best][0]===ej?1:-1;
         this.prog=this.dir===1?0:1;
-        // refresh destination occasionally
+        this._refreshSpeed();  // recalculate bspd for new edge length
         if(ej===this.destJ) this.destJ=this._pickDest(ej);
       } else {
         this.dir*=-1;
