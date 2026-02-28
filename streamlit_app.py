@@ -2078,7 +2078,9 @@ function updateSignals(dt){
 
   for(var i=0;i<SIG.length;i++){
     var sig=SIG[i];
-    sig.phase+=dt*S.speed;
+    // dt ≈ 1 at 60fps; multiply by 0.016 so phase increments in real seconds
+    // (1 frame × 0.016 s/frame × 60fps = ~1 real second per simulated second)
+    sig.phase+=dt*S.speed*0.016;
     if(sig.phase>=sig.cycle) sig.phase-=sig.cycle;
 
     var nearEvp=false;
@@ -2229,39 +2231,82 @@ function renderLWRTable(){
 
 // ── METRICS ───────────────────────────────────────────────────────────────────
 function updateMetrics(){
-  var warm=S.booted/500;
+  var warm=Math.min(S.booted/500,1);
   var norm=[],emerg=[];
   for(var i=0;i<particles.length;i++){
     if(particles[i].isE) emerg.push(particles[i]); else norm.push(particles[i]);
   }
   var moving=0,slow=0,stopped=0;
   for(var i=0;i<norm.length;i++){
-    if(norm[i].state==='moving') moving++;
-    else if(norm[i].state==='slow') slow++;
-    else stopped++;
-  }
+    if(norm[i].state==='moving') moving++;\n    else if(norm[i].state==='slow') slow++;\n    else stopped++;\n  }
   var total=particles.length;
   var lp=CUR.lp;
   var lwr=CUR.lwr;
+  var mul=DMUL[S.dens-1];
 
-  // Real LP-derived metrics
-  var avgDelay=0, avgLam=0, avgX=0, maxDelay=0, lpObj=0;
+  // ── Dynamic metric computation (responds to all sliders) ──────────────────
+  // Base Webster delay from LP (density-specific precomputed values)
+  var baseDelay=0, avgLam=0, avgX=0, maxDelay=0, baseLpObj=0;
   if(lp&&lp.delay){
     for(var i=0;i<lp.delay.length;i++){
-      var al=S.algo==='fixed'?1.3:S.algo==='optimal'?(1-warm*.38):1;
-      avgDelay+=lp.delay[i]*al;
+      baseDelay+=lp.delay[i];
       avgLam+=lp.lambda[i];
       avgX+=lp.x[i];
       if(lp.delay[i]>maxDelay) maxDelay=lp.delay[i];
     }
-    avgDelay/=lp.delay.length; avgLam/=lp.lambda.length; avgX/=lp.x.length;
-    lpObj=lp.obj_val||0;
+    baseDelay/=lp.delay.length;
+    avgLam/=lp.lambda.length;
+    avgX/=lp.x.length;
+    baseLpObj=lp.obj_val||0;
   } else {
-    avgDelay=120*DMUL[S.dens-1];
-    avgLam=0.5; avgX=0.7; lpObj=0;
+    baseDelay=80; avgLam=0.45; avgX=0.75; baseLpObj=0;
   }
 
-  // LWR shock metrics
+  // Algorithm modifier: optimal LP reduces delay vs fixed-timer baseline
+  var algoDelayMul = S.algo==='fixed'   ? 1.35 :
+                     S.algo==='lp'      ? (1 - warm*0.20) :
+                     S.algo==='optimal' ? (1 - warm*0.35) :
+                     S.algo==='webster' ? (1 - warm*0.15) :
+                     1.0; // evp
+
+  // Cycle time modifier: Webster optimal C reduces delay; too long or too short increases it
+  var C_opt = lp&&lp.C_opt ? lp.C_opt : 90;
+  var cycleDelta = Math.abs(S.cycle - C_opt) / C_opt;
+  var cycleDelayMul = 1 + cycleDelta * 0.6;  // up to +60% if far from optimal
+
+  // Particle state modifier: fraction stopped/slow increases perceived delay
+  var stopFrac = norm.length>0 ? (stopped + slow*0.5)/norm.length : 0;
+  var particleDelayMul = 1 + stopFrac * 0.8;
+
+  var avgDelay = Math.min(baseDelay * algoDelayMul * cycleDelayMul * particleDelayMul, 300);
+
+  // v/c ratio: scales with density and degrades with poor algorithm
+  var vcBase = avgX;
+  var avgVC = Math.min(vcBase * mul * algoDelayMul * cycleDelayMul * 0.7, 0.999);
+
+  // Signal efficiency g/C: LP-optimised algorithms improve green utilisation
+  var baseEff = avgLam;
+  var algoEffBonus = S.algo==='optimal' ? warm*0.12 :
+                     S.algo==='lp'      ? warm*0.08 :
+                     S.algo==='webster' ? warm*0.05 : 0;
+  var avgEff = Math.min((baseEff + algoEffBonus) * 100, 95);
+
+  // Network throughput: moving vehicles × scale factor, drops under congestion
+  var movingFrac = norm.length>0 ? moving/norm.length : 0.5;
+  var baseThr = 800 + movingFrac * 1200;  // 800-2000 veh/hr/lane range
+  var algoThrMul = S.algo==='fixed'?0.72 : S.algo==='optimal'?(0.85+warm*0.15) : (0.80+warm*0.10);
+  var thr = Math.round(baseThr * algoThrMul / Math.max(mul, 0.3));
+
+  // Average network speed: inversely proportional to congestion and delay
+  var baseSpeed = S.wave;
+  var congSpeedMul = 1 - stopFrac*0.7 - (mul-0.5)*0.15;
+  var avgSpd = Math.max(5, baseSpeed * Math.max(congSpeedMul, 0.1) *
+               (S.algo==='fixed'?0.75 : S.algo==='optimal'?(0.7+warm*0.3) : 0.80));
+
+  // LP objective: scales with delay, density, and algorithm efficiency
+  var lpObj = baseLpObj * algoDelayMul * mul;
+
+  // LWR shock metrics (from density-precomputed data)
   var maxShock=0,nShocks=0;
   if(lwr){
     for(var i=0;i<lwr.length;i++){
@@ -2269,20 +2314,19 @@ function updateMetrics(){
       if(wabs>maxShock) maxShock=wabs;
       if(wabs>5) nShocks++;
     }
+    // Scale shock speed by density - higher density = stronger shocks
+    maxShock = maxShock * Math.min(mul, 1.4);
   }
 
-  var avgSpd=S.algo==='fixed'?17.8:Math.min(40,17.8+warm*21);
-  var avgEff=avgLam*100;
-  var thr=Math.round((880+moving*2.8)*(S.algo==='fixed'?0.75:1+warm*.25));
   var evpAct=0;
   for(var i=0;i<SIG.length;i++) if(SIG[i].evp) evpAct++;
 
-  pushGraph('g0',thr);
-  pushGraph('g1',Math.min(avgDelay,200));
-  pushGraph('g2',Math.min(avgX,1.0));
-  pushGraph('g3',avgEff);
-  pushGraph('g4',Math.min(maxShock,80));
-  pushGraph('g5',Math.min(lpObj/100,2000));
+  pushGraph('g0', Math.min(thr, 2200));
+  pushGraph('g1', Math.min(avgDelay, 200));
+  pushGraph('g2', Math.min(avgVC, 1.0));
+  pushGraph('g3', avgEff);
+  pushGraph('g4', Math.min(maxShock, 80));
+  pushGraph('g5', Math.min(lpObj/50, 2000));
 
   sv('kv0',(total*5000).toLocaleString());
   sv('kv1',avgDelay.toFixed(1)+'s');
@@ -2293,26 +2337,26 @@ function updateMetrics(){
 
   sv('gv0',thr); setDelta('thr','gd0',thr,true);
   sv('gv1',avgDelay.toFixed(1)); setDelta('del','gd1',avgDelay,false);
-  sv('gv2',avgX.toFixed(3)); setDelta('xvr','gd2',avgX,false);
+  sv('gv2',avgVC.toFixed(3)); setDelta('xvr','gd2',avgVC,false);
   sv('gv3',avgEff.toFixed(0)); setDelta('eff','gd3',avgEff,true);
   sv('gv4',maxShock.toFixed(1)); setDelta('lwr','gd4',maxShock,false);
   sv('gv5',lpObj.toFixed(0)); setDelta('obj','gd5',lpObj,true);
 
-  // LP status
+  // LP status panel
   sv('lp-status',lp&&lp.lp_ok?'OPTIMAL':'FEASIBLE');
   sv('lp-obj',lpObj.toFixed(1));
   sv('lp-wd',avgDelay.toFixed(1));
-  sv('lp-xavg',avgX.toFixed(3));
+  sv('lp-xavg',avgVC.toFixed(3));
   sv('w-C',S.cycle);
   sv('w-lam',avgLam.toFixed(3));
-  sv('w-x',avgX.toFixed(3));
+  sv('w-x',avgVC.toFixed(3));
   sv('w-d',avgDelay.toFixed(1));
-  sv('w-dmax',maxDelay.toFixed(1));
+  sv('w-dmax',(maxDelay*algoDelayMul*cycleDelayMul).toFixed(1));
 
-  // LWR
+  // LWR display
   sv('lwr-maxw',maxShock.toFixed(1));
   sv('lwr-shocks',nShocks);
-  var avgK2=JN.reduce(function(a,j){return a+j.cong*DMUL[S.dens-1]*120;},0)/JN.length;
+  var avgK2=JN.reduce(function(a,j){return a+j.cong*mul*120;},0)/JN.length;
   sv('lwr-avgk',avgK2.toFixed(1));
   sv('lwrd',maxShock.toFixed(0)+' km/h');
 
@@ -2323,7 +2367,7 @@ function updateMetrics(){
   sv('vtot',(total*5000).toLocaleString());
   sv('sbl',lp&&lp.lp_ok?'OPTIMAL':'FEAS');
   sv('sbw',avgDelay.toFixed(1));
-  sv('sbx',avgX.toFixed(3));
+  sv('sbx',avgVC.toFixed(3));
   sv('sbwv',maxShock.toFixed(0));
   sv('sbod','1.2M');
   sv('sbe',evpAct);
@@ -2465,53 +2509,76 @@ var paretoChart2 = null;
 function initParetoTab(){
   if(!paretoInited){
     paretoInited=true;
-    renderParetoChart();
-    renderMCSummary();
-    renderSCOOTTable();
-    renderPIBox();
-    setTimeout(function(){renderRadarChart();},200);
+    // Delay slightly so the tab's display:flex has applied and canvas has real dimensions
+    setTimeout(function(){
+      renderParetoChart();
+      renderMCSummary();
+      renderSCOOTTable();
+      renderPIBox();
+      setTimeout(function(){renderRadarChart();},150);
+    },50);
+  } else {
+    // Re-render on every tab visit to handle resize/layout changes
+    if(paretoChart2){try{paretoChart2.resize();}catch(e){}}
+    if(radarChart){try{radarChart.resize();}catch(e){}}
   }
 }
 
 function renderParetoChart(){
   var pf = BACKEND.pareto;
-  if(!pf||pf.length===0) return;
+  if(!pf||pf.length===0){ sv('pf-n','No data'); return; }
   sv('pf-n', pf.length);
   var minD=pf[0].f1_delay, minE=pf[pf.length-1].f2_emiss;
   sv('pf-d1', minD.toFixed(1));
   sv('pf-d2', minE.toFixed(4));
   var el = g('pareto-canv');
   if(!el) return;
+  if(paretoChart2){try{paretoChart2.destroy();}catch(e){} paretoChart2=null;}
   try{
     var pts = pf.map(function(p){return {x:p.f1_delay, y:p.f2_emiss};});
     paretoChart2 = new Chart(el,{
-      type:'scatter',
+      type:'line',
       data:{
+        labels: pf.map(function(p){return p.f1_delay.toFixed(0);}),
         datasets:[{
           label:'Pareto Front',
-          data: pts,
+          data: pts.map(function(p){return p.y;}),
           borderColor:'#00e5ff',
-          backgroundColor:'#00e5ff44',
-          pointRadius:5,
-          showLine:true,
+          backgroundColor:'#00e5ff22',
+          pointBackgroundColor:'#00e5ff',
+          pointRadius:4,
           borderWidth:2,
+          fill:true,
           tension:0.3
+        },{
+          label:'Min Delay',
+          data: pts.map(function(p,i){return i===0?p.y:null;}),
+          borderColor:'#00ff88',
+          backgroundColor:'#00ff8866',
+          pointBackgroundColor:'#00ff88',
+          pointRadius:7,
+          borderWidth:0,
+          fill:false
         }]
       },
       options:{
         animation:false,responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){
-          return 'Delay:'+ctx.raw.x.toFixed(1)+' | CO2:'+ctx.raw.y.toFixed(4);
-        }}}},
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:function(ctx){
+            var i=ctx.dataIndex;
+            return 'Delay:'+pf[i].f1_delay.toFixed(1)+' | CO₂:'+pf[i].f2_emiss.toFixed(4);
+          }}}
+        },
         scales:{
-          x:{display:true,title:{display:true,text:'f1 Delay (weighted)',color:'#4a6880',font:{size:8}},
+          x:{display:true,title:{display:true,text:'f1 Delay (weighted s)',color:'#4a6880',font:{size:8}},
              ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}},
           y:{display:true,title:{display:true,text:'f2 CO₂ proxy',color:'#4a6880',font:{size:8}},
              ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}}
         }
       }
     });
-  }catch(e){}
+  }catch(e){console.warn('Pareto chart error:',e);}
 }
 
 function renderMCSummary(){
@@ -2559,21 +2626,29 @@ function renderPIBox(){
 }
 
 function renderRadarChart(){
-  if(radarInited) return;
-  radarInited=true;
   var el=g('radar-canv');
   if(!el) return;
+  if(radarChart){try{radarChart.destroy();}catch(e){} radarChart=null;}
+  radarInited=true;
   try{
-    // 5 metrics: Throughput, Delay-efficiency, v/c utilisation, LOS score, EVP response
-    // Optimal (GW+LP+EVP) vs Fixed timer — normalised 0-100
-    var optVals  = [88, 82, 73, 79, 95];   // relative to max
+    var warm=Math.min(S.booted/500,1);
+    var mul=DMUL[S.dens-1];
+    // Scores scale dynamically with current density and algorithm
+    var algoBoost = S.algo==='optimal'?warm : S.algo==='lp'?warm*0.7 : S.algo==='webster'?warm*0.4 : 0;
+    var optVals  = [
+      Math.round(60+algoBoost*28),   // Throughput
+      Math.round(55+algoBoost*27),   // Delay-Eff
+      Math.round(65-mul*8+algoBoost*15),  // v/c Control
+      Math.round(60+algoBoost*20),   // LOS
+      S.algo==='fixed'?20:Math.round(70+algoBoost*25)  // EVP Response
+    ];
     var fixedVals= [62, 45, 60, 52, 20];
     radarChart = new Chart(el,{
       type:'radar',
       data:{
         labels:['Throughput','Delay-Eff','v/c Ctrl','LOS','EVP Resp'],
         datasets:[
-          {label:'GW+LP+EVP',data:optVals,
+          {label:'Current Algo',data:optVals,
            borderColor:'#00e5ff',backgroundColor:'#00e5ff22',
            pointBackgroundColor:'#00e5ff',borderWidth:2,pointRadius:3},
           {label:'Fixed Timer',data:fixedVals,
@@ -2592,7 +2667,7 @@ function renderRadarChart(){
         }}
       }
     });
-  }catch(e){}
+  }catch(e){console.warn('Radar chart error:',e);}
 }
 
 // ── CTM BOTTLENECK DISPLAY ────────────────────────────────────────────────────
