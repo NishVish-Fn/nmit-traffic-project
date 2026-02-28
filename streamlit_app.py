@@ -962,6 +962,7 @@ details.csec summary:hover{background:#0a1828}
 </head>
 <body>
 
+<script id="__backend_data" type="application/json">""" + BACKEND_JSON + """</script>
 <div id="hdr">
   <div class="h-brand">
     <div class="h-icon">&#x1F6A6;</div>
@@ -1488,7 +1489,7 @@ details.csec summary:hover{background:#0a1828}
 'use strict';
 
 // ── BACKEND DATA INJECTED BY PYTHON ──────────────────────────────────────────
-var BACKEND = """ + BACKEND_JSON + """;
+var BACKEND = JSON.parse(document.getElementById('__backend_data').textContent);
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 var JN = BACKEND.junctions;
@@ -2333,8 +2334,6 @@ function updateMetrics(){
     if(jlFree) jlFree.innerHTML=htmlFree||'';
   }
 
-  }
-
   // Signal panel
   // Signal panel - full detail
   var sp=g('sigpanel');
@@ -2379,8 +2378,6 @@ function updateMetrics(){
   if(sp) sp.innerHTML=html;
   if(spMaj) spMaj.innerHTML=htmlMaj;
   if(spTiming) spTiming.innerHTML=htmlTiming;
-
-  }
 }
 
 function pad(n){return n<10?'0'+n:String(n);}
