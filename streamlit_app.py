@@ -724,7 +724,7 @@ HTML = """<!DOCTYPE html>
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
-     width:100vw;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+     width:100%;height:990px;overflow:hidden;display:flex;flex-direction:column}
 
 /* HEADER */
 #hdr{height:56px;flex-shrink:0;background:linear-gradient(90deg,#000a18,#020810 50%,#000a18);
@@ -762,18 +762,18 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* BODY */
-#body{flex:1;display:flex;overflow:hidden}
+#body{flex:1;min-height:0;display:flex;overflow:hidden}
 
 /* LEFT PANEL */
 #lp{width:286px;flex-shrink:0;background:var(--bg2);
-  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden}
+  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .tabs{display:flex;border-bottom:1px solid var(--cdim)}
 .tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
   font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
   color:#4a6880;border-bottom:2px solid transparent;transition:.2s;text-transform:uppercase}
 .tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
 .tab:hover:not(.on){color:#7090a0}
-.tpane{display:none;flex:1;overflow-y:auto;padding:10px;
+.tpane{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
   scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
   flex-direction:column;gap:8px}
 .tpane.on{display:flex}
@@ -837,8 +837,8 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 
 /* RIGHT PANEL */
 #rp{width:330px;flex-shrink:0;background:var(--bg2);
-  border-left:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden}
-.atab-content{display:none;flex:1;overflow-y:auto;padding:10px;
+  border-left:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.atab-content{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
   scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
   flex-direction:column;gap:8px}
 .atab-content.on{display:flex}
@@ -1186,7 +1186,6 @@ details.csec summary:hover{background:#0a1828}
       </details>
 
     </div>
-    </div>
   </div>
 
   <!-- MAP -->
@@ -1324,7 +1323,6 @@ details.csec summary:hover{background:#0a1828}
       </details>
 
     </div>
-    </div>
 
     <div class="atab-content" id="rt2">
 
@@ -1345,7 +1343,6 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </details>
 
-    </div>
     </div>
 
     <div class="atab-content" id="rt3">
@@ -1468,9 +1465,8 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </div>
     </div>
-  </div>
-</div>
 
+</div>
 <div id="statusbar">
   <div class="sb">&#x1F551; <span id="sbt" class="sbv">00:00:00</span></div>
   <div class="sb">ALGO <span id="sba" class="sbv">GW+LP+EVP</span></div>
@@ -1772,6 +1768,8 @@ function spawnParticles() {
 var map=L.map('map',{center:[12.97,77.62],zoom:12,
   zoomControl:false,attributionControl:false,preferCanvas:true});
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
+setTimeout(function(){map.invalidateSize();map.setView([12.97,77.62],12);},300);
+setTimeout(function(){map.invalidateSize();},800);
 
 var roadLines=[];
 function drawRoads() {
