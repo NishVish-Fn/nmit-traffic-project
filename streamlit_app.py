@@ -907,6 +907,57 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .badge-ok{background:#00ff8822;color:var(--green);border:1px solid #00ff8844}
 .badge-warn{background:#ffd70022;color:var(--yellow);border:1px solid #ffd70044}
 .badge-crit{background:#ff224422;color:var(--red);border:1px solid #ff224444}
+
+/* ── COLLAPSIBLE SECTIONS ──────────────────────────────────────────────────── */
+details.csec{background:var(--bg3);border:1px solid #0d2040;border-radius:4px;margin-bottom:6px;overflow:hidden}
+details.csec[open]{border-color:#1a3050}
+details.csec summary{
+  font-family:'Orbitron',monospace;font-size:0.52rem;font-weight:600;
+  color:var(--cyan);letter-spacing:1.5px;text-transform:uppercase;
+  padding:8px 10px;cursor:pointer;list-style:none;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid transparent;user-select:none;
+  transition:background .15s}
+details.csec summary::-webkit-details-marker{display:none}
+details.csec[open] summary{border-bottom-color:var(--cdim);background:#091420}
+details.csec summary::after{
+  content:'▼';font-size:0.4rem;color:#3a5570;transition:transform .2s}
+details.csec[open] summary::after{transform:rotate(180deg);color:var(--cyan)}
+details.csec summary:hover{background:#0a1828}
+.csec-body{padding:10px}
+.csec-badge{font-family:'Share Tech Mono',monospace;font-size:0.42rem;
+  padding:1px 6px;border-radius:2px;border:1px solid;margin-left:6px}
+.csec-badge.live{background:#00ff8811;color:var(--green);border-color:#00ff8844;
+  animation:blink 1.4s infinite}
+.csec-badge.warn{background:#ffd70011;color:var(--yellow);border-color:#ffd70044}
+.csec-badge.crit{background:#ff224411;color:var(--red);border-color:#ff224444}
+
+/* ── INTERSECTION SIGNAL BOX ───────────────────────────────────────────────── */
+.sig-box{display:grid;grid-template-columns:1fr 44px 1fr;grid-template-rows:1fr 44px 1fr;
+  gap:4px;padding:8px;background:var(--bg);border:1px solid #0d2040;border-radius:4px;margin-bottom:6px}
+.sig-arm{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.sig-arm.horiz{flex-direction:row}
+.sig-center{background:#0a1828;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-family:'Orbitron',monospace;font-size:0.48rem;
+  color:var(--cyan);text-align:center;line-height:1.3}
+.sig-light{width:8px;height:8px;border-radius:50%;border:1px solid #1a3050;flex-shrink:0}
+.sig-light.on-g{background:var(--green);box-shadow:0 0 6px var(--green)}
+.sig-light.on-y{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+.sig-light.on-r{background:var(--red);box-shadow:0 0 6px var(--red)}
+.sig-light.off{background:#0d2040}
+.sig-arm-lbl{font-family:'Share Tech Mono',monospace;font-size:0.42rem;color:#3a5570;
+  letter-spacing:0.5px;text-align:center}
+.sig-timer{font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:700;
+  color:var(--cyan);text-align:center}
+
+/* ── LANE-DIAGRAM MINI ─────────────────────────────────────────────────────── */
+.mini-road{position:relative;height:28px;background:#0a1828;border-radius:2px;
+  overflow:hidden;margin-top:4px;border:1px solid #0d2040}
+.lane-stripe{position:absolute;top:50%;transform:translateY(-50%);
+  width:100%;height:1px;border-top:1px dashed #1a3050;opacity:.5}
+.lane-flow{position:absolute;top:0;left:0;height:50%;width:100%;
+  background:linear-gradient(90deg,transparent,#00e5ff18,transparent)}
+.lane-flow.rev{top:50%;background:linear-gradient(270deg,transparent,#ff224418,transparent)}
 </style>
 </head>
 <body>
@@ -947,126 +998,193 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
     </div>
 
     <div class="tpane on" id="lt0">
-      <div class="sec">
-        <div class="stitle">&#9881; Simulation Controls</div>
-        <div class="ctrl">
-          <div class="clbl">Traffic Density <span id="ldns">Peak</span></div>
-          <input type="range" min="1" max="5" value="4" oninput="setDens(this.value)">
+
+      <details class="csec" open>
+        <summary>&#9881; Simulation Controls <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body">
+          <div class="ctrl">
+            <div class="clbl">Traffic Density <span id="ldns">Peak</span></div>
+            <input type="range" min="1" max="5" value="4" oninput="setDens(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Emergency Vehicles <span id="lems">50 = 5,000 veh</span></div>
+            <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Green Wave Speed <span id="lwav">40 km/h</span></div>
+            <input type="range" min="20" max="80" value="40" step="5" oninput="setWave(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
+            <input type="range" min="30" max="180" value="90" step="10" oninput="setCycle(this.value)">
+          </div>
         </div>
-        <div class="ctrl">
-          <div class="clbl">Emergency Dots (x100 veh) <span id="lems">50 = 5,000 veh</span></div>
-          <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x26A1; Algorithm &amp; Speed</summary>
+        <div class="csec-body">
+          <div class="ctrl">
+            <div class="clbl">Simulation Speed</div>
+            <select onchange="setSS(this.value)">
+              <option value="0.5">0.5x Slow</option>
+              <option value="1" selected>1x Real-time</option>
+              <option value="2">2x Fast</option>
+              <option value="4">4x Ultra</option>
+            </select>
+          </div>
+          <div class="ctrl" style="margin-top:8px">
+            <div class="clbl">Control Algorithm</div>
+            <select id="algo-sel" onchange="setAlgoSel(this.value)">
+              <option value="optimal">GW + LP + EVP (Proposed)</option>
+              <option value="fixed">Fixed Timer (Baseline)</option>
+              <option value="lp">LP Only</option>
+              <option value="evp">EVP Only</option>
+              <option value="webster">Webster Adaptive</option>
+            </select>
+          </div>
         </div>
-        <div class="ctrl">
-          <div class="clbl">Green Wave Speed <span id="lwav">40 km/h</span></div>
-          <input type="range" min="20" max="80" value="40" step="5" oninput="setWave(this.value)">
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4D0; LP Solver Status</summary>
+        <div class="csec-body">
+          <div class="lp-box" style="font-size:.53rem;line-height:1.7">
+            <span class="hi">Solver:</span> scipy HiGHS LP<br>
+            <span class="hi">Variables:</span> 12 green times g_i<br>
+            <span class="hi">Constraints:</span> &#x2211;g_i &#x2264; C&#x2212;L<br>
+            <span class="hi">Objective:</span> Minimise &#x2211; w_i&#x22C5;d_i<br>
+            <span class="hi">OD Matrix:</span> 12&#xD7;12 BBMP/KRDCL<br>
+            <span class="hi">CTM:</span> Daganzo (1994), 5 cells<br>
+            <span class="hi">Robertson:</span> &#x3B2;=0.8, TRANSYT<br>
+            <span class="hi">Status:</span> <span class="hig" id="lp-status">OPTIMAL</span><br>
+            <span class="hi">Obj Value:</span> <span class="hiy" id="lp-obj">--</span><br>
+            <span class="hi">Avg Delay:</span> <span class="hir" id="lp-wd">--</span> s<br>
+            <span class="hi">Avg x (v/c):</span> <span class="hio" id="lp-xavg">--</span>
+          </div>
         </div>
-        <div class="ctrl">
-          <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
-          <input type="range" min="30" max="180" value="90" step="10" oninput="setCycle(this.value)">
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F50D; Map Legend</summary>
+        <div class="csec-body">
+          <div class="sc-row"><div class="sc-dot" style="background:var(--cyan)"></div>
+            <div class="sc-txt">1 cyan dot = <b style="color:var(--cyan)">5,000</b> regular vehicles</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>
+            <div class="sc-txt">1 red dot = <b style="color:var(--red)">100</b> emergency vehicles</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--yellow)"></div>
+            <div class="sc-txt">Yellow = LWR shock wave front</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--orange)"></div>
+            <div class="sc-txt">Orange = stopped at red signal</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--pink);box-shadow:0 0 5px var(--pink)"></div>
+            <div class="sc-txt">Pink dashed = active EVP corridor</div></div>
+          <div style="margin-top:8px;border-top:1px solid #0d2040;padding-top:8px">
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--green);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Free-flow road &lt;40% cong.</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--yellow);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Moderate 40–65% congestion</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--orange);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Congested 65–85%</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--red);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Gridlock &gt;85% congestion</div></div>
+          </div>
         </div>
-        <div class="ctrl">
-          <div class="clbl">Sim Speed</div>
-          <select onchange="setSS(this.value)">
-            <option value="0.5">0.5x Slow</option>
-            <option value="1" selected>1x Real-time</option>
-            <option value="2">2x Fast</option>
-            <option value="4">4x Ultra</option>
-          </select>
-        </div>
-        <div class="ctrl">
-          <div class="clbl">Algorithm</div>
-          <select id="algo-sel" onchange="setAlgoSel(this.value)">
-            <option value="optimal">GW + LP + EVP (Proposed)</option>
-            <option value="fixed">Fixed Timer (Baseline)</option>
-            <option value="lp">LP Only</option>
-            <option value="evp">EVP Only</option>
-            <option value="webster">Webster Adaptive</option>
-          </select>
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F50D; Scale Legend</div>
-        <div class="sc-row"><div class="sc-dot" style="background:var(--cyan)"></div>
-          <div class="sc-txt">1 cyan dot = <b style="color:var(--cyan)">5,000</b> regular vehicles</div></div>
-        <div class="sc-row"><div class="sc-dot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>
-          <div class="sc-txt">1 red dot = <b style="color:var(--red)">100</b> emergency vehicles</div></div>
-        <div class="sc-row"><div class="sc-dot" style="background:var(--yellow)"></div>
-          <div class="sc-txt">Yellow = LWR shock wave front</div></div>
-        <div class="sc-row"><div class="sc-dot" style="background:var(--orange)"></div>
-          <div class="sc-txt">Orange = stopped at red signal</div></div>
-        <div class="sc-row"><div class="sc-dot" style="background:var(--pink);box-shadow:0 0 5px var(--pink)"></div>
-          <div class="sc-txt">Pink dashed = active EVP corridor</div></div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4D0; LP Status</div>
-        <div class="lp-box" style="font-size:.53rem;line-height:1.7">
-          <span class="hi">Solver:</span> scipy HiGHS LP<br>
-          <span class="hi">Variables:</span> 12 green times g_i<br>
-          <span class="hi">Constraints:</span> &#x2211;g_i &#x2264; C&#x2212;L, g_min&#x2264;g_i&#x2264;g_max<br>
-          <span class="hi">Objective:</span> Minimise &#x2211; w_i(C&#x2212;g_i)<br>
-          <span class="hi">OD Matrix:</span> 12&#xD7;12 BBMP survey<br>
-          <span class="hi">CTM:</span> Daganzo (1994), 5 cells/link<br>
-          <span class="hi">Robertson:</span> &#x3B2;=0.8, TRANSYT model<br>
-          <span class="hi">SCOOT:</span> Adaptive &#x394;C=5s steps<br>
-          <span class="hi">Pareto:</span> &#x3B5;-constraint (10 pts)<br>
-          <span class="hi">MC:</span> &#x3C3;=15%, 200 samples<br>
-          <span class="hi">Status:</span> <span class="hig" id="lp-status">OPTIMAL</span><br>
-          <span class="hi">Obj Value:</span> <span class="hiy" id="lp-obj">--</span><br>
-          <span class="hi">Avg Webster d:</span> <span class="hir" id="lp-wd">--</span> s<br>
-          <span class="hi">Avg x (v/c):</span> <span class="hio" id="lp-xavg">--</span>
-        </div>
-      </div>
+      </details>
+
     </div>
 
     <div class="tpane" id="lt1">
-      <div class="sec">
-        <div class="stitle">&#x1F5FA; Junction Monitor (12)</div>
-        <div id="jlist"></div>
-      </div>
+
+      <details class="csec" open>
+        <summary>&#x1F534; High Congestion (&gt;65%) <span class="csec-badge crit">CRITICAL</span></summary>
+        <div class="csec-body" id="jlist-crit"></div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x1F7E1; Moderate (45-65%) <span class="csec-badge warn">MOD</span></summary>
+        <div class="csec-body" id="jlist-mod"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F7E2; Free-flow (&lt;45%) <span class="csec-badge live">FREE</span></summary>
+        <div class="csec-body" id="jlist-free"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4CD; Network Stats</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Total junctions</td><td style="color:var(--cyan)">12</td></tr>
+            <tr><td>Critical (&gt;65%)</td><td style="color:var(--red)">3</td></tr>
+            <tr><td>Moderate (45-65%)</td><td style="color:var(--orange)">5</td></tr>
+            <tr><td>Free-flow (&lt;45%)</td><td style="color:var(--green)">4</td></tr>
+            <tr><td>OD demand total</td><td style="color:var(--cyan)">1.2M PCU/hr</td></tr>
+          </table>
+        </div>
+      </details>
+
     </div>
 
     <div class="tpane" id="lt2">
-      <div class="sec">
-        <div class="stitle">&#x1F4CB; BBMP / KRDCL Data</div>
-        <table class="dt">
-          <tr><td>Silk Board Congestion</td><td style="color:var(--red)">71%</td></tr>
-          <tr><td>Electronic City Cong.</td><td style="color:var(--red)">67%</td></tr>
-          <tr><td>Hebbal Congestion</td><td style="color:var(--red)">64%</td></tr>
-          <tr><td>Marathahalli Cong.</td><td style="color:var(--orange)">58%</td></tr>
-          <tr><td>KR Puram Congestion</td><td style="color:var(--orange)">54%</td></tr>
-          <tr><td>ORR Average</td><td style="color:var(--orange)">62%</td></tr>
-          <tr><td>Peak Hours</td><td style="color:var(--yellow)">8-10AM, 6-9PM</td></tr>
-          <tr><td>Avg Speed (Peak)</td><td style="color:var(--red)">17.8 km/h</td></tr>
-          <tr><td>Avg Speed (Off-peak)</td><td style="color:var(--green)">32.4 km/h</td></tr>
-          <tr><td>Daily Vehicles</td><td style="color:var(--cyan)">1.2M</td></tr>
-          <tr><td>Registered Vehicles</td><td style="color:var(--cyan)">10.5M</td></tr>
-          <tr><td>Bangalore Rank India</td><td style="color:var(--orange)">#4 Worst</td></tr>
-          <tr><td>Sat. Flow (PCU/hr/ln)</td><td style="color:var(--cyan)">1600-1800</td></tr>
-          <tr><td>Free-Flow Speed</td><td style="color:var(--green)">60 km/h</td></tr>
-          <tr><td>Jam Density</td><td style="color:var(--red)">120 veh/km/ln</td></tr>
-          <tr><td>LWR Wave Speed (max)</td><td style="color:var(--purple)">-60 km/h</td></tr>
-        </table>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4DA; Sources</div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.53rem;color:#3a5570;line-height:1.9">
-          BBMP Traffic Engineering Cell 2022<br>
-          KRDCL ORR Traffic Study 2019<br>
-          BDA Master Plan 2031 OD Survey<br>
-          TomTom Traffic Index 2024<br>
-          Webster (1958) — Signal Timing<br>
-          Lighthill &amp; Whitham (1955) — LWR<br>
-          Greenshields (1935) — Flow Model<br>
-          Daganzo (1994) — CTM, Trans. Res-B<br>
-          Robertson (1969) — Platoon Dispersion<br>
-          Hunt et al. (1982) — SCOOT, TRRL SR1014<br>
-          Ehrgott (2005) — Multi-Objective LP<br>
-          HCM 6th Ed. §18 — Performance Index<br>
-          EPA MOVES3 — Fuel/CO&#x2082; Emissions<br>
-          scipy.optimize.linprog (HiGHS)
+
+      <details class="csec" open>
+        <summary>&#x1F4CB; BBMP / KRDCL Data</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Silk Board</td><td style="color:var(--red)">71%</td></tr>
+            <tr><td>Electronic City</td><td style="color:var(--red)">67%</td></tr>
+            <tr><td>Hebbal</td><td style="color:var(--red)">64%</td></tr>
+            <tr><td>Marathahalli</td><td style="color:var(--orange)">58%</td></tr>
+            <tr><td>KR Puram</td><td style="color:var(--orange)">54%</td></tr>
+            <tr><td>ORR Average</td><td style="color:var(--orange)">62%</td></tr>
+            <tr><td>Peak Hours</td><td style="color:var(--yellow)">8-10AM, 6-9PM</td></tr>
+            <tr><td>Avg Speed (Peak)</td><td style="color:var(--red)">17.8 km/h</td></tr>
+            <tr><td>Avg Speed (Off)</td><td style="color:var(--green)">32.4 km/h</td></tr>
+            <tr><td>Daily Vehicles</td><td style="color:var(--cyan)">1.2M</td></tr>
+            <tr><td>Registered Veh.</td><td style="color:var(--cyan)">10.5M</td></tr>
+          </table>
         </div>
-      </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F697; Traffic Flow Params</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Sat. Flow</td><td style="color:var(--cyan)">1600-1800 PCU/hr/ln</td></tr>
+            <tr><td>Free-Flow Speed</td><td style="color:var(--green)">60 km/h</td></tr>
+            <tr><td>Jam Density k_j</td><td style="color:var(--red)">120 veh/km/ln</td></tr>
+            <tr><td>Capacity q_max</td><td style="color:var(--cyan)">1800 veh/hr</td></tr>
+            <tr><td>LWR Wave max</td><td style="color:var(--purple)">-60 km/h</td></tr>
+            <tr><td>Webster L</td><td style="color:var(--orange)">7s/cycle</td></tr>
+            <tr><td>Robertson beta</td><td style="color:var(--cyan)">0.8</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4DA; Academic Sources</summary>
+        <div class="csec-body">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.53rem;color:#3a5570;line-height:1.9">
+            BBMP Traffic Engineering Cell 2022<br>
+            KRDCL ORR Traffic Study 2019<br>
+            BDA Master Plan 2031 OD Survey<br>
+            Webster (1958) &mdash; Signal Timing<br>
+            Lighthill &amp; Whitham (1955) &mdash; LWR<br>
+            Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
+            Robertson (1969) &mdash; Platoon Dispersion<br>
+            Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
+            Ehrgott (2005) &mdash; Multi-Obj LP<br>
+            HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
+            EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
+          </div>
+        </div>
+      </details>
+
+    </div>
     </div>
   </div>
 
@@ -1109,89 +1227,124 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
     </div>
 
     <div class="atab-content on" id="rt0">
-      <div class="gc"><div class="gh">
-        <div class="gtl">Network Throughput<br>veh/hr/lane (VPHPL)</div>
-        <div class="gr"><div class="gv" id="gv0" style="color:var(--green)">--</div>
-          <span class="gu">VPHPL</span><div class="gd" id="gd0"></div></div>
-      </div><canvas class="gcanv" id="gc0"></canvas></div>
 
-      <div class="gc"><div class="gh">
-        <div class="gtl">Webster Avg Delay d<br>d=C(1-&#x03BB;)&#xB2;/2(1-&#x03BB;x)+x&#xB2;/2q(1-x)</div>
-        <div class="gr"><div class="gv" id="gv1" style="color:var(--red)">--</div>
-          <span class="gu">seconds/veh</span><div class="gd" id="gd1"></div></div>
-      </div><canvas class="gcanv" id="gc1"></canvas></div>
+      <details class="csec" open>
+        <summary>&#x1F4CA; Live Performance Charts <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body" style="padding:6px">
 
-      <div class="gc"><div class="gh">
-        <div class="gtl">AVG v/c Ratio x<br>Degree of saturation</div>
-        <div class="gr"><div class="gv" id="gv2" style="color:var(--orange)">--</div>
-          <span class="gu">x = q/c</span><div class="gd" id="gd2"></div></div>
-      </div><canvas class="gcanv" id="gc2"></canvas></div>
+          <div class="gc"><div class="gh">
+            <div class="gtl">Network Throughput<br>veh/hr/lane (VPHPL)</div>
+            <div class="gr"><div class="gv" id="gv0" style="color:var(--green)">--</div>
+              <span class="gu">VPHPL</span><div class="gd" id="gd0"></div></div>
+          </div><canvas class="gcanv" id="gc0"></canvas></div>
 
-      <div class="gc"><div class="gh">
-        <div class="gtl">Signal Efficiency &#x03BB;<br>Green ratio = g/C</div>
-        <div class="gr"><div class="gv" id="gv3" style="color:var(--cyan)">--</div>
-          <span class="gu">percent</span><div class="gd" id="gd3"></div></div>
-      </div><canvas class="gcanv" id="gc3"></canvas></div>
+          <div class="gc"><div class="gh">
+            <div class="gtl">Webster Avg Delay d</div>
+            <div class="gr"><div class="gv" id="gv1" style="color:var(--red)">--</div>
+              <span class="gu">sec/veh</span><div class="gd" id="gd1"></div></div>
+          </div><canvas class="gcanv" id="gc1"></canvas></div>
 
-      <div class="gc"><div class="gh">
-        <div class="gtl">Max LWR Shock Speed<br>w=(q_A-q_B)/(k_A-k_B)</div>
-        <div class="gr"><div class="gv" id="gv4" style="color:var(--purple)">--</div>
-          <span class="gu">km/h</span><div class="gd" id="gd4"></div></div>
-      </div><canvas class="gcanv" id="gc4"></canvas></div>
+          <div class="gc"><div class="gh">
+            <div class="gtl">AVG v/c Ratio x</div>
+            <div class="gr"><div class="gv" id="gv2" style="color:var(--orange)">--</div>
+              <span class="gu">x = q/c</span><div class="gd" id="gd2"></div></div>
+          </div><canvas class="gcanv" id="gc2"></canvas></div>
 
-      <div class="gc"><div class="gh">
-        <div class="gtl">LP Objective Value<br>Weighted green sum</div>
-        <div class="gr"><div class="gv" id="gv5" style="color:var(--yellow)">--</div>
-          <span class="gu">score</span><div class="gd" id="gd5"></div></div>
-      </div><canvas class="gcanv" id="gc5"></canvas></div>
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x26A1; Signal &amp; Wave Metrics</summary>
+        <div class="csec-body" style="padding:6px">
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Signal Efficiency g/C</div>
+            <div class="gr"><div class="gv" id="gv3" style="color:var(--cyan)">--</div>
+              <span class="gu">percent</span><div class="gd" id="gd3"></div></div>
+          </div><canvas class="gcanv" id="gc3"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Max LWR Shock Speed</div>
+            <div class="gr"><div class="gv" id="gv4" style="color:var(--purple)">--</div>
+              <span class="gu">km/h</span><div class="gd" id="gd4"></div></div>
+          </div><canvas class="gcanv" id="gc4"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">LP Objective Value</div>
+            <div class="gr"><div class="gv" id="gv5" style="color:var(--yellow)">--</div>
+              <span class="gu">score</span><div class="gd" id="gd5"></div></div>
+          </div><canvas class="gcanv" id="gc5"></canvas></div>
+
+        </div>
+      </details>
+
+    </div>
     </div>
 
     <div class="atab-content" id="rt1">
-      <div class="sec">
-        <div class="stitle">&#x2211; LP Optimal Green Times</div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px">
-          scipy HiGHS solver | C=<span id="lpt-C">90</span>s | Status: <span id="lpt-status" class="hig">OPTIMAL</span>
+
+      <details class="csec" open>
+        <summary>&#x2211; LP Optimal Green Times</summary>
+        <div class="csec-body" style="padding:4px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px;padding:0 4px">
+            scipy HiGHS | C=<span id="lpt-C">90</span>s | <span id="lpt-status" class="hig">OPTIMAL</span>
+          </div>
+          <div id="lp-table-wrap" style="overflow-x:auto">
+            <table class="lptbl" id="lp-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">Junction</th>
+                  <th>g (s)</th>
+                  <th>&#x03BB;</th>
+                  <th>x</th>
+                  <th>d (s)</th>
+                  <th>q</th>
+                </tr>
+              </thead>
+              <tbody id="lp-tbody"></tbody>
+            </table>
+          </div>
         </div>
-        <div id="lp-table-wrap" style="overflow-x:auto">
-          <table class="lptbl" id="lp-table">
-            <thead>
-              <tr>
-                <th style="text-align:left">Junction</th>
-                <th>g (s)</th>
-                <th>&#x03BB;</th>
-                <th>x</th>
-                <th>d (s)</th>
-                <th>q (PCU/h)</th>
-              </tr>
-            </thead>
-            <tbody id="lp-tbody"></tbody>
-          </table>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4CB; Webster Formula Detail</summary>
+        <div class="csec-body">
+          <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+            <span class="hi">d = C(1-&#x03BB;)&#xB2;/[2(1-&#x03BB;x)]</span><br>
+            <span style="padding-left:12px">+ x&#xB2;/[2q(1-x)]</span><br><br>
+            C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br><br>
+            &#x03BB;_avg: <span class="hig" id="w-lam">--</span><br>
+            x_avg: <span class="hiy" id="w-x">--</span><br>
+            d_avg: <span class="hir" id="w-d">--</span> s/veh<br>
+            Max d: <span class="hir" id="w-dmax">--</span> s (worst jct)
+          </div>
         </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4CB; Webster Formula Detail</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">d = C(1-&#x03BB;)&#xB2;/[2(1-&#x03BB;x)]</span><br>
-          <span style="padding-left:12px">+ x&#xB2;/[2q(1-x)]</span><br><br>
-          C = cycle = <span class="hio" id="w-C">90</span>s<br>
-          &#x03BB; = g/C = LP optimal green ratio<br>
-          x = q/c (v/c, degree of saturation)<br>
-          q = O-D demand (PCUs/s)<br>
-          c = S&#xB7;&#x03BB; = saturation flow &#xD7; &#x03BB;<br><br>
-          <span class="hi">Network averages:</span><br>
-          &#x03BB;_avg: <span class="hig" id="w-lam">--</span><br>
-          x_avg: <span class="hiy" id="w-x">--</span><br>
-          d_avg: <span class="hir" id="w-d">--</span> s/veh<br>
-          Max d: <span class="hir" id="w-dmax">--</span> s (worst jct)
-        </div>
-      </div>
+      </details>
+
+    </div>
     </div>
 
     <div class="atab-content" id="rt2">
-      <div class="sec">
-        <div class="stitle">&#x1F6A6; Signal Control Panel</div>
-        <div id="sigpanel"></div>
-      </div>
+
+      <details class="csec" open>
+        <summary>&#x1F6A6; Intersection Signal States <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body" style="padding:4px" id="sigpanel-major"></div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x23F1; Timing &amp; Phase Detail</summary>
+        <div class="csec-body" style="padding:4px" id="sigpanel-timing"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F504; Full Signal Panel</summary>
+        <div class="csec-body" style="padding:4px">
+          <div id="sigpanel"></div>
+        </div>
+      </details>
+
+    </div>
     </div>
 
     <div class="atab-content" id="rt3">
@@ -1352,6 +1505,106 @@ var ED = [
   [10,8],[11,6]
 ];
 
+// ── ROAD WAYPOINTS (curved intermediates for each edge) ─────────────────
+// Each entry: array of [lat,lng] waypoints BETWEEN the two junction endpoints
+// Designed to follow approximate real road curvature in Bangalore
+// Sources: OSM road network geometry approximation
+var ROAD_WPT = [
+  // [0]Silk Board→[7]Koramangala  (Hosur Rd / BH Road curve)
+  [[12.9220,77.6235],[12.9285,77.6238]],
+  // [0]Silk Board→[8]JP Nagar  (Outer Ring Rd south)
+  [[12.9140,77.6140],[12.9100,77.5980]],
+  // [0]Silk Board→[4]Electronic City  (Hosur Rd south)
+  [[12.9000,77.6350],[12.8750,77.6490]],
+  // [0]Silk Board→[6]Indiranagar  (Inner Ring Rd)
+  [[12.9300,77.6280],[12.9520,77.6340]],
+  // [1]Hebbal→[9]Yelahanka  (NH 44 north)
+  [[13.0580,77.5980],[13.0780,77.5970]],
+  // [1]Hebbal→[11]Nagawara  (Outer Ring Rd east)
+  [[13.0420,77.6040],[13.0440,77.6100]],
+  // [1]Hebbal→[3]KR Puram  (ORR east)
+  [[13.0250,77.6350],[13.0180,77.6600]],
+  // [2]Marathahalli→[3]KR Puram  (ORR north)
+  [[12.9650,77.7000],[12.9870,77.7020]],
+  // [2]Marathahalli→[5]Whitefield  (Airport Rd east)
+  [[12.9620,77.7200],[12.9660,77.7350]],
+  // [2]Marathahalli→[6]Indiranagar  (Airport Rd west)
+  [[12.9700,77.6800],[12.9760,77.6610]],
+  // [2]Marathahalli→[7]Koramangala  (Sarjapur Rd)
+  [[12.9550,77.6900],[12.9470,77.6600]],
+  // [3]KR Puram→[5]Whitefield  (Old Madras Rd)
+  [[13.0050,77.7200],[12.9890,77.7370]],
+  // [3]KR Puram→[11]Nagawara  (ORR north)
+  [[13.0200,77.6700],[13.0380,77.6430]],
+  // [4]Electronic City→[8]JP Nagar  (Bannerghatta Rd north)
+  [[12.8650,77.6600],[12.8830,77.6000]],
+  // [4]Electronic City→[10]Bannerghatta Rd  (Hosur Rd / BG Rd junction)
+  [[12.8650,77.6500],[12.8800,77.6200]],
+  // [6]Indiranagar→[7]Koramangala  (100ft Rd south)
+  [[12.9740,77.6370],[12.9580,77.6310]],
+  // [6]Indiranagar→[2]Marathahalli  (Airport Rd east from Indi)
+  [[12.9760,77.6550],[12.9680,77.6780]],
+  // [6]Indiranagar→[11]Nagawara  (ORR north from Indi)
+  [[12.9900,77.6350],[13.0180,77.6270]],
+  // [7]Koramangala→[10]Bannerghatta Rd  (Sarjapur / BG cross)
+  [[12.9200,77.6170],[12.9080,77.6050]],
+  // [7]Koramangala→[8]JP Nagar  (BTM / JP cross)
+  [[12.9250,77.6090],[12.9180,77.5960]],
+  // [8]JP Nagar→[10]Bannerghatta Rd  (BG Rd junction)
+  [[12.8990,77.5900],[12.8950,77.5935]],
+  // [9]Yelahanka→[11]Nagawara  (ORR south from Yelahanka)
+  [[13.0850,77.6050],[13.0650,77.6130]],
+  // [9]Yelahanka→[1]Hebbal  (NH44 south to Hebbal)
+  [[13.0800,77.5970],[13.0600,77.5970]],
+  // [10]Bannerghatta Rd→[8]JP Nagar  (reverse BG Rd)
+  [[12.8960,77.5940],[12.8990,77.5900]],
+  // [11]Nagawara→[6]Indiranagar  (ORR south from Nagawara)
+  [[13.0370,77.6250],[13.0100,77.6200]]
+];
+
+// Build full multi-point path for each edge (junction A → waypoints → junction B)
+function getEdgePath(ei) {
+  var e = ED[ei];
+  var ja = JN[e[0]], jb = JN[e[1]];
+  var wpts = ROAD_WPT[ei] || [];
+  var path = [[ja.lat, ja.lng]];
+  for (var i = 0; i < wpts.length; i++) path.push(wpts[i]);
+  path.push([jb.lat, jb.lng]);
+  return path;
+}
+
+// Get total path length (in lat-lng "units") for normalised progress
+function pathLen(path) {
+  var L = 0;
+  for (var i = 1; i < path.length; i++) {
+    var dlat = path[i][0]-path[i-1][0], dlng = path[i][1]-path[i-1][1];
+    L += Math.sqrt(dlat*dlat+dlng*dlng);
+  }
+  return L;
+}
+
+// Sample a point along path at normalised progress t ∈ [0,1]
+// laneOff: perpendicular pixel offset for lane separation
+function samplePath(path, t) {
+  var L = pathLen(path);
+  var target = t * L;
+  var acc = 0;
+  for (var i = 1; i < path.length; i++) {
+    var dlat = path[i][0]-path[i-1][0], dlng = path[i][1]-path[i-1][1];
+    var seg = Math.sqrt(dlat*dlat+dlng*dlng);
+    if (acc + seg >= target || i === path.length-1) {
+      var frac = seg>0 ? (target-acc)/seg : 0;
+      return {
+        lat: path[i-1][0] + dlat*frac,
+        lng: path[i-1][1] + dlng*frac,
+        dlat: dlat, dlng: dlng  // direction for lane offset
+      };
+    }
+    acc += seg;
+  }
+  return {lat: path[path.length-1][0], lng: path[path.length-1][1], dlat:0, dlng:0};
+}
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 var S = {
   algo:'optimal', paused:false, speed:1,
@@ -1392,14 +1645,18 @@ function Particle(isE) {
   this.ei = Math.floor(Math.random()*ED.length);
   this.prog = Math.random();
   this.dir = Math.random()>.5?1:-1;
-  this.bspd = isE ? (0.004+Math.random()*.003) : (0.0007+Math.random()*.0007);
+  // Speed in path-length units per frame (calibrated to ~40 km/h equiv)
+  this.bspd = isE ? (0.006+Math.random()*.004) : (0.0010+Math.random()*.0008);
   this.spd = this.bspd;
   this.tspd = this.bspd;
   this.state = 'moving';
   this.wt = 0;
   this.trail = [];
   this.ph = Math.random()*Math.PI*2;
-  this.loff = (Math.random()-.5)*.00022;
+  // Lane offset: positive = left side of road, negative = right
+  // dir=1 travels in "forward" direction → right lane offset
+  // dir=-1 travels in "backward" direction → left lane offset
+  this.laneIdx = Math.floor(Math.random()*3);  // 0,1,2 lane within direction
   // O-D routing: pick a destination junction from OD matrix
   this.destJ = this._pickDest(this.dir===1?ED[this.ei][0]:ED[this.ei][1]);
 }
@@ -1415,13 +1672,24 @@ Particle.prototype._pickDest = function(srcJ) {
 };
 
 Particle.prototype.pos = function() {
-  var e = ED[this.ei];
-  var a = JN[e[0]], b = JN[e[1]];
+  var path = getEdgePath(this.ei);
   var t = this.dir===1 ? this.prog : 1-this.prog;
-  var plat = (b.lng-a.lng)*.15;
-  var plng = (b.lat-a.lat)*.15;
-  return {lat: a.lat+(b.lat-a.lat)*t+this.loff*plat,
-          lng: a.lng+(b.lng-a.lng)*t+this.loff*plng};
+  var pt = samplePath(path, t);
+  // Perpendicular lane offset: rotate direction vector 90 degrees
+  var dlen = Math.sqrt(pt.dlat*pt.dlat + pt.dlng*pt.dlng);
+  if (dlen < 1e-9) return {lat:pt.lat, lng:pt.lng};
+  // Normal vector (perpendicular, pointing left of travel direction)
+  var nx = -pt.dlng / dlen, ny = pt.dlat / dlen;
+  // Lane sign: dir=1 → right half of road (negative normal offset)
+  //            dir=-1 → left half of road (positive normal offset)
+  var sign = this.dir===1 ? -1 : 1;
+  // Lane offsets: 0=inner lane, 1=mid, 2=outer — ~0.00008 deg ≈ 8m per lane
+  var LANE_W = 0.000072;
+  var laneOff = sign * (0.5 + this.laneIdx) * LANE_W;
+  return {
+    lat: pt.lat + nx * laneOff,
+    lng: pt.lng + ny * laneOff
+  };
 };
 
 Particle.prototype.update = function(dt) {
@@ -1516,52 +1784,71 @@ function drawRoads() {
     var mul=DMUL[S.dens-1];
     var af=S.algo==='fixed'?1.2:1.0;
     var ar=S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:0;
-    var c=Math.min((ja.cong+jb.cong)/2*mul*af*(1-ar),1);
-    // LWR-based colour: use shock wave speed to modulate hue
+    var cong=Math.min((ja.cong+jb.cong)/2*mul*af*(1-ar),1);
     var wv=lwr[ri]?Math.abs(lwr[ri].w_km_h):0;
-    var col=c>.85?'#ff2244':c>.65?'#ff8c00':c>.4?'#ffd700':'#00ff88';
-    var w=3+c*6;
+    var col=cong>.85?'#ff2244':cong>.65?'#ff8c00':cong>.4?'#ffd700':'#00ff88';
+    var w=4+cong*7;
+    // Full curved road path via waypoints
+    var path=getEdgePath(ri);
+    var latLngs=path.map(function(p){return[p[0],p[1]];});
     var hasEvp=false;
     for(var pi=0;pi<particles.length;pi++){
       if(particles[pi].isE&&particles[pi].ei===ri){hasEvp=true;break;}
     }
+    // Road glow shadow (wider, very faint)
+    try{
+      roadLines.push(L.polyline(latLngs,
+        {color:col+'33',weight:w+8,opacity:.3,lineJoin:'round',lineCap:'round'}).addTo(map));
+    }catch(ex){}
+    // Road base (solid, congestion coloured)
+    try{
+      roadLines.push(L.polyline(latLngs,
+        {color:col+'aa',weight:w,opacity:.9,lineJoin:'round',lineCap:'round'}).addTo(map));
+    }catch(ex){}
+    // Road centre divider line (dashed white)
+    try{
+      roadLines.push(L.polyline(latLngs,
+        {color:'#ffffff1a',weight:1,opacity:.6,dashArray:'5 9'}).addTo(map));
+    }catch(ex){}
+    // EVP corridor overlay
     if(hasEvp){
       try{
-        roadLines.push(L.polyline([[ja.lat,ja.lng],[jb.lat,jb.lng]],
-          {color:'#ff224455',weight:w+8,opacity:.6}).addTo(map));
-        roadLines.push(L.polyline([[ja.lat,ja.lng],[jb.lat,jb.lng]],
+        roadLines.push(L.polyline(latLngs,
+          {color:'#ff224444',weight:w+12,opacity:.45}).addTo(map));
+        roadLines.push(L.polyline(latLngs,
           {color:'#ff44aa',weight:2,opacity:.9,dashArray:'10 6'}).addTo(map));
-      }catch(e){}
+      }catch(ex){}
     }
-    // Shock wave line overlay (purple tint when strong wave)
+    // LWR shock wave overlay
     if(wv>15){
       try{
-        var alpha=Math.min(wv/60,.7);
-        roadLines.push(L.polyline([[ja.lat,ja.lng],[jb.lat,jb.lng]],
-          {color:'rgba(187,119,255,'+alpha.toFixed(2)+')',weight:2,opacity:.8,dashArray:'4 8'}).addTo(map));
-      }catch(e){}
+        var alpha=Math.min(wv/60,.6);
+        roadLines.push(L.polyline(latLngs,
+          {color:'rgba(187,119,255,'+alpha.toFixed(2)+')',weight:2.5,opacity:.85,dashArray:'4 8'}).addTo(map));
+      }catch(ex){}
     }
-    try{
-      roadLines.push(L.polyline([[ja.lat,ja.lng],[jb.lat,jb.lng]],
-        {color:col+'99',weight:w,opacity:.8}).addTo(map));
-    }catch(e){}
   }
 }
 
 var jmkrs=JN.map(function(j,i){
+  var lanes = j.lanes || 3;
+  var r = 6 + lanes*1.5;
   var m=L.circleMarker([j.lat,j.lng],
-    {radius:8+(j.imp||7),color:'#fff',weight:1.5,fillColor:'#ff2244',fillOpacity:.9}).addTo(map);
+    {radius:r,color:'#ffffff',weight:2,fillColor:'#ff2244',fillOpacity:.92}).addTo(map);
   var tc=j.cong>.65?'#ff2244':j.cong>.45?'#ff8c00':'#00ff88';
   var lp=CUR.lp;
   m.bindTooltip(
-    '<b style="color:#ffd700">'+j.name+'</b><br>'+
+    '<div style="font-family:monospace;font-size:11px;line-height:1.6;min-width:180px">'+
+    '<b style="color:#ffd700;font-size:12px">'+j.name+'</b><br>'+
     'Congestion: <b style="color:'+tc+'">'+Math.round(j.cong*100)+'%</b><br>'+
+    'Lanes: <b>'+lanes+' per direction</b><br>'+
     'O-D demand: <b>'+Math.round(BACKEND.od_totals[i]).toLocaleString()+' PCU/hr</b><br>'+
-    'Daily: <b>'+(j.daily/1000).toFixed(0)+'K/day</b><br>'+
-    'LP green: <b>'+(lp.g?lp.g[i].toFixed(0):45)+'s</b><br>'+
+    'Daily: <b>'+(j.daily/1000).toFixed(0)+'K veh/day</b><br>'+
+    'LP green: <b>'+(lp.g?lp.g[i].toFixed(0):45)+'s / '+(lp.C||90)+'s cycle</b><br>'+
     'Webster d: <b>'+(lp.delay?lp.delay[i].toFixed(1):'-')+'s/veh</b><br>'+
-    'v/c ratio: <b>'+(lp.x?lp.x[i].toFixed(3):'-')+'</b>',
-    {direction:'top'}
+    'v/c ratio: <b>'+(lp.x?lp.x[i].toFixed(3):'-')+'</b>'+
+    '</div>',
+    {direction:'top',className:'jn-tip'}
   );
   return m;
 });
@@ -1576,58 +1863,103 @@ function ll2px(lat,lng){try{var p=map.latLngToContainerPoint([lat,lng]);return {
 
 function renderParticles(){
   cx.clearRect(0,0,fc.width,fc.height);
+
+  // Draw 4-arm signal indicators at each junction
+  for(var ji=0;ji<JN.length;ji++){
+    var j=JN[ji]; var sig=SIG[ji];
+    var jpt=ll2px(j.lat,j.lng);
+    var col=sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    var R=8+(j.lanes||3)*1.5;
+    // 4 signal arms (N/S/E/W)
+    var arms=[{dx:0,dy:-(R+6)},{dx:0,dy:R+6},{dx:R+6,dy:0},{dx:-(R+6),dy:0}];
+    for(var ai=0;ai<arms.length;ai++){
+      var arm=arms[ai];
+      cx.save();
+      cx.fillStyle=col+'cc';
+      cx.shadowBlur=7; cx.shadowColor=col;
+      cx.fillRect(jpt.x+arm.dx-3,jpt.y+arm.dy-3,6,6);
+      cx.shadowBlur=0; cx.restore();
+    }
+    // Junction glow ring
+    cx.save(); cx.beginPath();
+    cx.arc(jpt.x,jpt.y,R+3,0,Math.PI*2);
+    cx.fillStyle=col+'12'; cx.fill(); cx.restore();
+    // Phase progress arc
+    var pct=sig.phase/sig.cycle;
+    cx.save(); cx.beginPath();
+    cx.arc(jpt.x,jpt.y,R,-Math.PI/2,-Math.PI/2+pct*2*Math.PI);
+    cx.strokeStyle=col+'77'; cx.lineWidth=2.5; cx.stroke(); cx.restore();
+  }
+
+  // Draw regular vehicles as directional mini-cars
   for(var i=0;i<particles.length;i++){
     var p=particles[i];
     if(p.isE) continue;
     try{
       var pos=p.pos();
       var pt=ll2px(pos.lat,pos.lng);
-      cx.fillStyle=p.col()+'cc';
-      cx.beginPath();cx.arc(pt.x,pt.y,3,0,Math.PI*2);cx.fill();
+      var path=getEdgePath(p.ei);
+      var t2=(p.dir===1?p.prog:1-p.prog);
+      var ptA=samplePath(path,Math.max(0,t2-0.015));
+      var ptB=samplePath(path,Math.min(1,t2+0.015));
+      // Screen direction (map lat decreases going down screen)
+      var pA=ll2px(ptA.lat,ptA.lng);
+      var pB=ll2px(ptB.lat,ptB.lng);
+      var ang=Math.atan2(pB.y-pA.y,pB.x-pA.x);
+      if(p.dir===-1) ang+=Math.PI;
+      var vcol=p.col();
+      cx.save();
+      cx.translate(pt.x,pt.y);
+      cx.rotate(ang);
+      cx.fillStyle=vcol+'cc';
+      cx.fillRect(-3.5,-1.8,7,3.6);
+      cx.fillStyle='#ffffff44';
+      cx.fillRect(0.5,-1.2,2.5,2.4);
+      cx.restore();
     }catch(e){}
   }
-  // LWR shock wave dots (yellow flash at mid-link when strong shock)
+
+  // LWR shock wave midpoint pulses
   var lwr=CUR.lwr;
   for(var ri=0;ri<ED.length&&ri<lwr.length;ri++){
     var wv=lwr[ri].w_km_h;
     if(Math.abs(wv)>10){
-      var e=ED[ri];
-      var ja=JN[e[0]], jb=JN[e[1]];
-      var midlat=(ja.lat+jb.lat)/2, midlng=(ja.lng+jb.lng)/2;
-      var pt2=ll2px(midlat,midlng);
+      var path3=getEdgePath(ri);
+      var midpt=samplePath(path3,0.5);
+      var pt2=ll2px(midpt.lat,midpt.lng);
       var pulse=.5+.5*Math.sin(S.frame*.15+ri);
       var a=Math.min(Math.abs(wv)/60,.8)*pulse;
       cx.fillStyle='rgba(187,119,255,'+a.toFixed(2)+')';
-      cx.beginPath();cx.arc(pt2.x,pt2.y,4,0,Math.PI*2);cx.fill();
+      cx.beginPath();cx.arc(pt2.x,pt2.y,5,0,Math.PI*2);cx.fill();
     }
   }
-  // Emergency on top
+
+  // Emergency vehicles on top with trails
   for(var i=0;i<particles.length;i++){
     var p=particles[i];
     if(!p.isE) continue;
     try{
       for(var t=1;t<p.trail.length;t++){
         var t1=ll2px(p.trail[t-1].lat,p.trail[t-1].lng);
-        var t2=ll2px(p.trail[t].lat,p.trail[t].lng);
-        cx.strokeStyle='rgba(255,34,68,'+(((1-t/p.trail.length)*.5).toFixed(2))+')';
+        var t3=ll2px(p.trail[t].lat,p.trail[t].lng);
+        cx.strokeStyle='rgba(255,34,68,'+(((1-t/p.trail.length)*.6).toFixed(2))+')';
         cx.lineWidth=Math.max(.5,4-t*.35);
-        cx.beginPath();cx.moveTo(t1.x,t1.y);cx.lineTo(t2.x,t2.y);cx.stroke();
+        cx.beginPath();cx.moveTo(t1.x,t1.y);cx.lineTo(t3.x,t3.y);cx.stroke();
       }
-      var pos2=p.pos(); var pt3=ll2px(pos2.lat,pos2.lng);
+      var pos2=p.pos(); var pt4=ll2px(pos2.lat,pos2.lng);
       var pulse2=.55+.45*Math.sin(S.frame*.25+p.ph);
-      cx.shadowBlur=16*pulse2;cx.shadowColor='#ff2244';cx.fillStyle='#ff2244';
-      cx.beginPath();cx.arc(pt3.x,pt3.y,7,0,Math.PI*2);cx.fill();
-      cx.shadowBlur=0;cx.strokeStyle='#ffffff';cx.lineWidth=1.8;
+      cx.shadowBlur=18*pulse2;cx.shadowColor='#ff2244';cx.fillStyle='#ff2244';
+      cx.beginPath();cx.arc(pt4.x,pt4.y,8,0,Math.PI*2);cx.fill();
+      cx.shadowBlur=0;cx.strokeStyle='#ffffff';cx.lineWidth=2;
       cx.beginPath();
-      cx.moveTo(pt3.x-5,pt3.y);cx.lineTo(pt3.x+5,pt3.y);
-      cx.moveTo(pt3.x,pt3.y-5);cx.lineTo(pt3.x,pt3.y+5);
+      cx.moveTo(pt4.x-6,pt4.y);cx.lineTo(pt4.x+6,pt4.y);
+      cx.moveTo(pt4.x,pt4.y-6);cx.lineTo(pt4.x,pt4.y+6);
       cx.stroke();
     }catch(e){}
   }
   cx.shadowBlur=0;
 }
 
-// ── LWR Q-K DIAGRAM ───────────────────────────────────────────────────────────
 var lwrChart=null;
 setTimeout(function(){
   var el=document.getElementById('lwrcanv');
@@ -1974,46 +2306,80 @@ function updateMetrics(){
   sv('sbe',evpAct);
 
   // Junction list
-  var jl=g('jlist');
-  if(jl){
-    var jhtml='';
+  // Junction list - split into congestion groups
+  var jlCrit=g('jlist-crit'),jlMod=g('jlist-mod'),jlFree=g('jlist-free');
+  if(jlCrit){
+    var htmlCrit='',htmlMod='',htmlFree='';
     for(var i=0;i<JN.length;i++){
       var j=JN[i]; var s=SIG[i];
       var col=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
-      var tl=s.state==='green'?Math.max(0,s.gDur-s.phase).toFixed(0)+'s':Math.max(0,s.cycle-s.phase).toFixed(0)+'s';
+      var tl=s.state==='green'?Math.max(0,s.gDur-s.phase).toFixed(0)+'s GO':Math.max(0,s.cycle-s.phase).toFixed(0)+'s WAIT';
       var cc=j.cong>.65?'var(--red)':j.cong>.45?'var(--orange)':'var(--green)';
       var xi2=(lp&&lp.x)?lp.x[i].toFixed(2):'--';
-      jhtml+='<div class="ji'+(s.evp?' evp':'')+'">';
-      jhtml+='<div class="jdot" style="background:'+col+';box-shadow:0 0 5px '+col+'"></div>';
-      jhtml+='<div class="jname">'+j.name+'<small>x='+xi2+' | '+(j.daily/1000).toFixed(0)+'K/day</small></div>';
-      jhtml+='<div class="jpct" style="color:'+cc+'">'+Math.round(j.cong*100)+'%</div>';
-      jhtml+='<div class="jtmr">'+tl+'</div>';
-      jhtml+='</div>';
+      var lanes=j.lanes||3;
+      var item='<div class="ji'+(s.evp?' evp':'')+'" style="background:'+(s.evp?'#150308':'#020810')+'">'+
+        '<div class="jdot" style="background:'+col+';box-shadow:0 0 5px '+col+'"></div>'+
+        '<div class="jname">'+j.name+
+          '<small>x='+xi2+' | '+(j.daily/1000).toFixed(0)+'K/d | '+lanes+' ln</small></div>'+
+        '<div class="jpct" style="color:'+cc+'">'+Math.round(j.cong*100)+'%</div>'+
+        '<div class="jtmr">'+tl+'</div>'+
+        '</div>';
+      if(j.cong>0.65) htmlCrit+=item;
+      else if(j.cong>0.45) htmlMod+=item;
+      else htmlFree+=item;
     }
-    jl.innerHTML=jhtml;
+    jlCrit.innerHTML=htmlCrit||'<div style="font-family:monospace;font-size:.5rem;color:#3a5570;padding:4px">None at this density</div>';
+    if(jlMod) jlMod.innerHTML=htmlMod||'';
+    if(jlFree) jlFree.innerHTML=htmlFree||'';
+  }
+
   }
 
   // Signal panel
+  // Signal panel - full detail
   var sp=g('sigpanel');
-  if(sp){
-    var html='';
-    for(var i=0;i<SIG.length;i++){
-      var s2=SIG[i];
-      var col2=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
-      var pct=Math.round(s2.phase/s2.cycle*100);
-      var tl2=s2.state==='green'?Math.max(0,s2.gDur-s2.phase).toFixed(0)+'s GO':Math.max(0,s2.cycle-s2.phase).toFixed(0)+'s WAIT';
-      var lam2=lp&&lp.lambda?lp.lambda[i].toFixed(2):'-';
-      var x2=lp&&lp.x?lp.x[i].toFixed(3):'-';
-      var d2=lp&&lp.delay?lp.delay[i].toFixed(0):'-';
-      html+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-top-color:'+col2+'">';
-      html+='<div class="sc-name">'+JN[i].name+'</div>';
-      html+='<div class="sc-state" style="color:'+col2+'">'+(s2.evp?'EVP!':s2.state.toUpperCase())+'</div>';
-      html+='<div class="sc-sub">&#x03BB;='+lam2+' x='+x2+' g='+s2.gDur.toFixed(0)+'s</div>';
-      html+='<div class="sc-tmr">d='+d2+'s | '+tl2+' | wait:'+s2.wait+'</div>';
-      html+='<div class="sc-bar"><div class="sc-fill" style="width:'+pct+'%;background:'+col2+'"></div></div>';
-      html+='</div>';
-    }
-    sp.innerHTML=html;
+  var spMaj=g('sigpanel-major');
+  var spTiming=g('sigpanel-timing');
+  var html='', htmlMaj='', htmlTiming='';
+  for(var i=0;i<SIG.length;i++){
+    var s2=SIG[i];
+    var col2=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
+    var pct=Math.round(s2.phase/s2.cycle*100);
+    var tl2=s2.state==='green'?Math.max(0,s2.gDur-s2.phase).toFixed(0)+'s GO':Math.max(0,s2.cycle-s2.phase).toFixed(0)+'s WAIT';
+    var lam2=lp&&lp.lambda?lp.lambda[i].toFixed(2):'-';
+    var x2=lp&&lp.x?lp.x[i].toFixed(3):'-';
+    var d2=lp&&lp.delay?lp.delay[i].toFixed(0):'-';
+    var stateLabel=s2.evp?'EVP!':s2.state.toUpperCase();
+    // Full signal card
+    html+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-top-color:'+col2+'">'+
+      '<div class="sc-name">'+JN[i].name+'</div>'+
+      '<div class="sc-state" style="color:'+col2+'">'+stateLabel+'</div>'+
+      '<div class="sc-sub">&#x03BB;='+lam2+' x='+x2+' g='+s2.gDur.toFixed(0)+'s</div>'+
+      '<div class="sc-tmr">d='+d2+'s | '+tl2+' | wait:'+s2.wait+'</div>'+
+      '<div class="sc-bar"><div class="sc-fill" style="width:'+pct+'%;background:'+col2+'"></div></div>'+
+      '</div>';
+    // Major states panel (compact 2-column grid)
+    htmlMaj+='<div style="display:grid;grid-template-columns:1fr 60px;align-items:center;'+
+      'padding:4px 6px;border-bottom:1px solid #0d2040;background:'+(s2.evp?'#150308':'transparent')+'">'+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:#5a7590">'+JN[i].name+'</div>'+
+      '<div style="font-family:Orbitron,monospace;font-size:.65rem;font-weight:700;'+
+        'color:'+col2+';text-align:right">'+stateLabel+'</div>'+
+      '</div>';
+    // Timing panel
+    var copt = CUR.scoot && CUR.scoot[i] ? CUR.scoot[i].C_opt.toFixed(0) : '--';
+    htmlTiming+='<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;'+
+      'align-items:center;padding:3px 6px;border-bottom:1px solid #0d2040;'+
+      'font-family:Share Tech Mono,monospace;font-size:.5rem">'+
+      '<div style="color:#5a7590">'+JN[i].name+'</div>'+
+      '<div style="color:var(--cyan)">g='+s2.gDur.toFixed(0)+'s</div>'+
+      '<div style="color:var(--yellow)">C_opt='+copt+'s</div>'+
+      '<div style="color:'+col2+'">'+Math.round(s2.phase/s2.cycle*100)+'%</div>'+
+      '</div>';
+  }
+  if(sp) sp.innerHTML=html;
+  if(spMaj) spMaj.innerHTML=htmlMaj;
+  if(spTiming) spTiming.innerHTML=htmlTiming;
+
   }
 }
 
