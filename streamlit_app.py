@@ -1484,7 +1484,7 @@ VAR_THEORY    = variational_traffic_theory(density_factor=1.0)
 SHAPLEY_DATA  = shapley_junction_criticality(dens_precomp["high"]["lp"], density_factor=1.0)
 NASH_DATA     = nash_equilibrium_analysis(dens_precomp["high"]["lp"], density_factor=1.0)
 CARBON_DATA   = carbon_credit_economics(dens_precomp["high"]["pi"], density_factor=1.0)
-DQN_DATA      = dqn_signal_controller(density_factor=1.0, n_episodes=200, C=90)
+DQN_DATA      = dqn_signal_controller(density_factor=1.0, n_episodes=100, C=90)
 
 BACKEND_JSON = json.dumps({
     "dens_precomp":  dens_precomp,
@@ -1576,12 +1576,13 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 #body{flex:1;min-height:0;display:flex;overflow:hidden}
 
 /* LEFT PANEL */
-#lp{width:286px;flex-shrink:0;background:var(--bg2);
+#lp{width:272px;flex-shrink:0;background:var(--bg2);
   border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
-.tabs{display:flex;border-bottom:1px solid var(--cdim)}
-.tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
-  font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
-  color:#4a6880;border-bottom:2px solid transparent;transition:.2s;text-transform:uppercase}
+.tabs{display:flex;border-bottom:1px solid var(--cdim);overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:7px 6px;text-align:center;cursor:pointer;
+  font-family:'Share Tech Mono',monospace;font-size:0.47rem;letter-spacing:0.5px;
+  color:#4a6880;border-bottom:2px solid transparent;transition:.2s;text-transform:uppercase;white-space:nowrap}
 .tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
 .tab:hover:not(.on){color:#7090a0}
 .tpane{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
@@ -1647,7 +1648,7 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 .mt{font-family:'Share Tech Mono',monospace;font-size:0.53rem;color:#5a7590}
 
 /* RIGHT PANEL */
-#rp{width:330px;flex-shrink:0;background:var(--bg2);
+#rp{width:360px;flex-shrink:0;background:var(--bg2);
   border-left:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .atab-content{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
   scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
