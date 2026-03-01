@@ -829,17 +829,17 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 #body{flex:1;min-height:0;display:flex;overflow:hidden;position:relative}
 
 /* LEFT PANEL — floating dropdown overlay, no longer in the flex flow */
-#lp{position:absolute;top:57px;left:0;z-index:1500;
+#lp{position:absolute;top:0;left:0;z-index:1500;
   width:296px;background:rgba(3,10,22,.97);
   border:1px solid var(--cdim);border-top:none;border-left:none;
   display:flex;flex-direction:column;overflow:hidden;
-  max-height:calc(100vh - 84px);
+  max-height:100%;
   transform:translateX(-100%);
   transition:transform .25s cubic-bezier(.4,0,.2,1);
   backdrop-filter:blur(8px);box-shadow:4px 0 24px #000a}
 #lp.open{transform:translateX(0)}
-/* Toggle button — always visible on map edge */
-#lp-toggle{position:absolute;top:57px;left:0;z-index:1600;
+/* Toggle button — always visible on map left edge, top:0 of #body */
+#lp-toggle{position:absolute;top:0;left:0;z-index:1600;
   width:32px;height:72px;background:rgba(3,10,22,.92);
   border:1px solid var(--cdim);border-left:none;border-top:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
@@ -926,20 +926,20 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
   width:340px;background:rgba(3,10,22,.97);
   border:1px solid var(--cdim);border-right:none;
   display:flex;flex-direction:column;overflow:hidden;
-  max-height:calc(100vh - 84px);
+  max-height:100%;
   transform:translateX(100%);
   transition:transform .25s cubic-bezier(.4,0,.2,1);
   backdrop-filter:blur(8px);box-shadow:-4px 0 24px #000a}
 .fp.open{transform:translateX(0)}
 
-/* Each panel gets a vertical offset so toggle buttons stack neatly */
-#fp-graphs  {top:57px}
-#fp-lptable {top:57px}
-#fp-signals {top:57px}
-#fp-lwr     {top:57px}
+/* Each panel sits at top:0 of #body (which is already below the header) */
+#fp-graphs  {top:0}
+#fp-lptable {top:0}
+#fp-signals {top:0}
+#fp-lwr     {top:0}
 
-/* Toggle buttons — vertical strip on right edge */
-#fp-btns{position:absolute;right:0;top:57px;z-index:1600;
+/* Toggle buttons — vertical strip on right edge, top:0 of #body */
+#fp-btns{position:absolute;right:0;top:0;z-index:1600;
   display:flex;flex-direction:column;gap:0}
 .fp-btn{width:36px;height:56px;background:rgba(3,10,22,.92);
   border:1px solid var(--cdim);border-right:none;border-bottom:none;
