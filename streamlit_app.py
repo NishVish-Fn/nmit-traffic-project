@@ -1764,9 +1764,13 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F4C8; 24hr Forecast (normalised)</div>
-        <canvas id="ml-canv" style="width:100%!important;height:75px!important;display:block"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
-          Observed(cyan) Fitted(green) Forecast(orange)
+        <div id="ml-chart-wrap" style="position:relative;height:72px;background:#030d1a;border-radius:3px;overflow:hidden;margin-top:4px">
+          <svg id="ml-svg" width="100%" height="100%" viewBox="0 0 300 72" preserveAspectRatio="none" style="position:absolute;top:0;left:0"></svg>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:4px">
+          <span style="font-family:monospace;font-size:.38rem;color:#00e5ff">&#9644; Observed</span>
+          <span style="font-family:monospace;font-size:.38rem;color:#00ff88">&#9644; Fitted</span>
+          <span style="font-family:monospace;font-size:.38rem;color:#ff8c00">&#9644; Forecast</span>
         </div>
       </div>
       <div class="sec">
@@ -1809,9 +1813,12 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F4CA; Field vs LP-Optimal</div>
-        <canvas id="val-canv" style="width:100%!important;height:120px!important;display:block"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
-          Dots above y=x line = LP improvement vs current signals
+        <div id="val-chart-wrap" style="position:relative;height:110px;background:#030d1a;border-radius:3px;overflow:hidden;margin-top:4px">
+          <svg id="val-svg" width="100%" height="100%" viewBox="0 0 260 110" preserveAspectRatio="none" style="position:absolute;top:0;left:0"></svg>
+          <div id="val-dots" style="position:absolute;inset:0"></div>
+        </div>
+        <div style="font-family:monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
+          &#x25CF; Each dot = one junction | Lower = better LP saving
         </div>
       </div>
       <div class="sec">
@@ -3224,7 +3231,7 @@ function updatePlatoonDisplay(){
 }
 
 // ── AI/ML PANEL ──────────────────────────────────────────────────────────────
-var _aiDone=false, _mlChart=null;
+var _aiDone=false;
 function initAIML(){
   if(_aiDone) return; _aiDone=true;
   var rl=BACKEND.rl; var ml=BACKEND.ml; var lp=CUR.lp;
@@ -3282,25 +3289,28 @@ function initAIML(){
     sv('ml-rmse', ml.rmse.toFixed(4));
     sv('ml-mape', ml.mape_pct.toFixed(2));
     sv('ml-peaks', ml.peak_windows?ml.peak_windows.join(', '):'--');
-    // ML chart
-    var mlEl=g('ml-canv');
-    if(mlEl&&!_mlChart&&ml.y_obs&&ml.y_fore){
-      try{
-        _mlChart=new Chart(mlEl,{
-          type:'line',
-          data:{datasets:[
-            {data:ml.y_obs.map(function(v,i){return{x:i,y:v};}),borderColor:'#00e5ff',borderWidth:1.5,pointRadius:0,fill:false,showLine:true,tension:.4},
-            {data:ml.y_fit?ml.y_fit.map(function(v,i){return{x:i,y:v};}):[], borderColor:'#00ff88',borderWidth:1,pointRadius:0,fill:false,showLine:true,borderDash:[3,3]},
-            {data:ml.y_fore.map(function(v,i){return{x:i+48,y:v};}),borderColor:'#ff8c00',borderWidth:1.5,pointRadius:0,fill:false,showLine:true,tension:.4}
-          ]},
-          options:{animation:false,responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{enabled:false}},
-            scales:{
-              x:{type:'linear',display:false},
-              y:{display:true,min:0,max:1.2,ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}}
-            }}
-        });
-      }catch(e){}
+    // ML chart — SVG polyline, works even from hidden tab
+    var svgEl=g('ml-svg');
+    if(svgEl&&ml.y_obs&&ml.y_fore){
+      var obs=ml.y_obs.slice(0,48); var fore=ml.y_fore.slice(0,48);
+      var fit=ml.y_fit?ml.y_fit.slice(0,48):[];
+      var allVals=obs.concat(fore).concat(fit);
+      var minV=Math.min.apply(null,allVals), maxV2=Math.max.apply(null,allVals)||1.2;
+      var W=300, H=72, pad=4;
+      function toX(i,len){return pad+(i/(len-1))*(W-2*pad);}
+      function toY(v){return H-pad-(v-minV)/(maxV2-minV+0.01)*(H-2*pad);}
+      function makePoly(arr,col){
+        var pts=arr.map(function(v,i){return toX(i,arr.length).toFixed(1)+','+toY(v).toFixed(1);}).join(' ');
+        return '<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+      }
+      // Grid line at 0.5
+      var gridY=toY(0.5).toFixed(1);
+      var svgHtml='<line x1="'+pad+'" y1="'+gridY+'" x2="'+(W-pad)+'" y2="'+gridY+'" stroke="#0d2040" stroke-width="1" stroke-dasharray="4 4"/>';
+      if(fit.length) svgHtml+=makePoly(fit,'#00ff88');
+      svgHtml+=makePoly(obs,'#00e5ff');
+      // Forecast starts after obs — draw as separate section
+      svgHtml+='<polyline points="'+fore.map(function(v,i){return toX(i,fore.length).toFixed(1)+','+toY(v).toFixed(1);}).join(' ')+'" fill="none" stroke="#ff8c00" stroke-width="1.5" stroke-dasharray="6 3" stroke-linecap="round"/>';
+      svgEl.innerHTML=svgHtml;
     }
   }
 
@@ -3312,7 +3322,7 @@ function initAIML(){
 }
 
 // ── VALIDATION PANEL ─────────────────────────────────────────────────────────
-var _valDone=false, _valChart=null;
+var _valDone=false;
 function initValid(){
   if(_valDone) return; _valDone=true;
   var val=BACKEND.validation; if(!val) return;
@@ -3335,26 +3345,32 @@ function initValid(){
     tb.innerHTML=th;
   }
 
-  // Scatter chart
-  var vcEl=g('val-canv');
-  if(vcEl&&!_valChart&&val.details){
-    try{
-      var maxV=Math.max.apply(null,val.details.map(function(d){return d.measured;}))*1.1;
-      _valChart=new Chart(vcEl,{
-        type:'scatter',
-        data:{datasets:[
-          {label:'y=x',data:[{x:0,y:0},{x:maxV,y:maxV}],showLine:true,borderColor:'#00e5ff22',borderWidth:1,pointRadius:0,borderDash:[5,5]},
-          {label:'LP',data:val.details.map(function(d){return{x:d.measured,y:d.modelled,label:d.junction};}),
-           backgroundColor:'#00ff88cc',pointRadius:7,pointHoverRadius:9}
-        ]},
-        options:{animation:false,responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var p=ctx.raw;return p.label?p.label+': field='+p.x+'s LP='+p.y+'s':'';}}}},
-          scales:{
-            x:{type:'linear',display:true,title:{display:true,text:'Field measured (s/veh)',color:'#3a5570',font:{size:8}},ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'},min:0,max:maxV},
-            y:{type:'linear',display:true,title:{display:true,text:'LP-optimal (s/veh)',color:'#3a5570',font:{size:8}},ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'},min:0,max:maxV}
-          }}
-      });
-    }catch(e){}
+  // SVG scatter — works from hidden tab, no canvas needed
+  var vsvg=g('val-svg');
+  if(vsvg&&val.details){
+    var meas2=val.details.map(function(d){return d.measured;});
+    var lps=val.details.map(function(d){return d.modelled;});
+    var maxF=Math.max.apply(null,meas2)*1.1;
+    var W2=260,H2=110,pad2=14;
+    function fx(v){return pad2+(v/maxF)*(W2-2*pad2);}
+    function fy(v){return H2-pad2-(v/maxF)*(H2-2*pad2);}
+    // y=x diagonal
+    var svgH='<line x1="'+fx(0)+'" y1="'+fy(0)+'" x2="'+fx(maxF)+'" y2="'+fy(maxF)+'" stroke="#00e5ff22" stroke-width="1" stroke-dasharray="5 4"/>';
+    // Axis labels
+    svgH+='<text x="'+pad2+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">0</text>';
+    svgH+='<text x="'+(W2-20)+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'s</text>';
+    svgH+='<text x="2" y="'+(pad2+4)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'</text>';
+    // Dots
+    val.details.forEach(function(d,idx){
+      var cx2=fx(d.measured), cy2=fy(d.modelled);
+      // color by saving: green=big saving, orange=moderate
+      var dotCol=d.savings_pct>70?'#00ff88':d.savings_pct>50?'#ffd700':'#ff8c00';
+      svgH+='<circle cx="'+cx2.toFixed(1)+'" cy="'+cy2.toFixed(1)+'" r="5" fill="'+dotCol+'" fill-opacity="0.85"/>';
+      // Label
+      var lx=cx2>W2-50?cx2-2:cx2+7;
+      svgH+='<text x="'+lx.toFixed(0)+'" y="'+(cy2-3).toFixed(0)+'" fill="'+dotCol+'" font-size="5.5">'+d.junction.substring(0,6)+'</text>';
+    });
+    vsvg.innerHTML=svgH;
   }
 }
 
