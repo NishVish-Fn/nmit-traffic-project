@@ -918,13 +918,65 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 .md{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .mt{font-family:'Share Tech Mono',monospace;font-size:0.53rem;color:#5a7590}
 
-/* RIGHT PANEL */
-#rp{width:330px;flex-shrink:0;background:var(--bg2);
-  border-left:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
-.atab-content{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
+/* RIGHT PANEL — 4 floating dropdown panels, stacked on right edge */
+#rp{display:none}/* hidden — replaced by floating panels */
+
+/* Floating panel base */
+.fp{position:absolute;right:0;z-index:1500;
+  width:340px;background:rgba(3,10,22,.97);
+  border:1px solid var(--cdim);border-right:none;
+  display:flex;flex-direction:column;overflow:hidden;
+  max-height:calc(100vh - 84px);
+  transform:translateX(100%);
+  transition:transform .25s cubic-bezier(.4,0,.2,1);
+  backdrop-filter:blur(8px);box-shadow:-4px 0 24px #000a}
+.fp.open{transform:translateX(0)}
+
+/* Each panel gets a vertical offset so toggle buttons stack neatly */
+#fp-graphs  {top:57px}
+#fp-lptable {top:57px}
+#fp-signals {top:57px}
+#fp-lwr     {top:57px}
+
+/* Toggle buttons — vertical strip on right edge */
+#fp-btns{position:absolute;right:0;top:57px;z-index:1600;
+  display:flex;flex-direction:column;gap:0}
+.fp-btn{width:36px;height:56px;background:rgba(3,10,22,.92);
+  border:1px solid var(--cdim);border-right:none;border-bottom:none;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;position:relative}
+.fp-btn:last-child{border-bottom:1px solid var(--cdim)}
+.fp-btn:hover{background:var(--cdim)}
+.fp-btn.open{background:rgba(79,195,247,.15);border-left-color:var(--cyan)}
+.fp-btn-lbl{font-family:'Share Tech Mono',monospace;font-size:0.38rem;
+  letter-spacing:1.5px;text-transform:uppercase;color:#4a6880;
+  writing-mode:vertical-lr;transform:rotate(180deg);line-height:1;
+  white-space:nowrap}
+.fp-btn.open .fp-btn-lbl{color:var(--cyan)}
+.fp-btn-dot{width:6px;height:6px;border-radius:50%;
+  position:absolute;top:5px;right:5px;display:none}
+.fp-btn.open .fp-btn-dot{display:block;background:var(--cyan);
+  box-shadow:0 0 6px var(--cyan);animation:blink 1.4s infinite}
+
+/* Panel content area */
+.fp-inner{flex:1;min-height:0;overflow-y:auto;padding:10px;
   scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
-  flex-direction:column;gap:8px}
-.atab-content.on{display:flex}
+  display:flex;flex-direction:column;gap:8px}
+/* Panel header */
+.fp-hdr{height:36px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:space-between;padding:0 12px;
+  border-bottom:1px solid var(--cdim);background:rgba(0,0,0,.3)}
+.fp-hdr-title{font-family:'Orbitron',monospace;font-size:0.58rem;
+  font-weight:700;color:var(--cyan);letter-spacing:2px;text-transform:uppercase}
+.fp-close{width:24px;height:24px;border:1px solid var(--cdim);border-radius:3px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-family:monospace;font-size:0.7rem;color:#4a6880;transition:all .15s}
+.fp-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* Keep existing content styles working inside .fp-inner */
+.fp-inner .atab-content{display:flex!important;flex:unset;min-height:unset;
+  overflow-y:unset;padding:0}
+
 .gc{background:var(--bg3);border:1px solid #0d2040;border-radius:4px;padding:8px}
 .gh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
 .gtl{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--cyan);
@@ -1315,18 +1367,28 @@ details.csec summary:hover{background:#0a1828}
     </div>
   </div>
 
-  <!-- RIGHT ANALYTICS -->
-  <div id="rp">
-    <div class="tabs">
-      <div class="tab on" onclick="rTab(0)">GRAPHS</div>
-      <div class="tab" onclick="rTab(1)">LP TABLE</div>
-      <div class="tab" onclick="rTab(2)">SIGNALS</div>
-      <div class="tab" onclick="rTab(3)">LWR</div>
+  <!-- FLOATING RIGHT PANELS + TOGGLE STRIP -->
+  <div id="fp-btns">
+    <div class="fp-btn" id="fpbtn-graphs" onclick="toggleFP('fp-graphs','fpbtn-graphs')" title="Performance Graphs">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">GRAPHS</div>
     </div>
+    <div class="fp-btn" id="fpbtn-lptable" onclick="toggleFP('fp-lptable','fpbtn-lptable')" title="LP Optimal Table">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LP TABLE</div>
+    </div>
+    <div class="fp-btn" id="fpbtn-signals" onclick="toggleFP('fp-signals','fpbtn-signals')" title="Signal States">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">SIGNALS</div>
+    </div>
+    <div class="fp-btn" id="fpbtn-lwr" onclick="toggleFP('fp-lwr','fpbtn-lwr')" title="LWR + CTM">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LWR</div>
+    </div>
+  </div>
 
-    <div class="atab-content on" id="rt0">
-
-      <details class="csec" open>
+  <div class="fp" id="fp-graphs">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x1F4CA; Live Performance Graphs</div>
+      <div class="fp-close" onclick="toggleFP('fp-graphs','fpbtn-graphs')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><details class="csec" open>
         <summary>&#x1F4CA; Live Performance Charts <span class="csec-badge live">LIVE</span></summary>
         <div class="csec-body" style="padding:6px">
 
@@ -1375,13 +1437,15 @@ details.csec summary:hover{background:#0a1828}
 
         </div>
       </details>
-
     </div>
+  </div>
+
+  <div class="fp" id="fp-lptable">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x2211; LP Optimal Green Times</div>
+      <div class="fp-close" onclick="toggleFP('fp-lptable','fpbtn-lptable')">&#x2715;</div>
     </div>
-
-    <div class="atab-content" id="rt1">
-
-      <details class="csec" open>
+    <div class="fp-inner"><details class="csec" open>
         <summary>&#x2211; LP Optimal Green Times</summary>
         <div class="csec-body" style="padding:4px">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px;padding:0 4px">
@@ -1423,12 +1487,15 @@ details.csec summary:hover{background:#0a1828}
           </div>
         </div>
       </details>
-
     </div>
+  </div>
 
-    <div class="atab-content" id="rt2">
-
-      <details class="csec" open>
+  <div class="fp" id="fp-signals">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x1F6A6; Real-Time Signal States</div>
+      <div class="fp-close" onclick="toggleFP('fp-signals','fpbtn-signals')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><details class="csec" open>
         <summary>&#x1F6A6; Real-Time Signal States <span class="csec-badge live">LIVE · 1s</span></summary>
         <div class="csec-body" style="padding:6px">
           <!-- Big real-time countdown clocks per junction -->
@@ -1447,11 +1514,15 @@ details.csec summary:hover{background:#0a1828}
           <div id="sigpanel"></div>
         </div>
       </details>
-
     </div>
+  </div>
 
-    <div class="atab-content" id="rt3">
-      <div class="sec">
+  <div class="fp" id="fp-lwr">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x1F300; LWR + CTM Analysis</div>
+      <div class="fp-close" onclick="toggleFP('fp-lwr','fpbtn-lwr')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><div class="sec">
         <div class="stitle">&#x1F300; LWR + CTM Hybrid Model</div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
           <span class="hi">LWR PDE:</span> &#x2202;k/&#x2202;t + &#x2202;q/&#x2202;x = 0<br>
@@ -1544,10 +1615,7 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </div>
     </div>
-
-
-
-</div>
+  </div>
 <div id="statusbar">
   <div class="sb">&#x1F551; <span id="sbt" class="sbv">00:00:00</span></div>
   <div class="sb">ALGO <span id="sba" class="sbv">GW+LP+EVP</span></div>
@@ -2727,19 +2795,50 @@ function lTab(n){
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
 }
-function rTab(n){
-  var tabs=document.querySelectorAll('#rp .tab');
-  var panes=document.querySelectorAll('.atab-content');
-  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
-  for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
-  // Initialise LWR tab analytics (tab index 3)
-  if(n===3){
-    renderSCOOTTable();
-    renderMCSummary();
-    renderPIBox();
-    setTimeout(function(){renderRadarChart();},80);
+// ── FLOATING PANEL TOGGLE ────────────────────────────────────────────────────
+var _openFP = null;  // currently open right panel id
+function toggleFP(panelId, btnId) {
+  var panel = g(panelId), btn = g(btnId);
+  if(!panel) return;
+  var isOpen = panel.classList.contains('open');
+  // Close any currently open panel
+  if(_openFP && _openFP !== panelId) {
+    var op = g(_openFP);
+    if(op) op.classList.remove('open');
+    // find its btn
+    var ob = document.querySelector('.fp-btn.open');
+    if(ob) ob.classList.remove('open');
+    _openFP = null;
+  }
+  if(isOpen) {
+    panel.classList.remove('open');
+    if(btn) btn.classList.remove('open');
+    _openFP = null;
+  } else {
+    panel.classList.add('open');
+    if(btn) btn.classList.add('open');
+    _openFP = panelId;
+    // Trigger chart init for LWR tab
+    if(panelId === 'fp-lwr') {
+      renderSCOOTTable(); renderMCSummary(); renderPIBox();
+      setTimeout(function(){renderRadarChart();}, 80);
+    }
+    if(panelId === 'fp-graphs') {
+      // Resize charts after panel opens
+      setTimeout(function(){
+        for(var k in charts){try{charts[k].resize();}catch(e){}}
+        if(lwrChart) try{lwrChart.resize();}catch(e){}
+      }, 280);
+    }
   }
 }
+// Legacy rTab stub — maps old indices to new panel ids
+function rTab(n) {
+  var map = ['fp-graphs','fp-lptable','fp-signals','fp-lwr'];
+  var btns = ['fpbtn-graphs','fpbtn-lptable','fpbtn-signals','fpbtn-lwr'];
+  if(map[n]) toggleFP(map[n], btns[n]);
+}
+window.toggleFP=toggleFP; window.rTab=rTab;
 
 // ── PARETO TAB INIT ───────────────────────────────────────────────────────────
 var paretoInited = false;
@@ -2952,7 +3051,8 @@ function toggleLP(){
 window.toggleLP=toggleLP;
 window.setDens=setDens;window.setEmerg=setEmerg;window.setWave=setWave;
 window.setCycle=setCycle;window.setSS=setSS;window.setAlgoSel=setAlgoSel;
-window.lTab=lTab;window.rTab=rTab;window.toggleLP=toggleLP;
+window.lTab=lTab;window.toggleLP=toggleLP;
+// toggleFP and rTab exported inside their own block above
 
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 // Wall-clock reference for accurate per-second signal phase advance
