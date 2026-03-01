@@ -1923,10 +1923,12 @@ details.csec summary:hover{background:#0a1828}
       </div>
 
       <div class="sec">
-        <div class="stitle">&#x1F4C8; Q-Learning Convergence</div>
-        <canvas id="rl-conv-canv" style="display:block;width:100%!important;height:70px!important"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:3px;text-align:center">
-          Episode reward convergence (last 20 episodes shown)
+        <div class="stitle">&#x1F4C8; Q-Learning Convergence (Episode Rewards)</div>
+        <div id="rl-conv-bars" style="display:flex;flex-direction:column;gap:3px;padding:4px 0"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570">episode 1</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#bb77ff">&#x2193; converging</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570">episode 20</span>
         </div>
       </div>
 
@@ -3466,7 +3468,6 @@ function updatePlatoonDisplay(){
 
 // ── AI/ML PANEL ───────────────────────────────────────────────────────────────
 var aimlInited = false;
-var rlConvChart = null;
 var mlForeChart = null;
 var valScatChart = null;
 
@@ -3507,20 +3508,32 @@ function renderAIMLPanel() {
       tb.innerHTML = html;
     }
 
-    // RL convergence chart
-    var rlEl = g('rl-conv-canv');
-    if (rlEl && !rlConvChart && rl.rewards_trace) {
-      try {
-        rlConvChart = new Chart(rlEl, {
-          type: 'line',
-          data: { labels: rl.rewards_trace.map(function(_,i){return i+1;}),
-                  datasets: [{ data: rl.rewards_trace, borderColor: '#bb77ff', borderWidth: 1.5,
-                               pointRadius: 0, fill: true, backgroundColor: '#bb77ff18', tension: 0.4 }] },
-          options: { animation: false, responsive: true, maintainAspectRatio: false,
-                     plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                     scales: { x: { display: false }, y: { display: true, ticks: { color: '#3a5570', font: { size: 7 } }, grid: { color: '#0d2040' } } } }
-        });
-      } catch(e) {}
+    // RL convergence — horizontal CSS bar chart (no canvas sizing issues)
+    var rlBars = g('rl-conv-bars');
+    if (rlBars && rl.rewards_trace && rl.rewards_trace.length > 0) {
+      var rewards = rl.rewards_trace;
+      var minR = Math.min.apply(null, rewards);
+      var maxR = Math.max.apply(null, rewards);
+      var rangeR = maxR - minR || 1;
+      var html = '';
+      for (var ri = 0; ri < rewards.length; ri++) {
+        var pct = Math.max(4, Math.round(((rewards[ri] - minR) / rangeR) * 100));
+        // Color: red (early/low) → purple → green (later/converged)
+        var progress = ri / Math.max(rewards.length - 1, 1);
+        var r = Math.round(187 * (1 - progress) + 0 * progress);
+        var g2 = Math.round(0 * (1 - progress) + 255 * progress);
+        var b2 = Math.round(255 * (1 - progress) + 136 * progress);
+        var col = 'rgb(' + r + ',' + g2 + ',' + b2 + ')';
+        var val2 = rewards[ri].toFixed(0);
+        html += '<div style="display:flex;align-items:center;gap:5px">' +
+          '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.38rem;color:#3a5570;width:16px;text-align:right">'+(ri+1)+'</div>' +
+          '<div style="flex:1;background:#0d2040;border-radius:2px;height:8px;overflow:hidden">' +
+            '<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:2px;box-shadow:0 0 4px '+col+'66;transition:width .3s"></div>' +
+          '</div>' +
+          '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.38rem;color:'+col+';width:28px;text-align:right">'+val2+'</div>' +
+        '</div>';
+      }
+      rlBars.innerHTML = html;
     }
   }
 
