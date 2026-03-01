@@ -3885,7 +3885,7 @@ function initNovelty(){
     {label:'LOS (typical)',     vals:['E-F','D-E','B-C','C-D','C-D','B-C']},
     {label:'Adaptivity',        vals:['None','Moderate','High','AI-driven','ML-pred','Optimal']},
     {label:'Model basis',       vals:['Rule','Webster','HiGHS LP','RL Q-learn','RF sklearn','LP+RL+EVP']},
-    {label:'Source',            vals:['—','Webster\'58','HiGHS opt','Abdulhai\'03','Breiman\'01','This work']},
+    {label:'Source',            vals:['-','Webster 1958','HiGHS opt','Abdulhai 2003','Breiman 2001','This work']},
   ];
 
   var tb = g('nov-tbody');
