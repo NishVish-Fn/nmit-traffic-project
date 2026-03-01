@@ -42,13 +42,6 @@ html,body,[data-testid="stAppViewContainer"]{background:#020810!important}
 section[data-testid="stSidebar"]{display:none!important}
 .block-container{padding:0!important;max-width:100%!important}
 iframe{border:none!important;display:block}
-/* Hide Streamlit bottom toolbar / Manage app button */
-[data-testid="stBottomBlockContainer"]{display:none!important}
-.stDeployButton{display:none!important}
-footer{display:none!important}
-#MainMenu{display:none!important}
-[data-testid="manage-app-button"]{display:none!important}
-iframe + div{display:none!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -779,12 +772,9 @@ HTML = """<!DOCTYPE html>
 <style>
 :root{
   --bg:#020810;--bg2:#06101e;--bg3:#0b1a2e;
-  /* Realistic traffic palette — muted, professional */
-  --cyan:#4fc3f7;--green:#2ecc71;--red:#e74c3c;
-  --orange:#e67e22;--yellow:#f1c40f;--purple:#9b59b6;--pink:#fd79a8;
-  --cdim:#4fc3f722;
-  /* Traffic-specific */
-  --free:#27ae60;--moderate:#f39c12;--heavy:#e67e22;--gridlock:#c0392b;
+  --cyan:#00e5ff;--green:#00ff88;--red:#ff2244;
+  --orange:#ff8c00;--yellow:#ffd700;--purple:#bb77ff;--pink:#ff44aa;
+  --cdim:#00e5ff22;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
@@ -828,28 +818,9 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 /* BODY */
 #body{flex:1;min-height:0;display:flex;overflow:hidden}
 
-/* LEFT PANEL — floating dropdown overlay, no longer in the flex flow */
-#lp{position:absolute;top:0;left:0;z-index:1500;
-  width:296px;background:rgba(3,10,22,.97);
-  border:1px solid var(--cdim);border-top:none;border-left:none;
-  display:flex;flex-direction:column;overflow:hidden;
-  height:100%;
-  transform:translateX(-100%);
-  transition:transform .25s cubic-bezier(.4,0,.2,1);
-  backdrop-filter:blur(8px);box-shadow:4px 0 24px #000a}
-#lp.open{transform:translateX(0)}
-/* Toggle button — always visible on map left edge, top:0 of #body */
-#lp-toggle{position:absolute;top:0;left:0;z-index:1600;
-  width:32px;height:72px;background:rgba(3,10,22,.92);
-  border:1px solid var(--cdim);border-left:none;border-top:none;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  cursor:pointer;transition:all .2s;border-radius:0 4px 4px 0}
-#lp-toggle:hover{background:var(--cdim);border-color:var(--cyan)}
-#lp-toggle span{display:block;width:14px;height:2px;background:var(--cyan);
-  border-radius:1px;transition:all .25s}
-#lp-toggle.open span:nth-child(1){transform:rotate(45deg) translate(3px,3px)}
-#lp-toggle.open span:nth-child(2){opacity:0}
-#lp-toggle.open span:nth-child(3){transform:rotate(-45deg) translate(3px,-3px)}
+/* LEFT PANEL */
+#lp{width:286px;flex-shrink:0;background:var(--bg2);
+  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .tabs{display:flex;border-bottom:1px solid var(--cdim)}
 .tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
   font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
@@ -896,8 +867,8 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 .dt td:last-child{text-align:right;font-weight:bold}
 
 /* MAP */
-#mw{flex:1;position:relative;overflow:hidden;width:100%;height:100%}
-#map{width:100%;height:100%;position:absolute;top:0;left:0}
+#mw{flex:1;position:relative;overflow:hidden}
+#map{width:100%;height:100%}
 #fc{position:absolute;top:0;left:0;pointer-events:none;z-index:400}
 .evpo{position:absolute;inset:0;pointer-events:none;z-index:450;
   background:transparent;transition:.4s}
@@ -918,65 +889,13 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 .md{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .mt{font-family:'Share Tech Mono',monospace;font-size:0.53rem;color:#5a7590}
 
-/* RIGHT PANEL — 4 floating dropdown panels, stacked on right edge */
-#rp{display:none}/* hidden — replaced by floating panels */
-
-/* Floating panel base */
-.fp{position:absolute;right:0;z-index:1500;
-  width:340px;background:rgba(3,10,22,.97);
-  border:1px solid var(--cdim);border-right:none;
-  display:flex;flex-direction:column;overflow:hidden;
-  height:100%;
-  transform:translateX(100%);
-  transition:transform .25s cubic-bezier(.4,0,.2,1);
-  backdrop-filter:blur(8px);box-shadow:-4px 0 24px #000a}
-.fp.open{transform:translateX(0)}
-
-/* Each panel sits at top:0 of #body (which is already below the header) */
-#fp-graphs  {top:0}
-#fp-lptable {top:0}
-#fp-signals {top:0}
-#fp-lwr     {top:0}
-
-/* Toggle buttons — vertical strip on right edge, top:0 of #body */
-#fp-btns{position:absolute;right:0;top:0;z-index:1600;
-  display:flex;flex-direction:column;gap:0}
-.fp-btn{width:36px;height:56px;background:rgba(3,10,22,.92);
-  border:1px solid var(--cdim);border-right:none;border-bottom:none;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .2s;position:relative}
-.fp-btn:last-child{border-bottom:1px solid var(--cdim)}
-.fp-btn:hover{background:var(--cdim)}
-.fp-btn.open{background:rgba(79,195,247,.15);border-left-color:var(--cyan)}
-.fp-btn-lbl{font-family:'Share Tech Mono',monospace;font-size:0.38rem;
-  letter-spacing:1.5px;text-transform:uppercase;color:#4a6880;
-  writing-mode:vertical-lr;transform:rotate(180deg);line-height:1;
-  white-space:nowrap}
-.fp-btn.open .fp-btn-lbl{color:var(--cyan)}
-.fp-btn-dot{width:6px;height:6px;border-radius:50%;
-  position:absolute;top:5px;right:5px;display:none}
-.fp-btn.open .fp-btn-dot{display:block;background:var(--cyan);
-  box-shadow:0 0 6px var(--cyan);animation:blink 1.4s infinite}
-
-/* Panel content area */
-.fp-inner{flex:1;min-height:0;overflow-y:auto;padding:10px;
+/* RIGHT PANEL */
+#rp{width:330px;flex-shrink:0;background:var(--bg2);
+  border-left:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.atab-content{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
   scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
-  display:flex;flex-direction:column;gap:8px}
-/* Panel header */
-.fp-hdr{height:36px;flex-shrink:0;display:flex;align-items:center;
-  justify-content:space-between;padding:0 12px;
-  border-bottom:1px solid var(--cdim);background:rgba(0,0,0,.3)}
-.fp-hdr-title{font-family:'Orbitron',monospace;font-size:0.58rem;
-  font-weight:700;color:var(--cyan);letter-spacing:2px;text-transform:uppercase}
-.fp-close{width:24px;height:24px;border:1px solid var(--cdim);border-radius:3px;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  font-family:monospace;font-size:0.7rem;color:#4a6880;transition:all .15s}
-.fp-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
-
-/* Keep existing content styles working inside .fp-inner */
-.fp-inner .atab-content{display:flex!important;flex:unset;min-height:unset;
-  overflow-y:unset;padding:0}
-
+  flex-direction:column;gap:8px}
+.atab-content.on{display:flex}
 .gc{background:var(--bg3);border:1px solid #0d2040;border-radius:4px;padding:8px}
 .gh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
 .gtl{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--cyan);
@@ -1036,8 +955,8 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .sb:last-child{border-right:none;margin-left:auto}
 .sbv{color:var(--cyan);font-weight:bold}
 .sbv.r{color:var(--red)}.sbv.g{color:var(--green)}.sbv.y{color:var(--yellow)}.sbv.p{color:var(--purple)}
-.leaflet-tile-pane{filter:brightness(.38) saturate(.35) contrast(1.1)!important}
-.leaflet-container{background:#0a1018}
+.leaflet-tile-pane{filter:brightness(.28) saturate(.2) hue-rotate(195deg)!important}
+.leaflet-container{background:var(--bg)}
 .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
 /* LWR shock wave canvas */
 #lwrcanv{display:block;width:100%!important;height:90px!important}
@@ -1136,291 +1055,8 @@ details.csec summary:hover{background:#0a1828}
 </div>
 
 <div id="body">
-  <!-- MAP -->
-  <div id="mw">
-    <div id="map"></div>
-    <canvas id="fc"></canvas>
-    <div class="evpo" id="evpo"></div>
-    <div class="mpill" id="mtop">
-      <span>SIM: <b id="stm">00:00:00</b></span>
-      <span>ALGO: <b id="algod">GW+LP+EVP</b></span>
-      <span>WAVE: <b id="wavd">25 km/h</b></span>
-      <span>VEHICLES: <b id="vtot">--</b></span>
-      <span>LWR: <b id="lwrd" style="color:var(--purple)">--</b></span>
-    </div>
-    <div class="mpill" id="mleg">
-      <div class="lt">ROAD DENSITY</div>
-      <div class="lr"><div class="lb" style="background:var(--free)"></div>Free-flow &lt;40%</div>
-      <div class="lr"><div class="lb" style="background:var(--moderate)"></div>Moderate 40–65%</div>
-      <div class="lr"><div class="lb" style="background:var(--heavy)"></div>Congested 65–85%</div>
-      <div class="lr"><div class="lb" style="background:var(--gridlock)"></div>Gridlock &gt;85%</div>
-      <div class="lr"><div class="lb" style="background:var(--pink)"></div>EVP Corridor</div>
-    </div>
-    <div class="mpill" id="mscl">
-      <div class="lt">PARTICLE SCALE</div>
-      <div class="mr"><div class="md" style="background:var(--cyan)"></div><div class="mt">1 dot = 5,000 vehicles</div></div>
-      <div class="mr"><div class="md" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div><div class="mt">1 dot = 100 emergency</div></div>
-      <div class="mr"><div class="md" style="background:var(--yellow)"></div><div class="mt">Shock wave front</div></div>
-    </div>
-  </div>
-
-  <!-- FLOATING RIGHT PANELS + TOGGLE STRIP -->
-  <div id="fp-btns">
-    <div class="fp-btn" id="fpbtn-graphs" onclick="toggleFP('fp-graphs','fpbtn-graphs')" title="Performance Graphs">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">GRAPHS</div>
-    </div>
-    <div class="fp-btn" id="fpbtn-lptable" onclick="toggleFP('fp-lptable','fpbtn-lptable')" title="LP Optimal Table">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LP TABLE</div>
-    </div>
-    <div class="fp-btn" id="fpbtn-signals" onclick="toggleFP('fp-signals','fpbtn-signals')" title="Signal States">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">SIGNALS</div>
-    </div>
-    <div class="fp-btn" id="fpbtn-lwr" onclick="toggleFP('fp-lwr','fpbtn-lwr')" title="LWR + CTM">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LWR</div>
-    </div>
-  </div>
-
-  <div class="fp" id="fp-graphs">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x1F4CA; Live Performance Graphs</div>
-      <div class="fp-close" onclick="toggleFP('fp-graphs','fpbtn-graphs')">&#x2715;</div>
-    </div>
-    <div class="fp-inner"><details class="csec" open>
-        <summary>&#x1F4CA; Live Performance Charts <span class="csec-badge live">LIVE</span></summary>
-        <div class="csec-body" style="padding:6px">
-
-          <div class="gc"><div class="gh">
-            <div class="gtl">Network Throughput<br>veh/hr/lane (VPHPL)</div>
-            <div class="gr"><div class="gv" id="gv0" style="color:var(--green)">--</div>
-              <span class="gu">VPHPL</span><div class="gd" id="gd0"></div></div>
-          </div><canvas class="gcanv" id="gc0"></canvas></div>
-
-          <div class="gc"><div class="gh">
-            <div class="gtl">Webster Avg Delay d</div>
-            <div class="gr"><div class="gv" id="gv1" style="color:var(--red)">--</div>
-              <span class="gu">sec/veh</span><div class="gd" id="gd1"></div></div>
-          </div><canvas class="gcanv" id="gc1"></canvas></div>
-
-          <div class="gc"><div class="gh">
-            <div class="gtl">AVG v/c Ratio x</div>
-            <div class="gr"><div class="gv" id="gv2" style="color:var(--orange)">--</div>
-              <span class="gu">x = q/c</span><div class="gd" id="gd2"></div></div>
-          </div><canvas class="gcanv" id="gc2"></canvas></div>
-
-        </div>
-      </details>
-
-      <details class="csec" open>
-        <summary>&#x26A1; Signal &amp; Wave Metrics</summary>
-        <div class="csec-body" style="padding:6px">
-
-          <div class="gc"><div class="gh">
-            <div class="gtl">Signal Efficiency g/C</div>
-            <div class="gr"><div class="gv" id="gv3" style="color:var(--cyan)">--</div>
-              <span class="gu">percent</span><div class="gd" id="gd3"></div></div>
-          </div><canvas class="gcanv" id="gc3"></canvas></div>
-
-          <div class="gc"><div class="gh">
-            <div class="gtl">Max LWR Shock Speed</div>
-            <div class="gr"><div class="gv" id="gv4" style="color:var(--purple)">--</div>
-              <span class="gu">km/h</span><div class="gd" id="gd4"></div></div>
-          </div><canvas class="gcanv" id="gc4"></canvas></div>
-
-          <div class="gc"><div class="gh">
-            <div class="gtl">LP Objective Value</div>
-            <div class="gr"><div class="gv" id="gv5" style="color:var(--yellow)">--</div>
-              <span class="gu">score</span><div class="gd" id="gd5"></div></div>
-          </div><canvas class="gcanv" id="gc5"></canvas></div>
-
-        </div>
-      </details>
-    </div>
-  </div>
-
-  <div class="fp" id="fp-lptable">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x2211; LP Optimal Green Times</div>
-      <div class="fp-close" onclick="toggleFP('fp-lptable','fpbtn-lptable')">&#x2715;</div>
-    </div>
-    <div class="fp-inner"><details class="csec" open>
-        <summary>&#x2211; LP Optimal Green Times</summary>
-        <div class="csec-body" style="padding:4px">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px;padding:0 4px">
-            scipy HiGHS | C=<span id="lpt-C">90</span>s | <span id="lpt-status" class="hig">OPTIMAL</span>
-          </div>
-          <div id="lp-table-wrap" style="overflow-x:auto">
-            <table class="lptbl" id="lp-table">
-              <thead>
-                <tr>
-                  <th style="text-align:left">Junction</th>
-                  <th>g(s)</th>
-                  <th>&#x03BB;</th>
-                  <th>x</th>
-                  <th>d(s)</th>
-                  <th>LOS</th>
-                  <th>Q</th>
-                  <th>C*</th>
-                </tr>
-              </thead>
-              <tbody id="lp-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F4CB; Webster Formula Detail</summary>
-        <div class="csec-body">
-          <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-            <span class="hi">d = d&#x2081;&#x22C5;PF + d&#x2082; + d&#x2083;</span> <span style="color:#3a5570">(HCM 6th §19)</span><br>
-            <span class="hi">d&#x2081;=C(1-&#x03BB;)&#xB2;/[2(1-&#x03BB;x)]</span> [uniform]<br>
-            <span class="hi">d&#x2082;=900T[(x-1)+&#x221A;((x-1)&#xB2;+8kIx/cT)]</span><br>
-            <span class="hi">PF=(1-P)/(1-&#x03BB;)</span>, P=0.33 (Arr.Type 3)<br>
-            <span style="color:#2a4060">k=0.5 pre-timed | I=1.0 isolated | T=0.25hr</span><br><br>
-            C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br>
-            &#x03BB;_avg: <span class="hig" id="w-lam">--</span> &nbsp; x_avg: <span class="hiy" id="w-x">--</span><br>
-            d&#x2081;_avg: <span class="hio" id="w-d1">--</span>s &nbsp; d&#x2082;_avg: <span class="hio" id="w-d2">--</span>s<br>
-            d_avg: <span class="hir" id="w-d">--</span> s/veh &nbsp; Max d: <span class="hir" id="w-dmax">--</span>s
-          </div>
-        </div>
-      </details>
-    </div>
-  </div>
-
-  <div class="fp" id="fp-signals">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x1F6A6; Real-Time Signal States</div>
-      <div class="fp-close" onclick="toggleFP('fp-signals','fpbtn-signals')">&#x2715;</div>
-    </div>
-    <div class="fp-inner"><details class="csec" open>
-        <summary>&#x1F6A6; Real-Time Signal States <span class="csec-badge live">LIVE · 1s</span></summary>
-        <div class="csec-body" style="padding:6px">
-          <!-- Big real-time countdown clocks per junction -->
-          <div id="sigpanel-rt" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
-        </div>
-      </details>
-
-      <details class="csec" open>
-        <summary>&#x23F1; Timing &amp; Phase Detail</summary>
-        <div class="csec-body" style="padding:4px" id="sigpanel-timing"></div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F504; Full Signal Panel</summary>
-        <div class="csec-body" style="padding:4px">
-          <div id="sigpanel"></div>
-        </div>
-      </details>
-    </div>
-  </div>
-
-  <div class="fp" id="fp-lwr">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x1F300; LWR + CTM Analysis</div>
-      <div class="fp-close" onclick="toggleFP('fp-lwr','fpbtn-lwr')">&#x2715;</div>
-    </div>
-    <div class="fp-inner"><div class="sec">
-        <div class="stitle">&#x1F300; LWR + CTM Hybrid Model</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">LWR PDE:</span> &#x2202;k/&#x2202;t + &#x2202;q/&#x2202;x = 0<br>
-          <span class="hi">Greenshields FD:</span> v = v_f(1&#x2212;k/k_j)<br>
-          <span class="hi">Shock speed:</span> w = (q_A&#x2212;q_B)/(k_A&#x2212;k_B)<br>
-          <span class="hi">CTM Sending:</span> &#x394;(x) = min(q_c, v_f&#x22C5;k)<br>
-          <span class="hi">CTM Receiving:</span> &#x3A3;(x) = min(q_c, w&#x22C5;(k_j&#x2212;k))<br>
-          <span class="hi">CTM Flow:</span> q = min(&#x394;_i, &#x3A3;_{i+1})<br><br>
-          v_f = 60 km/h | k_j = 120 veh/km<br>
-          q_c = 1800 veh/hr/ln | cells = 5/link<br><br>
-          <span class="hi">Active shock fronts:</span> <span class="hiy" id="lwr-shocks">--</span><br>
-          <span class="hi">Max |w|:</span> <span class="hir" id="lwr-maxw">--</span> km/h<br>
-          <span class="hi">Avg density:</span> <span class="hio" id="lwr-avgk">--</span> veh/km<br>
-          <span class="hi">Network LOS:</span> <span id="lwr-los">--</span><br>
-          <span class="hi">CTM bottleneck:</span> <span id="ctm-btn" class="hiy">--</span>
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4C8; Density-Flow Diagram (q-k)</div>
-        <canvas id="lwrcanv"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
-          Greenshields parabola | dots = current junction states
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x26A1; LWR/CTM Edge Table</div>
-        <div id="lwr-table-wrap" style="overflow-y:auto;max-height:200px">
-          <table class="lptbl" id="lwr-table">
-            <thead>
-              <tr>
-                <th style="text-align:left">Link</th>
-                <th>k_A</th>
-                <th>k_B</th>
-                <th>w km/h</th>
-                <th>CTM LOS</th>
-              </tr>
-            </thead>
-            <tbody id="lwr-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4A7; Robertson Platoon Dispersion</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">Model:</span> q_d(t) = F&#x22C5;q_d(t&#x2212;1) + (1&#x2212;F)&#x22C5;q_u(t&#x2212;t_0)<br>
-          <span class="hi">F:</span> 1/(1 + &#x3B2;&#x22C5;t_0),  &#x3B2; = 0.8 (Robertson 1969)<br>
-          <span class="hi">&#x3C6;:</span> Progression factor &#x2248; 1 &#x2212; F<br>
-          <span class="hi">Delay corr.:</span> 1 &#x2212; 0.5&#x22C5;&#x3C6; (range 0.5&#x2013;1.0)<br><br>
-          <span id="platoon-summary" style="color:#4a7090">Loading...</span>
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x26A1; SCOOT Adaptive Cycle</div>
-        <div id="scoot-table-wrap" style="overflow-y:auto;max-height:180px">
-          <table class="lptbl" id="scoot-table">
-            <thead>
-              <tr>
-                <th style="text-align:left">Junction</th>
-                <th>C_opt</th>
-                <th>C_rec</th>
-                <th>Y</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="scoot-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F6E2; Network PI + MC Sensitivity</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">HCM PI = &#x3B1;&#x22C5;&#x2211;d_i&#x22C5;q_i + &#x3B2;&#x22C5;&#x2211;s_i&#x22C5;q_i</span><br>
-          <span class="hi">PI total:</span> <span id="pi-total" class="hir">--</span>
-          &nbsp; <span class="hi">Fuel:</span> <span id="pi-fuel" class="hio">--</span> L/hr
-          &nbsp; <span class="hi">CO&#x2082;:</span> <span id="pi-co2" class="hip">--</span> kg/hr<br>
-          <hr style="border-color:#0d2040;margin:5px 0">
-          <span class="hi">MC Sensitivity (&#x3C3;=15%, n=200):</span><br>
-          <span class="hi">Mean obj:</span> <span id="mc-obj" style="color:var(--cyan)">--</span>
-          &nbsp; <span class="hi">&#x3C3;:</span> <span id="mc-std" class="hiy">--</span><br>
-          <span class="hi">P95 delay:</span> <span id="mc-p95" class="hir">--</span>s/veh
-          &nbsp; <span class="hi">Mean:</span> <span id="mc-avg" class="hio">--</span>s/veh<br>
-          <span class="hi">Most sensitive:</span> <span id="mc-sens" style="color:var(--yellow)">--</span>
-        </div>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4CA; Algorithm Radar (5-Metric)</div>
-        <canvas id="radar-canv" style="display:block;width:100%!important;height:160px!important;margin-top:4px"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
-          GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
-        </div>
-      </div>
-    </div>
-
-    <!-- ALL FLOATING OVERLAYS inside #mw -->
-    <!-- FLOATING PANEL TOGGLE — always visible, top-left of map -->
-<div id="lp-toggle" onclick="toggleLP()" title="Toggle Controls Panel">
-    <span></span><span></span><span></span>
-</div>
-
-    <!-- LEFT PANEL — floating dropdown overlay -->
-<div id="lp">
+  <!-- LEFT -->
+  <div id="lp">
     <div class="tabs">
       <div class="tab on" onclick="lTab(0)">CONTROLS</div>
       <div class="tab" onclick="lTab(1)">JUNCTIONS</div>
@@ -1599,46 +1235,64 @@ details.csec summary:hover{background:#0a1828}
         <summary>&#x1F4DA; Academic Sources</summary>
         <div class="csec-body">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.53rem;color:#3a5570;line-height:1.9">
-              BBMP Traffic Engineering Cell 2022<br>
-              KRDCL ORR Traffic Study 2019<br>
-              BDA Master Plan 2031 OD Survey<br>
-              Webster (1958) &mdash; Signal Timing<br>
-              Lighthill &amp; Whitham (1955) &mdash; LWR<br>
-              Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
-              Robertson (1969) &mdash; Platoon Dispersion<br>
-              Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
-              Ehrgott (2005) &mdash; Multi-Obj LP<br>
-              HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
-              EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
+            BBMP Traffic Engineering Cell 2022<br>
+            KRDCL ORR Traffic Study 2019<br>
+            BDA Master Plan 2031 OD Survey<br>
+            Webster (1958) &mdash; Signal Timing<br>
+            Lighthill &amp; Whitham (1955) &mdash; LWR<br>
+            Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
+            Robertson (1969) &mdash; Platoon Dispersion<br>
+            Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
+            Ehrgott (2005) &mdash; Multi-Obj LP<br>
+            HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
+            EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
           </div>
         </div>
       </details>
 
     </div>
-</div>
+  </div>
 
-    <!-- FLOATING RIGHT PANELS + TOGGLE STRIP -->
-<div id="fp-btns">
-    <div class="fp-btn" id="fpbtn-graphs" onclick="toggleFP('fp-graphs','fpbtn-graphs')" title="Performance Graphs">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">GRAPHS</div>
+  <!-- MAP -->
+  <div id="mw">
+    <div id="map"></div>
+    <canvas id="fc"></canvas>
+    <div class="evpo" id="evpo"></div>
+    <div class="mpill" id="mtop">
+      <span>SIM: <b id="stm">00:00:00</b></span>
+      <span>ALGO: <b id="algod">GW+LP+EVP</b></span>
+      <span>WAVE: <b id="wavd">25 km/h</b></span>
+      <span>VEHICLES: <b id="vtot">--</b></span>
+      <span>LWR: <b id="lwrd" style="color:var(--purple)">--</b></span>
     </div>
-    <div class="fp-btn" id="fpbtn-lptable" onclick="toggleFP('fp-lptable','fpbtn-lptable')" title="LP Optimal Table">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LP TABLE</div>
+    <div class="mpill" id="mleg">
+      <div class="lt">ROAD DENSITY</div>
+      <div class="lr"><div class="lb" style="background:var(--green)"></div>Free-flow &lt;40%</div>
+      <div class="lr"><div class="lb" style="background:var(--yellow)"></div>Moderate 40-65%</div>
+      <div class="lr"><div class="lb" style="background:var(--orange)"></div>Congested 65-85%</div>
+      <div class="lr"><div class="lb" style="background:var(--red)"></div>Gridlock &gt;85%</div>
+      <div class="lr"><div class="lb" style="background:var(--pink)"></div>EVP Corridor</div>
     </div>
-    <div class="fp-btn" id="fpbtn-signals" onclick="toggleFP('fp-signals','fpbtn-signals')" title="Signal States">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">SIGNALS</div>
+    <div class="mpill" id="mscl">
+      <div class="lt">PARTICLE SCALE</div>
+      <div class="mr"><div class="md" style="background:var(--cyan)"></div><div class="mt">1 dot = 5,000 vehicles</div></div>
+      <div class="mr"><div class="md" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div><div class="mt">1 dot = 100 emergency</div></div>
+      <div class="mr"><div class="md" style="background:var(--yellow)"></div><div class="mt">Shock wave front</div></div>
     </div>
-    <div class="fp-btn" id="fpbtn-lwr" onclick="toggleFP('fp-lwr','fpbtn-lwr')" title="LWR + CTM">
-      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LWR</div>
-    </div>
-</div>
+  </div>
 
-<div class="fp" id="fp-graphs">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x1F4CA; Live Performance Graphs</div>
-      <div class="fp-close" onclick="toggleFP('fp-graphs','fpbtn-graphs')">&#x2715;</div>
+  <!-- RIGHT ANALYTICS -->
+  <div id="rp">
+    <div class="tabs">
+      <div class="tab on" onclick="rTab(0)">GRAPHS</div>
+      <div class="tab" onclick="rTab(1)">LP TABLE</div>
+      <div class="tab" onclick="rTab(2)">SIGNALS</div>
+      <div class="tab" onclick="rTab(3)">LWR</div>
     </div>
-    <div class="fp-inner"><details class="csec" open>
+
+    <div class="atab-content on" id="rt0">
+
+      <details class="csec" open>
         <summary>&#x1F4CA; Live Performance Charts <span class="csec-badge live">LIVE</span></summary>
         <div class="csec-body" style="padding:6px">
 
@@ -1687,19 +1341,17 @@ details.csec summary:hover{background:#0a1828}
 
         </div>
       </details>
-    </div>
-</div>
 
-<div class="fp" id="fp-lptable">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x2211; LP Optimal Green Times</div>
-      <div class="fp-close" onclick="toggleFP('fp-lptable','fpbtn-lptable')">&#x2715;</div>
     </div>
-    <div class="fp-inner"><details class="csec" open>
+    </div>
+
+    <div class="atab-content" id="rt1">
+
+      <details class="csec" open>
         <summary>&#x2211; LP Optimal Green Times</summary>
         <div class="csec-body" style="padding:4px">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px;padding:0 4px">
-              scipy HiGHS | C=<span id="lpt-C">90</span>s | <span id="lpt-status" class="hig">OPTIMAL</span>
+            scipy HiGHS | C=<span id="lpt-C">90</span>s | <span id="lpt-status" class="hig">OPTIMAL</span>
           </div>
           <div id="lp-table-wrap" style="overflow-x:auto">
             <table class="lptbl" id="lp-table">
@@ -1730,22 +1382,19 @@ details.csec summary:hover{background:#0a1828}
             <span class="hi">d&#x2082;=900T[(x-1)+&#x221A;((x-1)&#xB2;+8kIx/cT)]</span><br>
             <span class="hi">PF=(1-P)/(1-&#x03BB;)</span>, P=0.33 (Arr.Type 3)<br>
             <span style="color:#2a4060">k=0.5 pre-timed | I=1.0 isolated | T=0.25hr</span><br><br>
-              C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br>
-              &#x03BB;_avg: <span class="hig" id="w-lam">--</span> &nbsp; x_avg: <span class="hiy" id="w-x">--</span><br>
-              d&#x2081;_avg: <span class="hio" id="w-d1">--</span>s &nbsp; d&#x2082;_avg: <span class="hio" id="w-d2">--</span>s<br>
-              d_avg: <span class="hir" id="w-d">--</span> s/veh &nbsp; Max d: <span class="hir" id="w-dmax">--</span>s
+            C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br>
+            &#x03BB;_avg: <span class="hig" id="w-lam">--</span> &nbsp; x_avg: <span class="hiy" id="w-x">--</span><br>
+            d&#x2081;_avg: <span class="hio" id="w-d1">--</span>s &nbsp; d&#x2082;_avg: <span class="hio" id="w-d2">--</span>s<br>
+            d_avg: <span class="hir" id="w-d">--</span> s/veh &nbsp; Max d: <span class="hir" id="w-dmax">--</span>s
           </div>
         </div>
       </details>
-    </div>
-</div>
 
-<div class="fp" id="fp-signals">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x1F6A6; Real-Time Signal States</div>
-      <div class="fp-close" onclick="toggleFP('fp-signals','fpbtn-signals')">&#x2715;</div>
     </div>
-    <div class="fp-inner"><details class="csec" open>
+
+    <div class="atab-content" id="rt2">
+
+      <details class="csec" open>
         <summary>&#x1F6A6; Real-Time Signal States <span class="csec-badge live">LIVE · 1s</span></summary>
         <div class="csec-body" style="padding:6px">
           <!-- Big real-time countdown clocks per junction -->
@@ -1764,15 +1413,11 @@ details.csec summary:hover{background:#0a1828}
           <div id="sigpanel"></div>
         </div>
       </details>
-    </div>
-</div>
 
-<div class="fp" id="fp-lwr">
-    <div class="fp-hdr">
-      <div class="fp-hdr-title">&#x1F300; LWR + CTM Analysis</div>
-      <div class="fp-close" onclick="toggleFP('fp-lwr','fpbtn-lwr')">&#x2715;</div>
     </div>
-    <div class="fp-inner"><div class="sec">
+
+    <div class="atab-content" id="rt3">
+      <div class="sec">
         <div class="stitle">&#x1F300; LWR + CTM Hybrid Model</div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
           <span class="hi">LWR PDE:</span> &#x2202;k/&#x2202;t + &#x2202;q/&#x2202;x = 0<br>
@@ -1781,8 +1426,8 @@ details.csec summary:hover{background:#0a1828}
           <span class="hi">CTM Sending:</span> &#x394;(x) = min(q_c, v_f&#x22C5;k)<br>
           <span class="hi">CTM Receiving:</span> &#x3A3;(x) = min(q_c, w&#x22C5;(k_j&#x2212;k))<br>
           <span class="hi">CTM Flow:</span> q = min(&#x394;_i, &#x3A3;_{i+1})<br><br>
-            v_f = 60 km/h | k_j = 120 veh/km<br>
-            q_c = 1800 veh/hr/ln | cells = 5/link<br><br>
+          v_f = 60 km/h | k_j = 120 veh/km<br>
+          q_c = 1800 veh/hr/ln | cells = 5/link<br><br>
           <span class="hi">Active shock fronts:</span> <span class="hiy" id="lwr-shocks">--</span><br>
           <span class="hi">Max |w|:</span> <span class="hir" id="lwr-maxw">--</span> km/h<br>
           <span class="hi">Avg density:</span> <span class="hio" id="lwr-avgk">--</span> veh/km<br>
@@ -1794,7 +1439,7 @@ details.csec summary:hover{background:#0a1828}
         <div class="stitle">&#x1F4C8; Density-Flow Diagram (q-k)</div>
         <canvas id="lwrcanv"></canvas>
         <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
-            Greenshields parabola | dots = current junction states
+          Greenshields parabola | dots = current junction states
         </div>
       </div>
       <div class="sec">
@@ -1846,14 +1491,14 @@ details.csec summary:hover{background:#0a1828}
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
           <span class="hi">HCM PI = &#x3B1;&#x22C5;&#x2211;d_i&#x22C5;q_i + &#x3B2;&#x22C5;&#x2211;s_i&#x22C5;q_i</span><br>
           <span class="hi">PI total:</span> <span id="pi-total" class="hir">--</span>
-            &nbsp; <span class="hi">Fuel:</span> <span id="pi-fuel" class="hio">--</span> L/hr
-            &nbsp; <span class="hi">CO&#x2082;:</span> <span id="pi-co2" class="hip">--</span> kg/hr<br>
+          &nbsp; <span class="hi">Fuel:</span> <span id="pi-fuel" class="hio">--</span> L/hr
+          &nbsp; <span class="hi">CO&#x2082;:</span> <span id="pi-co2" class="hip">--</span> kg/hr<br>
           <hr style="border-color:#0d2040;margin:5px 0">
           <span class="hi">MC Sensitivity (&#x3C3;=15%, n=200):</span><br>
           <span class="hi">Mean obj:</span> <span id="mc-obj" style="color:var(--cyan)">--</span>
-            &nbsp; <span class="hi">&#x3C3;:</span> <span id="mc-std" class="hiy">--</span><br>
+          &nbsp; <span class="hi">&#x3C3;:</span> <span id="mc-std" class="hiy">--</span><br>
           <span class="hi">P95 delay:</span> <span id="mc-p95" class="hir">--</span>s/veh
-            &nbsp; <span class="hi">Mean:</span> <span id="mc-avg" class="hio">--</span>s/veh<br>
+          &nbsp; <span class="hi">Mean:</span> <span id="mc-avg" class="hio">--</span>s/veh<br>
           <span class="hi">Most sensitive:</span> <span id="mc-sens" style="color:var(--yellow)">--</span>
         </div>
       </div>
@@ -1861,13 +1506,14 @@ details.csec summary:hover{background:#0a1828}
         <div class="stitle">&#x1F4CA; Algorithm Radar (5-Metric)</div>
         <canvas id="radar-canv" style="display:block;width:100%!important;height:160px!important;margin-top:4px"></canvas>
         <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
-            GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
+          GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
         </div>
       </div>
     </div>
-</div>
-  </div>
 
+
+
+</div>
 <div id="statusbar">
   <div class="sb">&#x1F551; <span id="sbt" class="sbv">00:00:00</span></div>
   <div class="sb">ALGO <span id="sba" class="sbv">GW+LP+EVP</span></div>
@@ -2217,10 +1863,10 @@ Particle.prototype.update = function(dt) {
 };
 
 Particle.prototype.col = function() {
-  if(this.isE) return '#e74c3c';           // emergency: red
-  if(this.state==='stopped') return '#e67e22';  // stopped: amber
-  if(this.state==='slow') return '#f1c40f';     // slow: yellow
-  return '#5dade2';                              // moving: steel blue (realistic headlights)
+  if(this.isE) return '#ff2244';
+  if(this.state==='stopped') return '#ff5500';
+  if(this.state==='slow') return '#ffcc00';
+  return '#00ccff';
 };
 
 function spawnParticles() {
@@ -2252,11 +1898,8 @@ function drawRoads() {
     var ar=S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:0;
     var cong=Math.min((ja.cong+jb.cong)/2*mul*af*(1-ar),1);
     var wv=lwr[ri]?Math.abs(lwr[ri].w_km_h):0;
-    // Realistic traffic map colors (Google Maps / TomTom style):
-    // Free-flow: muted teal-grey | Moderate: amber | Heavy: deep orange | Gridlock: crimson
-    var col=cong>.85?'#c0392b':cong>.65?'#e67e22':cong>.4?'#f1c40f':'#27ae60';
-    // Road width scales with congestion (queued vehicles widen visually)
-    var w=3+cong*5;
+    var col=cong>.85?'#ff2244':cong>.65?'#ff8c00':cong>.4?'#ffd700':'#00ff88';
+    var w=4+cong*7;
     // Full curved road path via waypoints
     var path=getEdgePath(ri);
     var latLngs=path.map(function(p){return[p[0],p[1]];});
@@ -2264,20 +1907,20 @@ function drawRoads() {
     for(var pi=0;pi<particles.length;pi++){
       if(particles[pi].isE&&particles[pi].ei===ri){hasEvp=true;break;}
     }
-    // Road subtle glow (narrower, less garish)
+    // Road glow shadow (wider, very faint)
     try{
       roadLines.push(L.polyline(latLngs,
-        {color:col+'44',weight:w+5,opacity:.25,lineJoin:'round',lineCap:'round'}).addTo(map));
+        {color:col+'33',weight:w+8,opacity:.3,lineJoin:'round',lineCap:'round'}).addTo(map));
     }catch(ex){}
-    // Road base (solid, congestion coloured — realistic opacity)
+    // Road base (solid, congestion coloured)
     try{
       roadLines.push(L.polyline(latLngs,
-        {color:col+'cc',weight:w,opacity:.85,lineJoin:'round',lineCap:'round'}).addTo(map));
+        {color:col+'aa',weight:w,opacity:.9,lineJoin:'round',lineCap:'round'}).addTo(map));
     }catch(ex){}
-    // Road centre divider line (subtle)
+    // Road centre divider line (dashed white)
     try{
       roadLines.push(L.polyline(latLngs,
-        {color:'#ffffff11',weight:1,opacity:.4,dashArray:'4 10'}).addTo(map));
+        {color:'#ffffff1a',weight:1,opacity:.6,dashArray:'5 9'}).addTo(map));
     }catch(ex){}
     // EVP corridor overlay
     if(hasEvp){
@@ -2301,12 +1944,10 @@ function drawRoads() {
 
 var jmkrs=JN.map(function(j,i){
   var lanes = j.lanes || 3;
-  var r = 5 + lanes*1.2;
-  // Realistic junction color: dark fill with congestion-colored ring
-  var jcol = j.cong>.65 ? '#c0392b' : j.cong>.45 ? '#e67e22' : '#27ae60';
+  var r = 6 + lanes*1.5;
   var m=L.circleMarker([j.lat,j.lng],
-    {radius:r,color:jcol,weight:2.5,fillColor:'#0d1f33',fillOpacity:.88}).addTo(map);
-  var tc=j.cong>.65?'#e74c3c':j.cong>.45?'#e67e22':'#2ecc71';
+    {radius:r,color:'#ffffff',weight:2,fillColor:'#ff2244',fillOpacity:.92}).addTo(map);
+  var tc=j.cong>.65?'#ff2244':j.cong>.45?'#ff8c00':'#00ff88';
   var lp=CUR.lp;
   m.bindTooltip(
     '<div style="font-family:monospace;font-size:11px;line-height:1.6;min-width:180px">'+
@@ -2339,7 +1980,7 @@ function renderParticles(){
   for(var ji=0;ji<JN.length;ji++){
     var j=JN[ji]; var sig=SIG[ji];
     var jpt=ll2px(j.lat,j.lng);
-    var col=sig.evp?'#e74c3c':sig.state==='green'?'#2ecc71':sig.state==='yellow'?'#f39c12':'#e74c3c';
+    var col=sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
     var R=8+(j.lanes||3)*1.5;
     // 4 signal arms (N/S/E/W)
     var arms=[{dx:0,dy:-(R+6)},{dx:0,dy:R+6},{dx:R+6,dy:0},{dx:-(R+6),dy:0}];
@@ -2413,13 +2054,13 @@ function renderParticles(){
       for(var t=1;t<p.trail.length;t++){
         var t1=ll2px(p.trail[t-1].lat,p.trail[t-1].lng);
         var t3=ll2px(p.trail[t].lat,p.trail[t].lng);
-        cx.strokeStyle='rgba(231,76,60,'+(((1-t/p.trail.length)*.6).toFixed(2))+')';
+        cx.strokeStyle='rgba(255,34,68,'+(((1-t/p.trail.length)*.6).toFixed(2))+')';
         cx.lineWidth=Math.max(.5,4-t*.35);
         cx.beginPath();cx.moveTo(t1.x,t1.y);cx.lineTo(t3.x,t3.y);cx.stroke();
       }
       var pos2=p.pos(); var pt4=ll2px(pos2.lat,pos2.lng);
       var pulse2=.55+.45*Math.sin(S.frame*.25+p.ph);
-      cx.shadowBlur=16*pulse2;cx.shadowColor='#e74c3c';cx.fillStyle='#e74c3c';
+      cx.shadowBlur=18*pulse2;cx.shadowColor='#ff2244';cx.fillStyle='#ff2244';
       cx.beginPath();cx.arc(pt4.x,pt4.y,8,0,Math.PI*2);cx.fill();
       cx.shadowBlur=0;cx.strokeStyle='#ffffff';cx.lineWidth=2;
       cx.beginPath();
@@ -2578,11 +2219,8 @@ function updateSignals(dt){
 function updateJMkrs(){
   for(var i=0;i<JN.length;i++){
     var s=SIG[i];
-    // Signal state colors: realistic traffic light palette
-    var sigCol = s.evp?'#e74c3c':s.state==='green'?'#2ecc71':s.state==='yellow'?'#f39c12':'#e74c3c';
-    var ringCol = JN[i].cong>.65?'#c0392b':JN[i].cong>.45?'#e67e22':'#27ae60';
-    try{jmkrs[i].setStyle({fillColor:'#0d1f33',color:s.evp?'#e74c3c':ringCol,
-      weight:s.evp?3:2.5,fillOpacity:.88});}catch(e){}
+    var c=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
+    try{jmkrs[i].setStyle({fillColor:c,color:s.evp?'#ff4466':'#ffffff'});}catch(e){}
   }
 }
 
@@ -3047,50 +2685,19 @@ function lTab(n){
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
 }
-// ── FLOATING PANEL TOGGLE ────────────────────────────────────────────────────
-var _openFP = null;  // currently open right panel id
-function toggleFP(panelId, btnId) {
-  var panel = g(panelId), btn = g(btnId);
-  if(!panel) return;
-  var isOpen = panel.classList.contains('open');
-  // Close any currently open panel
-  if(_openFP && _openFP !== panelId) {
-    var op = g(_openFP);
-    if(op) op.classList.remove('open');
-    // find its btn
-    var ob = document.querySelector('.fp-btn.open');
-    if(ob) ob.classList.remove('open');
-    _openFP = null;
-  }
-  if(isOpen) {
-    panel.classList.remove('open');
-    if(btn) btn.classList.remove('open');
-    _openFP = null;
-  } else {
-    panel.classList.add('open');
-    if(btn) btn.classList.add('open');
-    _openFP = panelId;
-    // Trigger chart init for LWR tab
-    if(panelId === 'fp-lwr') {
-      renderSCOOTTable(); renderMCSummary(); renderPIBox();
-      setTimeout(function(){renderRadarChart();}, 80);
-    }
-    if(panelId === 'fp-graphs') {
-      // Resize charts after panel opens
-      setTimeout(function(){
-        for(var k in charts){try{charts[k].resize();}catch(e){}}
-        if(lwrChart) try{lwrChart.resize();}catch(e){}
-      }, 280);
-    }
+function rTab(n){
+  var tabs=document.querySelectorAll('#rp .tab');
+  var panes=document.querySelectorAll('.atab-content');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
+  for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
+  // Initialise LWR tab analytics (tab index 3)
+  if(n===3){
+    renderSCOOTTable();
+    renderMCSummary();
+    renderPIBox();
+    setTimeout(function(){renderRadarChart();},80);
   }
 }
-// Legacy rTab stub — maps old indices to new panel ids
-function rTab(n) {
-  var map = ['fp-graphs','fp-lptable','fp-signals','fp-lwr'];
-  var btns = ['fpbtn-graphs','fpbtn-lptable','fpbtn-signals','fpbtn-lwr'];
-  if(map[n]) toggleFP(map[n], btns[n]);
-}
-window.toggleFP=toggleFP; window.rTab=rTab;
 
 // ── PARETO TAB INIT ───────────────────────────────────────────────────────────
 var paretoInited = false;
@@ -3294,17 +2901,10 @@ function updatePlatoonDisplay(){
     '<span style="color:#4a6880">Links analysed:</span> '+pl.length;
 }
 
-function toggleLP(){
-  var lp=g('lp'), btn=g('lp-toggle');
-  if(!lp) return;
-  var open=lp.classList.toggle('open');
-  if(btn) btn.classList.toggle('open', open);
-}
-window.toggleLP=toggleLP;
+window.cycleAlgo=cycleAlgo;window.massEVP=massEVP;window.togglePause=togglePause;
 window.setDens=setDens;window.setEmerg=setEmerg;window.setWave=setWave;
 window.setCycle=setCycle;window.setSS=setSS;window.setAlgoSel=setAlgoSel;
-window.lTab=lTab;window.toggleLP=toggleLP;
-// toggleFP and rTab exported inside their own block above
+window.lTab=lTab;window.rTab=rTab;
 
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 // Wall-clock reference for accurate per-second signal phase advance
