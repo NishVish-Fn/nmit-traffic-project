@@ -826,14 +826,14 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* BODY */
-#body{flex:1;min-height:0;display:flex;overflow:hidden;position:relative}
+#body{flex:1;min-height:0;display:flex;overflow:hidden}
 
 /* LEFT PANEL — floating dropdown overlay, no longer in the flex flow */
 #lp{position:absolute;top:0;left:0;z-index:1500;
   width:296px;background:rgba(3,10,22,.97);
   border:1px solid var(--cdim);border-top:none;border-left:none;
   display:flex;flex-direction:column;overflow:hidden;
-  max-height:100%;
+  height:100%;
   transform:translateX(-100%);
   transition:transform .25s cubic-bezier(.4,0,.2,1);
   backdrop-filter:blur(8px);box-shadow:4px 0 24px #000a}
@@ -896,8 +896,8 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 .dt td:last-child{text-align:right;font-weight:bold}
 
 /* MAP */
-#mw{flex:1;position:relative;overflow:hidden;width:100%}
-#map{width:100%;height:100%}
+#mw{flex:1;position:relative;overflow:hidden;width:100%;height:100%}
+#map{width:100%;height:100%;position:absolute;top:0;left:0}
 #fc{position:absolute;top:0;left:0;pointer-events:none;z-index:400}
 .evpo{position:absolute;inset:0;pointer-events:none;z-index:450;
   background:transparent;transition:.4s}
@@ -926,7 +926,7 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
   width:340px;background:rgba(3,10,22,.97);
   border:1px solid var(--cdim);border-right:none;
   display:flex;flex-direction:column;overflow:hidden;
-  max-height:100%;
+  height:100%;
   transform:translateX(100%);
   transition:transform .25s cubic-bezier(.4,0,.2,1);
   backdrop-filter:blur(8px);box-shadow:-4px 0 24px #000a}
@@ -1136,209 +1136,6 @@ details.csec summary:hover{background:#0a1828}
 </div>
 
 <div id="body">
-  <!-- FLOATING PANEL TOGGLE — always visible, top-left of map -->
-  <div id="lp-toggle" onclick="toggleLP()" title="Toggle Controls Panel">
-    <span></span><span></span><span></span>
-  </div>
-
-  <!-- LEFT PANEL — floating dropdown overlay -->
-  <div id="lp">
-    <div class="tabs">
-      <div class="tab on" onclick="lTab(0)">CONTROLS</div>
-      <div class="tab" onclick="lTab(1)">JUNCTIONS</div>
-      <div class="tab" onclick="lTab(2)">DATA</div>
-    </div>
-
-    <div class="tpane on" id="lt0">
-
-      <details class="csec" open>
-        <summary>&#9881; Simulation Controls <span class="csec-badge live">LIVE</span></summary>
-        <div class="csec-body">
-          <div class="ctrl">
-            <div class="clbl">Traffic Density <span id="ldns">Peak</span></div>
-            <input type="range" min="1" max="5" value="4" oninput="setDens(this.value)">
-          </div>
-          <div class="ctrl">
-            <div class="clbl">Emergency Vehicles <span id="lems">50 = 5,000 veh</span></div>
-            <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
-          </div>
-          <div class="ctrl">
-            <div class="clbl">Free-Flow Speed <span id="lwav">25 km/h</span></div>
-            <input type="range" min="10" max="60" value="25" step="5" oninput="setWave(this.value)">
-          </div>
-          <div class="ctrl">
-            <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
-            <input type="range" min="30" max="180" value="90" step="10" oninput="setCycle(this.value)">
-          </div>
-        </div>
-      </details>
-
-      <details class="csec" open>
-        <summary>&#x26A1; Algorithm &amp; Speed</summary>
-        <div class="csec-body">
-          <div class="ctrl">
-            <div class="clbl">Simulation Speed</div>
-            <select onchange="setSS(this.value)">
-              <option value="0.5">0.5x Slow</option>
-              <option value="1" selected>1x Real-time</option>
-              <option value="2">2x Fast</option>
-              <option value="4">4x Ultra</option>
-            </select>
-          </div>
-          <div class="ctrl" style="margin-top:8px">
-            <div class="clbl">Control Algorithm</div>
-            <select id="algo-sel" onchange="setAlgoSel(this.value)">
-              <option value="optimal">GW + LP + EVP (Proposed)</option>
-              <option value="fixed">Fixed Timer (Baseline)</option>
-              <option value="lp">LP Only</option>
-              <option value="evp">EVP Only</option>
-              <option value="webster">Webster Adaptive</option>
-            </select>
-          </div>
-        </div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F4D0; LP Solver Status</summary>
-        <div class="csec-body">
-          <div class="lp-box" style="font-size:.53rem;line-height:1.7">
-            <span class="hi">Solver:</span> scipy HiGHS LP<br>
-            <span class="hi">Variables:</span> 12 green times g_i<br>
-            <span class="hi">Constraints:</span> &#x2211;g_i &#x2264; C&#x2212;L<br>
-            <span class="hi">Objective:</span> Minimise &#x2211; w_i&#x22C5;d_i<br>
-            <span class="hi">OD Matrix:</span> 12&#xD7;12 BBMP/KRDCL<br>
-            <span class="hi">CTM:</span> Daganzo (1994), 5 cells<br>
-            <span class="hi">Robertson:</span> &#x3B2;=0.8, TRANSYT<br>
-            <span class="hi">Status:</span> <span class="hig" id="lp-status">OPTIMAL</span><br>
-            <span class="hi">Obj Value:</span> <span class="hiy" id="lp-obj">--</span><br>
-            <span class="hi">Avg Delay:</span> <span class="hir" id="lp-wd">--</span> s<br>
-            <span class="hi">Avg x (v/c):</span> <span class="hio" id="lp-xavg">--</span>
-          </div>
-        </div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F50D; Map Legend</summary>
-        <div class="csec-body">
-          <div class="sc-row"><div class="sc-dot" style="background:var(--cyan)"></div>
-            <div class="sc-txt">1 cyan dot = <b style="color:var(--cyan)">5,000</b> regular vehicles</div></div>
-          <div class="sc-row"><div class="sc-dot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>
-            <div class="sc-txt">1 red dot = <b style="color:var(--red)">100</b> emergency vehicles</div></div>
-          <div class="sc-row"><div class="sc-dot" style="background:var(--yellow)"></div>
-            <div class="sc-txt">Yellow = LWR shock wave front</div></div>
-          <div class="sc-row"><div class="sc-dot" style="background:var(--orange)"></div>
-            <div class="sc-txt">Orange = stopped at red signal</div></div>
-          <div class="sc-row"><div class="sc-dot" style="background:var(--pink);box-shadow:0 0 5px var(--pink)"></div>
-            <div class="sc-txt">Pink dashed = active EVP corridor</div></div>
-          <div style="margin-top:8px;border-top:1px solid #0d2040;padding-top:8px">
-            <div class="sc-row" style="align-items:center">
-              <div style="width:22px;height:3px;background:var(--green);border-radius:2px;flex-shrink:0"></div>
-              <div class="sc-txt">Free-flow road &lt;40% cong.</div></div>
-            <div class="sc-row" style="align-items:center">
-              <div style="width:22px;height:3px;background:var(--yellow);border-radius:2px;flex-shrink:0"></div>
-              <div class="sc-txt">Moderate 40–65% congestion</div></div>
-            <div class="sc-row" style="align-items:center">
-              <div style="width:22px;height:3px;background:var(--orange);border-radius:2px;flex-shrink:0"></div>
-              <div class="sc-txt">Congested 65–85%</div></div>
-            <div class="sc-row" style="align-items:center">
-              <div style="width:22px;height:3px;background:var(--red);border-radius:2px;flex-shrink:0"></div>
-              <div class="sc-txt">Gridlock &gt;85% congestion</div></div>
-          </div>
-        </div>
-      </details>
-
-    </div>
-
-    <div class="tpane" id="lt1">
-
-      <details class="csec" open>
-        <summary>&#x1F534; High Congestion (&gt;65%) <span class="csec-badge crit">CRITICAL</span></summary>
-        <div class="csec-body" id="jlist-crit"></div>
-      </details>
-
-      <details class="csec" open>
-        <summary>&#x1F7E1; Moderate (45-65%) <span class="csec-badge warn">MOD</span></summary>
-        <div class="csec-body" id="jlist-mod"></div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F7E2; Free-flow (&lt;45%) <span class="csec-badge live">FREE</span></summary>
-        <div class="csec-body" id="jlist-free"></div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F4CD; Network Stats</summary>
-        <div class="csec-body">
-          <table class="dt">
-            <tr><td>Total junctions</td><td style="color:var(--cyan)">12</td></tr>
-            <tr><td>Critical (&gt;65%)</td><td style="color:var(--red)">3</td></tr>
-            <tr><td>Moderate (45-65%)</td><td style="color:var(--orange)">5</td></tr>
-            <tr><td>Free-flow (&lt;45%)</td><td style="color:var(--green)">4</td></tr>
-            <tr><td>OD demand total</td><td style="color:var(--cyan)">1.2M PCU/hr</td></tr>
-          </table>
-        </div>
-      </details>
-
-    </div>
-
-    <div class="tpane" id="lt2">
-
-      <details class="csec" open>
-        <summary>&#x1F4CB; BBMP / KRDCL Data</summary>
-        <div class="csec-body">
-          <table class="dt">
-            <tr><td>Silk Board</td><td style="color:var(--red)">71%</td></tr>
-            <tr><td>Electronic City</td><td style="color:var(--red)">67%</td></tr>
-            <tr><td>Hebbal</td><td style="color:var(--red)">64%</td></tr>
-            <tr><td>Marathahalli</td><td style="color:var(--orange)">58%</td></tr>
-            <tr><td>KR Puram</td><td style="color:var(--orange)">54%</td></tr>
-            <tr><td>ORR Average</td><td style="color:var(--orange)">62%</td></tr>
-            <tr><td>Peak Hours</td><td style="color:var(--yellow)">8-10AM, 6-9PM</td></tr>
-            <tr><td>Avg Speed (Peak)</td><td style="color:var(--red)">17.8 km/h</td></tr>
-            <tr><td>Avg Speed (Off)</td><td style="color:var(--green)">32.4 km/h</td></tr>
-            <tr><td>Daily Vehicles</td><td style="color:var(--cyan)">1.2M</td></tr>
-            <tr><td>Registered Veh.</td><td style="color:var(--cyan)">10.5M</td></tr>
-          </table>
-        </div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F697; Traffic Flow Params</summary>
-        <div class="csec-body">
-          <table class="dt">
-            <tr><td>Sat. Flow</td><td style="color:var(--cyan)">1600-1800 PCU/hr/ln</td></tr>
-            <tr><td>Free-Flow Speed</td><td style="color:var(--green)">60 km/h</td></tr>
-            <tr><td>Jam Density k_j</td><td style="color:var(--red)">120 veh/km/ln</td></tr>
-            <tr><td>Capacity q_max</td><td style="color:var(--cyan)">1800 veh/hr</td></tr>
-            <tr><td>LWR Wave max</td><td style="color:var(--purple)">-60 km/h</td></tr>
-            <tr><td>Webster L</td><td style="color:var(--orange)">7s/cycle</td></tr>
-            <tr><td>Robertson beta</td><td style="color:var(--cyan)">0.8</td></tr>
-          </table>
-        </div>
-      </details>
-
-      <details class="csec">
-        <summary>&#x1F4DA; Academic Sources</summary>
-        <div class="csec-body">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.53rem;color:#3a5570;line-height:1.9">
-            BBMP Traffic Engineering Cell 2022<br>
-            KRDCL ORR Traffic Study 2019<br>
-            BDA Master Plan 2031 OD Survey<br>
-            Webster (1958) &mdash; Signal Timing<br>
-            Lighthill &amp; Whitham (1955) &mdash; LWR<br>
-            Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
-            Robertson (1969) &mdash; Platoon Dispersion<br>
-            Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
-            Ehrgott (2005) &mdash; Multi-Obj LP<br>
-            HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
-            EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
-          </div>
-        </div>
-      </details>
-
-    </div>
-  </div>
-
   <!-- MAP -->
   <div id="mw">
     <div id="map"></div>
@@ -1615,7 +1412,462 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </div>
     </div>
+
+    <!-- ALL FLOATING OVERLAYS inside #mw -->
+    <!-- FLOATING PANEL TOGGLE — always visible, top-left of map -->
+<div id="lp-toggle" onclick="toggleLP()" title="Toggle Controls Panel">
+    <span></span><span></span><span></span>
+</div>
+
+    <!-- LEFT PANEL — floating dropdown overlay -->
+<div id="lp">
+    <div class="tabs">
+      <div class="tab on" onclick="lTab(0)">CONTROLS</div>
+      <div class="tab" onclick="lTab(1)">JUNCTIONS</div>
+      <div class="tab" onclick="lTab(2)">DATA</div>
+    </div>
+
+    <div class="tpane on" id="lt0">
+
+      <details class="csec" open>
+        <summary>&#9881; Simulation Controls <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body">
+          <div class="ctrl">
+            <div class="clbl">Traffic Density <span id="ldns">Peak</span></div>
+            <input type="range" min="1" max="5" value="4" oninput="setDens(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Emergency Vehicles <span id="lems">50 = 5,000 veh</span></div>
+            <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Free-Flow Speed <span id="lwav">25 km/h</span></div>
+            <input type="range" min="10" max="60" value="25" step="5" oninput="setWave(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
+            <input type="range" min="30" max="180" value="90" step="10" oninput="setCycle(this.value)">
+          </div>
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x26A1; Algorithm &amp; Speed</summary>
+        <div class="csec-body">
+          <div class="ctrl">
+            <div class="clbl">Simulation Speed</div>
+            <select onchange="setSS(this.value)">
+              <option value="0.5">0.5x Slow</option>
+              <option value="1" selected>1x Real-time</option>
+              <option value="2">2x Fast</option>
+              <option value="4">4x Ultra</option>
+            </select>
+          </div>
+          <div class="ctrl" style="margin-top:8px">
+            <div class="clbl">Control Algorithm</div>
+            <select id="algo-sel" onchange="setAlgoSel(this.value)">
+              <option value="optimal">GW + LP + EVP (Proposed)</option>
+              <option value="fixed">Fixed Timer (Baseline)</option>
+              <option value="lp">LP Only</option>
+              <option value="evp">EVP Only</option>
+              <option value="webster">Webster Adaptive</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4D0; LP Solver Status</summary>
+        <div class="csec-body">
+          <div class="lp-box" style="font-size:.53rem;line-height:1.7">
+            <span class="hi">Solver:</span> scipy HiGHS LP<br>
+            <span class="hi">Variables:</span> 12 green times g_i<br>
+            <span class="hi">Constraints:</span> &#x2211;g_i &#x2264; C&#x2212;L<br>
+            <span class="hi">Objective:</span> Minimise &#x2211; w_i&#x22C5;d_i<br>
+            <span class="hi">OD Matrix:</span> 12&#xD7;12 BBMP/KRDCL<br>
+            <span class="hi">CTM:</span> Daganzo (1994), 5 cells<br>
+            <span class="hi">Robertson:</span> &#x3B2;=0.8, TRANSYT<br>
+            <span class="hi">Status:</span> <span class="hig" id="lp-status">OPTIMAL</span><br>
+            <span class="hi">Obj Value:</span> <span class="hiy" id="lp-obj">--</span><br>
+            <span class="hi">Avg Delay:</span> <span class="hir" id="lp-wd">--</span> s<br>
+            <span class="hi">Avg x (v/c):</span> <span class="hio" id="lp-xavg">--</span>
+          </div>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F50D; Map Legend</summary>
+        <div class="csec-body">
+          <div class="sc-row"><div class="sc-dot" style="background:var(--cyan)"></div>
+            <div class="sc-txt">1 cyan dot = <b style="color:var(--cyan)">5,000</b> regular vehicles</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>
+            <div class="sc-txt">1 red dot = <b style="color:var(--red)">100</b> emergency vehicles</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--yellow)"></div>
+            <div class="sc-txt">Yellow = LWR shock wave front</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--orange)"></div>
+            <div class="sc-txt">Orange = stopped at red signal</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--pink);box-shadow:0 0 5px var(--pink)"></div>
+            <div class="sc-txt">Pink dashed = active EVP corridor</div></div>
+          <div style="margin-top:8px;border-top:1px solid #0d2040;padding-top:8px">
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--green);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Free-flow road &lt;40% cong.</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--yellow);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Moderate 40–65% congestion</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--orange);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Congested 65–85%</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--red);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Gridlock &gt;85% congestion</div></div>
+          </div>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="tpane" id="lt1">
+
+      <details class="csec" open>
+        <summary>&#x1F534; High Congestion (&gt;65%) <span class="csec-badge crit">CRITICAL</span></summary>
+        <div class="csec-body" id="jlist-crit"></div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x1F7E1; Moderate (45-65%) <span class="csec-badge warn">MOD</span></summary>
+        <div class="csec-body" id="jlist-mod"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F7E2; Free-flow (&lt;45%) <span class="csec-badge live">FREE</span></summary>
+        <div class="csec-body" id="jlist-free"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4CD; Network Stats</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Total junctions</td><td style="color:var(--cyan)">12</td></tr>
+            <tr><td>Critical (&gt;65%)</td><td style="color:var(--red)">3</td></tr>
+            <tr><td>Moderate (45-65%)</td><td style="color:var(--orange)">5</td></tr>
+            <tr><td>Free-flow (&lt;45%)</td><td style="color:var(--green)">4</td></tr>
+            <tr><td>OD demand total</td><td style="color:var(--cyan)">1.2M PCU/hr</td></tr>
+          </table>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="tpane" id="lt2">
+
+      <details class="csec" open>
+        <summary>&#x1F4CB; BBMP / KRDCL Data</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Silk Board</td><td style="color:var(--red)">71%</td></tr>
+            <tr><td>Electronic City</td><td style="color:var(--red)">67%</td></tr>
+            <tr><td>Hebbal</td><td style="color:var(--red)">64%</td></tr>
+            <tr><td>Marathahalli</td><td style="color:var(--orange)">58%</td></tr>
+            <tr><td>KR Puram</td><td style="color:var(--orange)">54%</td></tr>
+            <tr><td>ORR Average</td><td style="color:var(--orange)">62%</td></tr>
+            <tr><td>Peak Hours</td><td style="color:var(--yellow)">8-10AM, 6-9PM</td></tr>
+            <tr><td>Avg Speed (Peak)</td><td style="color:var(--red)">17.8 km/h</td></tr>
+            <tr><td>Avg Speed (Off)</td><td style="color:var(--green)">32.4 km/h</td></tr>
+            <tr><td>Daily Vehicles</td><td style="color:var(--cyan)">1.2M</td></tr>
+            <tr><td>Registered Veh.</td><td style="color:var(--cyan)">10.5M</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F697; Traffic Flow Params</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Sat. Flow</td><td style="color:var(--cyan)">1600-1800 PCU/hr/ln</td></tr>
+            <tr><td>Free-Flow Speed</td><td style="color:var(--green)">60 km/h</td></tr>
+            <tr><td>Jam Density k_j</td><td style="color:var(--red)">120 veh/km/ln</td></tr>
+            <tr><td>Capacity q_max</td><td style="color:var(--cyan)">1800 veh/hr</td></tr>
+            <tr><td>LWR Wave max</td><td style="color:var(--purple)">-60 km/h</td></tr>
+            <tr><td>Webster L</td><td style="color:var(--orange)">7s/cycle</td></tr>
+            <tr><td>Robertson beta</td><td style="color:var(--cyan)">0.8</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4DA; Academic Sources</summary>
+        <div class="csec-body">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.53rem;color:#3a5570;line-height:1.9">
+              BBMP Traffic Engineering Cell 2022<br>
+              KRDCL ORR Traffic Study 2019<br>
+              BDA Master Plan 2031 OD Survey<br>
+              Webster (1958) &mdash; Signal Timing<br>
+              Lighthill &amp; Whitham (1955) &mdash; LWR<br>
+              Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
+              Robertson (1969) &mdash; Platoon Dispersion<br>
+              Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
+              Ehrgott (2005) &mdash; Multi-Obj LP<br>
+              HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
+              EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
+          </div>
+        </div>
+      </details>
+
+    </div>
+</div>
+
+    <!-- FLOATING RIGHT PANELS + TOGGLE STRIP -->
+<div id="fp-btns">
+    <div class="fp-btn" id="fpbtn-graphs" onclick="toggleFP('fp-graphs','fpbtn-graphs')" title="Performance Graphs">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">GRAPHS</div>
+    </div>
+    <div class="fp-btn" id="fpbtn-lptable" onclick="toggleFP('fp-lptable','fpbtn-lptable')" title="LP Optimal Table">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LP TABLE</div>
+    </div>
+    <div class="fp-btn" id="fpbtn-signals" onclick="toggleFP('fp-signals','fpbtn-signals')" title="Signal States">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">SIGNALS</div>
+    </div>
+    <div class="fp-btn" id="fpbtn-lwr" onclick="toggleFP('fp-lwr','fpbtn-lwr')" title="LWR + CTM">
+      <div class="fp-btn-dot"></div><div class="fp-btn-lbl">LWR</div>
+    </div>
+</div>
+
+<div class="fp" id="fp-graphs">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x1F4CA; Live Performance Graphs</div>
+      <div class="fp-close" onclick="toggleFP('fp-graphs','fpbtn-graphs')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><details class="csec" open>
+        <summary>&#x1F4CA; Live Performance Charts <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body" style="padding:6px">
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Network Throughput<br>veh/hr/lane (VPHPL)</div>
+            <div class="gr"><div class="gv" id="gv0" style="color:var(--green)">--</div>
+              <span class="gu">VPHPL</span><div class="gd" id="gd0"></div></div>
+          </div><canvas class="gcanv" id="gc0"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Webster Avg Delay d</div>
+            <div class="gr"><div class="gv" id="gv1" style="color:var(--red)">--</div>
+              <span class="gu">sec/veh</span><div class="gd" id="gd1"></div></div>
+          </div><canvas class="gcanv" id="gc1"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">AVG v/c Ratio x</div>
+            <div class="gr"><div class="gv" id="gv2" style="color:var(--orange)">--</div>
+              <span class="gu">x = q/c</span><div class="gd" id="gd2"></div></div>
+          </div><canvas class="gcanv" id="gc2"></canvas></div>
+
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x26A1; Signal &amp; Wave Metrics</summary>
+        <div class="csec-body" style="padding:6px">
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Signal Efficiency g/C</div>
+            <div class="gr"><div class="gv" id="gv3" style="color:var(--cyan)">--</div>
+              <span class="gu">percent</span><div class="gd" id="gd3"></div></div>
+          </div><canvas class="gcanv" id="gc3"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Max LWR Shock Speed</div>
+            <div class="gr"><div class="gv" id="gv4" style="color:var(--purple)">--</div>
+              <span class="gu">km/h</span><div class="gd" id="gd4"></div></div>
+          </div><canvas class="gcanv" id="gc4"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">LP Objective Value</div>
+            <div class="gr"><div class="gv" id="gv5" style="color:var(--yellow)">--</div>
+              <span class="gu">score</span><div class="gd" id="gd5"></div></div>
+          </div><canvas class="gcanv" id="gc5"></canvas></div>
+
+        </div>
+      </details>
+    </div>
+</div>
+
+<div class="fp" id="fp-lptable">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x2211; LP Optimal Green Times</div>
+      <div class="fp-close" onclick="toggleFP('fp-lptable','fpbtn-lptable')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><details class="csec" open>
+        <summary>&#x2211; LP Optimal Green Times</summary>
+        <div class="csec-body" style="padding:4px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px;padding:0 4px">
+              scipy HiGHS | C=<span id="lpt-C">90</span>s | <span id="lpt-status" class="hig">OPTIMAL</span>
+          </div>
+          <div id="lp-table-wrap" style="overflow-x:auto">
+            <table class="lptbl" id="lp-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">Junction</th>
+                  <th>g(s)</th>
+                  <th>&#x03BB;</th>
+                  <th>x</th>
+                  <th>d(s)</th>
+                  <th>LOS</th>
+                  <th>Q</th>
+                  <th>C*</th>
+                </tr>
+              </thead>
+              <tbody id="lp-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4CB; Webster Formula Detail</summary>
+        <div class="csec-body">
+          <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+            <span class="hi">d = d&#x2081;&#x22C5;PF + d&#x2082; + d&#x2083;</span> <span style="color:#3a5570">(HCM 6th §19)</span><br>
+            <span class="hi">d&#x2081;=C(1-&#x03BB;)&#xB2;/[2(1-&#x03BB;x)]</span> [uniform]<br>
+            <span class="hi">d&#x2082;=900T[(x-1)+&#x221A;((x-1)&#xB2;+8kIx/cT)]</span><br>
+            <span class="hi">PF=(1-P)/(1-&#x03BB;)</span>, P=0.33 (Arr.Type 3)<br>
+            <span style="color:#2a4060">k=0.5 pre-timed | I=1.0 isolated | T=0.25hr</span><br><br>
+              C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br>
+              &#x03BB;_avg: <span class="hig" id="w-lam">--</span> &nbsp; x_avg: <span class="hiy" id="w-x">--</span><br>
+              d&#x2081;_avg: <span class="hio" id="w-d1">--</span>s &nbsp; d&#x2082;_avg: <span class="hio" id="w-d2">--</span>s<br>
+              d_avg: <span class="hir" id="w-d">--</span> s/veh &nbsp; Max d: <span class="hir" id="w-dmax">--</span>s
+          </div>
+        </div>
+      </details>
+    </div>
+</div>
+
+<div class="fp" id="fp-signals">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x1F6A6; Real-Time Signal States</div>
+      <div class="fp-close" onclick="toggleFP('fp-signals','fpbtn-signals')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><details class="csec" open>
+        <summary>&#x1F6A6; Real-Time Signal States <span class="csec-badge live">LIVE · 1s</span></summary>
+        <div class="csec-body" style="padding:6px">
+          <!-- Big real-time countdown clocks per junction -->
+          <div id="sigpanel-rt" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x23F1; Timing &amp; Phase Detail</summary>
+        <div class="csec-body" style="padding:4px" id="sigpanel-timing"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F504; Full Signal Panel</summary>
+        <div class="csec-body" style="padding:4px">
+          <div id="sigpanel"></div>
+        </div>
+      </details>
+    </div>
+</div>
+
+<div class="fp" id="fp-lwr">
+    <div class="fp-hdr">
+      <div class="fp-hdr-title">&#x1F300; LWR + CTM Analysis</div>
+      <div class="fp-close" onclick="toggleFP('fp-lwr','fpbtn-lwr')">&#x2715;</div>
+    </div>
+    <div class="fp-inner"><div class="sec">
+        <div class="stitle">&#x1F300; LWR + CTM Hybrid Model</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">LWR PDE:</span> &#x2202;k/&#x2202;t + &#x2202;q/&#x2202;x = 0<br>
+          <span class="hi">Greenshields FD:</span> v = v_f(1&#x2212;k/k_j)<br>
+          <span class="hi">Shock speed:</span> w = (q_A&#x2212;q_B)/(k_A&#x2212;k_B)<br>
+          <span class="hi">CTM Sending:</span> &#x394;(x) = min(q_c, v_f&#x22C5;k)<br>
+          <span class="hi">CTM Receiving:</span> &#x3A3;(x) = min(q_c, w&#x22C5;(k_j&#x2212;k))<br>
+          <span class="hi">CTM Flow:</span> q = min(&#x394;_i, &#x3A3;_{i+1})<br><br>
+            v_f = 60 km/h | k_j = 120 veh/km<br>
+            q_c = 1800 veh/hr/ln | cells = 5/link<br><br>
+          <span class="hi">Active shock fronts:</span> <span class="hiy" id="lwr-shocks">--</span><br>
+          <span class="hi">Max |w|:</span> <span class="hir" id="lwr-maxw">--</span> km/h<br>
+          <span class="hi">Avg density:</span> <span class="hio" id="lwr-avgk">--</span> veh/km<br>
+          <span class="hi">Network LOS:</span> <span id="lwr-los">--</span><br>
+          <span class="hi">CTM bottleneck:</span> <span id="ctm-btn" class="hiy">--</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4C8; Density-Flow Diagram (q-k)</div>
+        <canvas id="lwrcanv"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
+            Greenshields parabola | dots = current junction states
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x26A1; LWR/CTM Edge Table</div>
+        <div id="lwr-table-wrap" style="overflow-y:auto;max-height:200px">
+          <table class="lptbl" id="lwr-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">Link</th>
+                <th>k_A</th>
+                <th>k_B</th>
+                <th>w km/h</th>
+                <th>CTM LOS</th>
+              </tr>
+            </thead>
+            <tbody id="lwr-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4A7; Robertson Platoon Dispersion</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">Model:</span> q_d(t) = F&#x22C5;q_d(t&#x2212;1) + (1&#x2212;F)&#x22C5;q_u(t&#x2212;t_0)<br>
+          <span class="hi">F:</span> 1/(1 + &#x3B2;&#x22C5;t_0),  &#x3B2; = 0.8 (Robertson 1969)<br>
+          <span class="hi">&#x3C6;:</span> Progression factor &#x2248; 1 &#x2212; F<br>
+          <span class="hi">Delay corr.:</span> 1 &#x2212; 0.5&#x22C5;&#x3C6; (range 0.5&#x2013;1.0)<br><br>
+          <span id="platoon-summary" style="color:#4a7090">Loading...</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x26A1; SCOOT Adaptive Cycle</div>
+        <div id="scoot-table-wrap" style="overflow-y:auto;max-height:180px">
+          <table class="lptbl" id="scoot-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">Junction</th>
+                <th>C_opt</th>
+                <th>C_rec</th>
+                <th>Y</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="scoot-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F6E2; Network PI + MC Sensitivity</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">HCM PI = &#x3B1;&#x22C5;&#x2211;d_i&#x22C5;q_i + &#x3B2;&#x22C5;&#x2211;s_i&#x22C5;q_i</span><br>
+          <span class="hi">PI total:</span> <span id="pi-total" class="hir">--</span>
+            &nbsp; <span class="hi">Fuel:</span> <span id="pi-fuel" class="hio">--</span> L/hr
+            &nbsp; <span class="hi">CO&#x2082;:</span> <span id="pi-co2" class="hip">--</span> kg/hr<br>
+          <hr style="border-color:#0d2040;margin:5px 0">
+          <span class="hi">MC Sensitivity (&#x3C3;=15%, n=200):</span><br>
+          <span class="hi">Mean obj:</span> <span id="mc-obj" style="color:var(--cyan)">--</span>
+            &nbsp; <span class="hi">&#x3C3;:</span> <span id="mc-std" class="hiy">--</span><br>
+          <span class="hi">P95 delay:</span> <span id="mc-p95" class="hir">--</span>s/veh
+            &nbsp; <span class="hi">Mean:</span> <span id="mc-avg" class="hio">--</span>s/veh<br>
+          <span class="hi">Most sensitive:</span> <span id="mc-sens" style="color:var(--yellow)">--</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4CA; Algorithm Radar (5-Metric)</div>
+        <canvas id="radar-canv" style="display:block;width:100%!important;height:160px!important;margin-top:4px"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
+            GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
+        </div>
+      </div>
+    </div>
+</div>
   </div>
+
 <div id="statusbar">
   <div class="sb">&#x1F551; <span id="sbt" class="sbv">00:00:00</span></div>
   <div class="sb">ALGO <span id="sba" class="sbv">GW+LP+EVP</span></div>
