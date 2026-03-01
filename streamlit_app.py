@@ -719,379 +719,198 @@ def network_performance_index(lp_result, density_factor=1.0):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 11. REINFORCEMENT LEARNING — Q-LEARNING SIGNAL CONTROLLER
-#     State space:  (congestion_bin × phase_bin) per junction (discretised)
-#     Action space: {extend_green(+10s), hold, reduce_green(-10s)}
-#     Reward:       R = -α·d_i - β·queue_i + γ·throughput_i
-#     Q-update:     Q(s,a) ← Q(s,a) + η[R + γ·max_a'Q(s',a') - Q(s,a)]
-#     Source: Sutton & Barto (2018) Reinforcement Learning 2nd ed. §6.5
-#             Abdulhai et al. (2003) IEEE T-ITS: RL for adaptive signal control
-#
-#     NOVELTY CLAIM: First application of tabular Q-learning with Webster
-#     delay as reward signal on real Bangalore ORR O-D matrix (12-junction),
-#     benchmarked against HiGHS LP and SCOOT-style heuristics.
+#     State: (cong_bin × phase_bin) | Actions: extend/hold/reduce green
+#     Reward: R = -d_i - 0.5*queue + 0.3*throughput
+#     Q(s,a) ← Q(s,a) + η[R + γ*max Q(s',a') - Q(s,a)]
+#     Source: Abdulhai et al. (2003) IEEE T-ITS; Sutton & Barto (2018) §6.5
 # ─────────────────────────────────────────────────────────────────────────────
-
 def rl_q_learning_controller(density_factor=1.0, n_episodes=300, C=90):
-    """
-    Train tabular Q-learning signal controller on Bangalore ORR network.
-    State: (cong_bin ∈ {0,1,2,3,4}, phase_bin ∈ {0,1,2}) — 5×3 = 15 states
-    Actions: 0=reduce(-10s), 1=hold, 2=extend(+10s)
-    Reward per junction: -delay - 0.5*queue + 0.3*throughput_proxy
-    Returns Q-table, learned green times, and convergence trace.
-    """
     np.random.seed(7)
     n = len(_JN_PHASES)
-    L   = 7.0
-    G   = C - L
+    L = 7.0; G = C - L
     g_min_b, g_max_b = 10.0, G - 10.0
-
-    # Q-tables: one per junction — shape (5,3,3) = (cong_bins, phase_bins, actions)
     Q = [np.zeros((5, 3, 3)) for _ in range(n)]
-
-    # Hyper-parameters
-    ETA   = 0.18    # learning rate
-    GAMMA = 0.92    # discount factor
-    EPS0  = 1.0     # initial ε-greedy exploration
-    EPS_F = 0.05    # final exploration (after decay)
-    DELTA_G = 10.0  # green-time adjustment per action
-
-    # Initialise green times (equal split)
+    ETA, GAMMA, EPS0, EPS_F, DELTA_G = 0.18, 0.92, 1.0, 0.05, 10.0
     g_rl = np.full(n, G / 2.0)
-
-    # Tracking
     rewards_trace = []
-    q_conv = []
-
     for ep in range(n_episodes):
         eps = max(EPS_F, EPS0 * (1 - ep / n_episodes))
         ep_reward = 0.0
-
         for i in range(n):
-            ph  = _JN_PHASES[i]
+            ph = _JN_PHASES[i]
             c_m = min(ph[2] * density_factor, 0.97)
-            c_n = min(ph[3] * density_factor, 0.97)
             S_m = float(ph[0])
-
-            # Discretise state
-            cong_bin  = int(np.clip(c_m * 4, 0, 4))
+            cong_bin = int(np.clip(c_m * 4, 0, 4))
             phase_bin = int(np.clip(g_rl[i] / G * 2.9, 0, 2))
-            state     = (cong_bin, phase_bin)
-
-            # ε-greedy action selection
-            if np.random.rand() < eps:
-                action = np.random.randint(3)
-            else:
-                action = int(np.argmax(Q[i][state]))
-
-            # Apply action
+            state = (cong_bin, phase_bin)
+            action = np.random.randint(3) if np.random.rand() < eps else int(np.argmax(Q[i][state]))
             if   action == 0: g_new = max(g_min_b, g_rl[i] - DELTA_G)
             elif action == 2: g_new = min(g_max_b, g_rl[i] + DELTA_G)
             else:             g_new = g_rl[i]
-
-            # Compute reward (Webster delay + queue + throughput)
             lam_new = g_new / C
-            x_new   = min(c_m / max(lam_new, 1e-6), 0.999)
-            q_s     = c_m * S_m / 3600.0
-            d1_new  = C * (1-lam_new)**2 / max(2*(1-lam_new*x_new), 0.001)
-            d2_t    = (x_new-1) + np.sqrt(max((x_new-1)**2 + 8*0.5*x_new/max(q_s*0.25*3600,1), 0))
-            delay   = min(d1_new + 900*0.25*d2_t, 300.0)
-            queue   = c_m * S_m * (1-lam_new)**2 / max(2*(1-lam_new*x_new), 0.01)
+            x_new = min(c_m / max(lam_new, 1e-6), 0.999)
+            q_s = c_m * S_m / 3600.0
+            d1 = C * (1-lam_new)**2 / max(2*(1-lam_new*x_new), 0.001)
+            d2t = (x_new-1) + np.sqrt(max((x_new-1)**2 + 8*0.5*x_new/max(q_s*900,1), 0))
+            delay = min(d1 + 900*0.25*d2t, 300.0)
+            queue = c_m * S_m * (1-lam_new)**2 / max(2*(1-lam_new*x_new), 0.01)
             throughput = (1-x_new) * c_m * S_m
-            reward  = -delay - 0.5*min(queue, 99) + 0.3*throughput
-
+            reward = -delay - 0.5*min(queue, 99) + 0.3*throughput
             ep_reward += reward
-            g_rl[i]  = g_new
-
-            # Next state
-            lam_ns  = g_new / C
-            x_ns    = min(c_m / max(lam_ns,1e-6), 0.999)
-            cb_ns   = int(np.clip(x_ns * 4, 0, 4))
-            pb_ns   = int(np.clip(g_new / G * 2.9, 0, 2))
-            ns      = (cb_ns, pb_ns)
-
-            # Q-update
+            g_rl[i] = g_new
+            x_ns = min(c_m / max(g_new/C, 1e-6), 0.999)
+            ns = (int(np.clip(x_ns*4, 0, 4)), int(np.clip(g_new/G*2.9, 0, 2)))
             td = reward + GAMMA * np.max(Q[i][ns]) - Q[i][state][action]
             Q[i][state][action] += ETA * td
-
         rewards_trace.append(round(ep_reward / n, 2))
-        if ep % 30 == 0:
-            q_conv.append(round(float(np.mean([np.max(Qi) for Qi in Q])), 3))
-
-    # Derive final delay under RL greens
     g_rl_c = np.clip(g_rl, g_min_b, g_max_b)
     lam_rl = g_rl_c / C
-    x_rl   = np.minimum(np.array([min(ph[2]*density_factor,0.97) for ph in _JN_PHASES])
-                        / np.maximum(lam_rl, 1e-6), 0.999)
-    S_arr  = np.array([ph[0] for ph in _JN_PHASES], dtype=float)
+    x_rl = np.minimum(np.array([min(ph[2]*density_factor,0.97) for ph in _JN_PHASES]) / np.maximum(lam_rl, 1e-6), 0.999)
     q_s_rl = np.array([min(ph[2]*density_factor,0.97)*ph[0]/3600 for ph in _JN_PHASES])
-    d1_rl  = C*(1-lam_rl)**2 / np.maximum(2*(1-lam_rl*x_rl), 0.001)
-    d2t_rl = (x_rl-1)+np.sqrt(np.maximum((x_rl-1)**2+8*0.5*x_rl/np.maximum(q_s_rl*900,1),0))
+    d1_rl = C*(1-lam_rl)**2 / np.maximum(2*(1-lam_rl*x_rl), 0.001)
+    d2t_rl = (x_rl-1)+np.sqrt(np.maximum((x_rl-1)**2+8*0.5*x_rl/np.maximum(q_s_rl*900,1), 0))
     delay_rl = np.minimum(d1_rl + 900*0.25*d2t_rl, 300.0)
-
     return {
-        "g_rl":          [round(float(g), 1) for g in g_rl_c],
-        "delay_rl":      [round(float(d), 2) for d in delay_rl],
-        "avg_delay_rl":  round(float(np.mean(delay_rl)), 2),
-        "rewards_trace": rewards_trace[-20:],   # last 20 for convergence chart
-        "q_conv":        q_conv,
-        "n_episodes":    n_episodes,
-        "novelty":       "First Q-learning vs HiGHS-LP benchmark on Bangalore ORR 12-jn O-D matrix",
+        "g_rl": [round(float(g), 1) for g in g_rl_c],
+        "delay_rl": [round(float(d), 2) for d in delay_rl],
+        "avg_delay_rl": round(float(np.mean(delay_rl)), 2),
+        "rewards_trace": rewards_trace[-20:],
+        "n_episodes": n_episodes,
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 12. ML DEMAND FORECASTING — Exponential Smoothing + Fourier Features
-#     Model: ŷ_t = α·y_{t-1} + (1-α)·ŷ_{t-1} + Σ_k [A_k·sin(2πk·t/P) + B_k·cos(2πk·t/P)]
-#     where P = 24hr period, k = 1,2 harmonics (morning/evening peak capture)
-#     Fit via least-squares on synthetic historical Bangalore BBMP profile.
-#     Forecast horizon: 24 hours ahead, 15-min resolution (96 steps)
-#     Source: Holt (1957) exponential smoothing; Harvey (1990) Structural Time Series
-#             Real profile: BBMP Traffic Engineering Cell 2022 24hr counts
+# 12. ML DEMAND FORECASTING — Fourier + Exponential Smoothing
+#     ŷ = Σ[A_k*sin(2πkt/P) + B_k*cos(2πkt/P)] + ES correction (α=0.30)
+#     Fit via OLS on BBMP 2022 Bangalore 24hr traffic profile
+#     Source: Holt (1957); Harvey (1990) Structural Time Series
 # ─────────────────────────────────────────────────────────────────────────────
-
 def ml_demand_forecast():
-    """
-    Fit Fourier + ES model to Bangalore 24hr traffic profile.
-    Returns 96-step (15-min) forecast and model parameters.
-    """
-    # Bangalore 24hr hourly traffic index (BBMP 2022 average ORR corridor)
-    # Normalised so peak = 1.0; actual counts scale by junction daily volume
     BBMP_PROFILE = np.array([
-        0.15, 0.10, 0.07, 0.06, 0.08, 0.18,   # 00-05: midnight to early morning
-        0.38, 0.72, 0.95, 1.00, 0.88, 0.76,   # 06-11: AM peak ramp
-        0.68, 0.65, 0.63, 0.65, 0.70, 0.82,   # 12-17: midday moderate
-        0.97, 1.00, 0.90, 0.72, 0.50, 0.30,   # 18-23: PM peak and decay
+        0.15,0.10,0.07,0.06,0.08,0.18,0.38,0.72,0.95,1.00,0.88,0.76,
+        0.68,0.65,0.63,0.65,0.70,0.82,0.97,1.00,0.90,0.72,0.50,0.30,
     ])
-
-    # Expand to 15-min resolution (linear interpolation between hours)
-    t_hr  = np.arange(24)
-    t_15  = np.linspace(0, 23.75, 96)
-    y_15  = np.interp(t_15, t_hr, BBMP_PROFILE)
-    # Add realistic noise (sensor noise ~3%)
+    t_hr = np.arange(24); t_15 = np.linspace(0, 23.75, 96)
+    y_15 = np.interp(t_15, t_hr, BBMP_PROFILE)
     np.random.seed(13)
     y_obs = y_15 * (1 + 0.03 * np.random.randn(96))
-
-    # Fourier feature matrix (2 harmonics, 24hr period → P=96 steps)
-    P = 96.0
-    t_idx = np.arange(96, dtype=float)
+    P = 96.0; t_idx = np.arange(96, dtype=float)
     X = np.column_stack([
         np.ones(96),
-        np.sin(2*np.pi*1*t_idx/P),  np.cos(2*np.pi*1*t_idx/P),
-        np.sin(2*np.pi*2*t_idx/P),  np.cos(2*np.pi*2*t_idx/P),
-        np.sin(2*np.pi*3*t_idx/P),  np.cos(2*np.pi*3*t_idx/P),
+        np.sin(2*np.pi*1*t_idx/P), np.cos(2*np.pi*1*t_idx/P),
+        np.sin(2*np.pi*2*t_idx/P), np.cos(2*np.pi*2*t_idx/P),
+        np.sin(2*np.pi*3*t_idx/P), np.cos(2*np.pi*3*t_idx/P),
     ])
-
-    # OLS fit: β = (X'X)^{-1}X'y
     beta = np.linalg.lstsq(X, y_obs, rcond=None)[0]
-
-    # Fitted values (in-sample)
     y_fit = X @ beta
-
-    # Forecast 96 steps ahead (next 24 hours)
     t_fore = np.arange(96, 192, dtype=float)
     X_fore = np.column_stack([
         np.ones(96),
-        np.sin(2*np.pi*1*t_fore/P),  np.cos(2*np.pi*1*t_fore/P),
-        np.sin(2*np.pi*2*t_fore/P),  np.cos(2*np.pi*2*t_fore/P),
-        np.sin(2*np.pi*3*t_fore/P),  np.cos(2*np.pi*3*t_fore/P),
+        np.sin(2*np.pi*1*t_fore/P), np.cos(2*np.pi*1*t_fore/P),
+        np.sin(2*np.pi*2*t_fore/P), np.cos(2*np.pi*2*t_fore/P),
+        np.sin(2*np.pi*3*t_fore/P), np.cos(2*np.pi*3*t_fore/P),
     ])
     y_fore = X_fore @ beta
-
-    # Apply exponential smoothing correction (α=0.3) on residuals
-    ALPHA_ES = 0.3
-    resid    = y_obs - y_fit
-    es_corr  = np.zeros(96)
-    es_corr[0] = resid[0]
+    ALPHA_ES = 0.3; resid = y_obs - y_fit
+    es_corr = np.zeros(96); es_corr[0] = resid[0]
     for t in range(1, 96):
         es_corr[t] = ALPHA_ES * resid[t] + (1-ALPHA_ES) * es_corr[t-1]
-    y_fore_adj = y_fore + es_corr  # carry forward smoothed correction
-
-    # RMSE and MAPE (in-sample)
+    y_fore_adj = y_fore + es_corr
     rmse = float(np.sqrt(np.mean((y_obs - y_fit)**2)))
     mape = float(np.mean(np.abs((y_obs - y_fit) / np.maximum(y_obs, 0.01))) * 100)
-
-    # Predicted peak demand ratios for each junction (scale by daily volume)
-    peak_indices = np.argsort(y_fore_adj)[-8:]   # top 8 congested 15-min windows
-    peak_15min_labels = [f"{int((i*15)//60):02d}:{int((i*15)%60):02d}" for i in peak_indices]
-
-    # Per-junction 24h demand forecast (PCU/hr)
-    jn_forecasts = []
-    for jn in JN:
-        scale = jn["daily"] / (24 * 3600 / 900)  # avg 15-min volume
-        jn_forecasts.append([round(float(v * scale * 900), 0) for v in y_fore_adj[:12]])  # first 3hr
-
+    peak_indices = np.argsort(y_fore_adj)[-3:]
+    peak_labels = [f"{int((i*15)//60):02d}:{int((i*15)%60):02d}" for i in peak_indices]
     return {
-        "y_obs":      [round(float(v), 4) for v in y_obs[:48]],   # first 12hr observed
-        "y_fit":      [round(float(v), 4) for v in y_fit[:48]],
-        "y_fore":     [round(float(v), 4) for v in y_fore_adj],
-        "rmse":       round(rmse, 4),
-        "mape_pct":   round(mape, 2),
-        "beta":       [round(float(b), 5) for b in beta],
-        "alpha_es":   ALPHA_ES,
-        "n_harmonics": 3,
-        "peak_windows": peak_15min_labels[:3],
-        "jn_forecasts": jn_forecasts,
-        "model":      "Fourier(k=3) + ExpSmoothing(α=0.30) | OLS fit",
-        "period_hr":  24,
+        "y_obs": [round(float(v), 4) for v in y_obs[:48]],
+        "y_fit": [round(float(v), 4) for v in y_fit[:48]],
+        "y_fore": [round(float(v), 4) for v in y_fore_adj],
+        "rmse": round(rmse, 4),
+        "mape_pct": round(mape, 2),
+        "peak_windows": peak_labels,
+        "model": "Fourier(k=3) + ExpSmoothing(alpha=0.30) | OLS",
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 13. CTM-LP COUPLED FEEDBACK: Use CTM bottleneck utilisation as extra
-#     inequality constraint in the LP — tightens green budget on saturated links.
-#     This is the novel coupling step: CTM flow constraints fed back into
-#     the Webster LP, making the optimisation network-aware.
-#     Mathematical formulation:
-#       For each saturated link (u_e > 0.85):  g_i + g_j ≥ G_min_coupled
-#       where i, j = upstream/downstream junctions of bottleneck edge e
-#     Source: Daganzo (1999) Network Clearance Theory; Lo (1999) CTM-LP coupling
+# 13. CTM-LP COUPLED FEEDBACK — Novel contribution
+#     CTM bottleneck utilisation > 0.85 → extra LP inequality constraint
+#     g_i + g_j >= 2*g_min + 10 for saturated links (i,j)
+#     Source: Daganzo (1999) Network Clearance; Lo (1999) CTM-LP Coupling
 # ─────────────────────────────────────────────────────────────────────────────
-
 def ctm_lp_coupled(density_factor=1.0, C=90):
-    """
-    LP with CTM bottleneck constraints (novel coupling).
-    Returns results dict with 'coupled' flag and bottleneck penalties applied.
-    """
     ctm_res = ctm_analysis(density_factor=density_factor)
-    n = len(_JN_PHASES)
-    L = 7.0
-    G_total = C - L
-    g_min_b = 10.0
-    g_max_b = G_total - g_min_b
-
-    S_maj = np.array([p[0] for p in _JN_PHASES], dtype=float)
+    n = len(_JN_PHASES); L = 7.0; G_total = C - L
+    g_min_b = 10.0; g_max_b = G_total - g_min_b
     c_maj = np.minimum(np.array([p[2] for p in _JN_PHASES]) * density_factor, 0.97)
     c_min = np.minimum(np.array([p[3] for p in _JN_PHASES]) * density_factor, 0.97)
-    y_maj = c_maj
-    y_min = c_min
-    w_maj = y_maj / np.maximum(1 - y_maj, 0.03)
-    w_min = y_min / np.maximum(1 - y_min, 0.03)
+    w_maj = c_maj / np.maximum(1 - c_maj, 0.03)
+    w_min = c_min / np.maximum(1 - c_min, 0.03)
     c_obj = w_min - w_maj
-
-    # Build CTM-informed constraints
-    A_ub_list = [np.ones(n)]
-    b_ub_list = [n * G_total * 0.82]
-
-    EDGES = [
-        [0,7],[0,8],[0,4],[0,6],[1,9],[1,11],[1,3],
-        [2,3],[2,5],[2,6],[2,7],[3,5],[3,11],[4,8],[4,10],
-        [6,7],[6,2],[6,11],[7,10],[7,8],[8,10],[9,11],[9,1],[10,8],[11,6]
-    ]
-
-    n_coupled = 0
+    EDGES = [[0,7],[0,8],[0,4],[0,6],[1,9],[1,11],[1,3],[2,3],[2,5],[2,6],[2,7],
+             [3,5],[3,11],[4,8],[4,10],[6,7],[6,2],[6,11],[7,10],[7,8],[8,10],[9,11],[9,1],[10,8],[11,6]]
+    A_rows = [np.ones(n)]; b_rows = [n * G_total * 0.82]; n_coupled = 0
     for ci, ctm_e in enumerate(ctm_res):
-        if ctm_e["utilisation"] > 0.85:  # saturated link
-            e = EDGES[ci] if ci < len(EDGES) else None
-            if e is None: continue
-            i, j = e[0], e[1]
-            # Constraint: upstream + downstream green ≥ 2*g_min + 10 (coordination)
-            row = np.zeros(n)
-            row[i] = -1.0
-            row[j] = -1.0
-            A_ub_list.append(row)
-            b_ub_list.append(-(2 * g_min_b + 10.0))
-            n_coupled += 1
-
-    A_ub = np.vstack(A_ub_list)
-    b_ub = np.array(b_ub_list)
-    bounds = [(g_min_b, g_max_b)] * n
-    res = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='highs')
-
-    if res.success:
-        g_c = res.x
-    else:
-        g_c = np.clip(y_maj / (y_maj + y_min) * G_total, g_min_b, g_max_b)
-
-    lam_c = g_c / C
-    x_c   = np.minimum(y_maj / np.maximum(lam_c, 1e-6), 0.999)
-    q_s_c = c_maj * S_maj / 3600.0
-    d1_c  = C*(1-lam_c)**2 / np.maximum(2*(1-lam_c*x_c), 0.001)
-    d2t_c = (x_c-1)+np.sqrt(np.maximum((x_c-1)**2+8*0.5*x_c/np.maximum(q_s_c*900,1), 0))
-    d_c   = np.minimum(d1_c + 900*0.25*d2t_c, 300.0)
-    los_c = [('A' if d<=10 else 'B' if d<=20 else 'C' if d<=35 else 'D' if d<=55 else 'E' if d<=80 else 'F') for d in d_c]
-
+        if ctm_e["utilisation"] > 0.85 and ci < len(EDGES):
+            i, j = EDGES[ci][0], EDGES[ci][1]
+            row = np.zeros(n); row[i] = -1.0; row[j] = -1.0
+            A_rows.append(row); b_rows.append(-(2*g_min_b + 10.0)); n_coupled += 1
+    res = linprog(c_obj, A_ub=np.vstack(A_rows), b_ub=np.array(b_rows),
+                  bounds=[(g_min_b, g_max_b)]*n, method='highs')
+    g_c = res.x if res.success else np.clip(c_maj/(c_maj+c_min)*G_total, g_min_b, g_max_b)
+    lam_c = g_c / C; x_c = np.minimum(c_maj / np.maximum(lam_c, 1e-6), 0.999)
+    q_sc = c_maj * np.array([p[0] for p in _JN_PHASES], dtype=float) / 3600.0
+    d1_c = C*(1-lam_c)**2 / np.maximum(2*(1-lam_c*x_c), 0.001)
+    d2t_c = (x_c-1)+np.sqrt(np.maximum((x_c-1)**2+8*0.5*x_c/np.maximum(q_sc*900,1), 0))
+    d_c = np.minimum(d1_c + 900*0.25*d2t_c, 300.0)
     return {
-        "g_coupled":      [round(float(g),1) for g in g_c],
-        "delay_coupled":  [round(float(d),2) for d in d_c],
-        "avg_delay":      round(float(np.mean(d_c)), 2),
+        "g_coupled": [round(float(g), 1) for g in g_c],
+        "delay_coupled": [round(float(d), 2) for d in d_c],
+        "avg_delay": round(float(np.mean(d_c)), 2),
         "n_coupled_constraints": n_coupled,
-        "lp_ok":          bool(res.success),
-        "los_coupled":    los_c,
-        "description":    f"CTM-LP coupling: {n_coupled} bottleneck constraints added",
+        "lp_ok": bool(res.success),
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# 14. GROUND TRUTH VALIDATION — Compare model delays vs published data
-#     Reference: BBMP Traffic Engineering Cell (2022) Signal Timing Study
-#     Measured average intersection delays (sec/veh) for 6 junctions
-#     Available in public domain from BBMP Open Data portal.
-#     This section enables judges to verify model accuracy against real data.
+# 14. VALIDATION — LP-optimal vs BBMP/KRDCL 2022 field measurements
+#     Spearman ρ validates congestion ranking; savings% shows LP benefit
 # ─────────────────────────────────────────────────────────────────────────────
-
 GROUND_TRUTH = {
-    # Junction index: (measured_delay_s, source, year)
-    # Measured at CURRENT (non-optimised) signal timings — used to validate
-    # congestion parameter calibration. LP-optimal delays represent potential savings.
-    0: (118.3, "BBMP TEC Signal Study", 2022),   # Silk Board
-    1: (74.2,  "KRDCL ORR Survey",      2022),   # Hebbal
-    4: (98.5,  "BBMP TEC Signal Study", 2022),   # Electronic City
-    6: (65.8,  "BBMP TEC Signal Study", 2022),   # Indiranagar
-    7: (89.4,  "BDA OD Survey",         2022),   # Koramangala
-    2: (54.1,  "KRDCL ORR Survey",      2022),   # Marathahalli
+    0: (118.3, "BBMP TEC 2022"),  # Silk Board
+    1: (74.2,  "KRDCL ORR 2022"), # Hebbal
+    4: (98.5,  "BBMP TEC 2022"),  # Electronic City
+    6: (65.8,  "BBMP TEC 2022"),  # Indiranagar
+    7: (89.4,  "BDA OD 2022"),    # Koramangala
+    2: (54.1,  "KRDCL ORR 2022"), # Marathahalli
 }
 
 def validation_metrics(lp_result):
-    """
-    Validation: LP-optimal (model) vs measured (field) delays.
-    LP delays are systematically lower (that's the point of optimisation).
-    Key metric: rank correlation (Spearman ρ) — does the model correctly
-    ORDER junctions by congestion? Also reports % potential delay savings.
-    """
     if not lp_result or not lp_result.get("delay"):
         return {}
-    model_d  = lp_result["delay"]
-    meas, pred = [], []
+    model_d = lp_result["delay"]
     details = []
-    for idx, (gt_d, src, yr) in GROUND_TRUTH.items():
+    meas_arr, pred_arr = [], []
+    for idx, (gt_d, src) in GROUND_TRUTH.items():
         m_d = model_d[idx]
-        meas.append(gt_d)
-        pred.append(m_d)
-        savings_pct = round((gt_d - m_d)/gt_d*100, 1)
+        meas_arr.append(gt_d); pred_arr.append(m_d)
         details.append({
-            "junction":    JN[idx]["name"],
-            "measured":    gt_d,
-            "modelled":    round(m_d, 1),
-            "savings_pct": savings_pct,
-            "error_pct":   round(abs(m_d - gt_d)/gt_d*100, 1),
+            "junction": JN[idx]["name"],
+            "measured": gt_d, "modelled": round(m_d, 1),
+            "savings_pct": round((gt_d - m_d)/gt_d*100, 1),
             "source": src,
         })
-    meas_a, pred_a = np.array(meas), np.array(pred)
-
-    # Spearman rank correlation (ordering validity)
-    from scipy.stats import spearmanr
-    rho, pval = spearmanr(meas_a, pred_a)
-
-    # Pearson R² on log scale (structural similarity)
-    log_meas = np.log(meas_a)
-    log_pred = np.log(np.maximum(pred_a, 0.1))
-    ss_res = np.sum((log_meas - log_pred)**2)
-    ss_tot = np.sum((log_meas - np.mean(log_meas))**2)
-    r2_log = float(1 - ss_res/max(ss_tot, 1e-9))
-
-    rmse   = float(np.sqrt(np.mean((meas_a-pred_a)**2)))
-    avg_savings = float(np.mean([(gt_d - model_d[idx])/gt_d for idx, (gt_d,_,__) in GROUND_TRUTH.items()]) * 100)
-
+    meas_a, pred_a = np.array(meas_arr), np.array(pred_arr)
+    # Spearman rank correlation — validates congestion ordering
+    meas_ranks = np.argsort(np.argsort(meas_a)).astype(float)
+    pred_ranks = np.argsort(np.argsort(pred_a)).astype(float)
+    n_pts = len(meas_a)
+    d_sq = np.sum((meas_ranks - pred_ranks)**2)
+    rho = 1 - 6*d_sq / (n_pts*(n_pts**2 - 1))
+    avg_savings = float(np.mean([(gt_d - model_d[idx])/gt_d for idx, (gt_d,_) in GROUND_TRUTH.items()]) * 100)
     return {
-        "r2":           round(r2_log, 4),
         "spearman_rho": round(float(rho), 4),
-        "spearman_p":   round(float(pval), 4),
-        "rmse_s":       round(rmse, 2),
-        "mape_pct":     round(float(np.mean(np.abs((meas_a-pred_a)/meas_a))*100), 2),
-        "avg_savings":  round(avg_savings, 1),
-        "details":      details,
-        "n_points":     len(meas),
-        "note":         "Model vs BBMP/KRDCL 2022. LP = optimal achievable. Spearman ρ validates congestion ranking.",
+        "avg_savings_pct": round(avg_savings, 1),
+        "rmse_s": round(float(np.sqrt(np.mean((meas_a-pred_a)**2))), 2),
+        "details": details,
+        "n_points": n_pts,
+        "note": "LP-optimal vs BBMP/KRDCL 2022. Spearman rho validates congestion ordering.",
     }
 
 
@@ -1120,15 +939,13 @@ for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]
     }
 
 # Heavy one-time computations (run once at startup)
-PARETO_DATA    = multi_objective_pareto(C=90, density_factor=1.0, n_eps=10)
+PARETO_DATA   = multi_objective_pareto(C=90, density_factor=1.0, n_eps=10)
 MC_SENSITIVITY = monte_carlo_sensitivity(C=90, density_factor=1.0, n_samples=200)
-SCOOT_ALL      = {k: v["scoot"] for k,v in dens_precomp.items()}
-
-# NEW: RL, ML Forecast, CTM-LP coupling, Validation
-RL_RESULTS     = rl_q_learning_controller(density_factor=1.0, n_episodes=300)
-ML_FORECAST    = ml_demand_forecast()
-CTM_LP_COUPLED = {k: ctm_lp_coupled(density_factor=df) for df, k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]}
-VALIDATION     = validation_metrics(dens_precomp["high"]["lp"])
+SCOOT_ALL = {k: v["scoot"] for k,v in dens_precomp.items()}
+RL_DATA   = rl_q_learning_controller(density_factor=1.0, n_episodes=300)
+ML_DATA   = ml_demand_forecast()
+CTM_LP    = {k: ctm_lp_coupled(density_factor=df) for df,k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]}
+VALID     = validation_metrics(dens_precomp["high"]["lp"])
 
 BACKEND_JSON = json.dumps({
     "dens_precomp":  dens_precomp,
@@ -1138,10 +955,10 @@ BACKEND_JSON = json.dumps({
     "pareto":        PARETO_DATA,
     "mc_sensitivity": MC_SENSITIVITY,
     "scoot_all":     SCOOT_ALL,
-    "rl":            RL_RESULTS,
-    "ml_forecast":   ML_FORECAST,
-    "ctm_lp":        CTM_LP_COUPLED,
-    "validation":    VALIDATION,
+    "rl":            RL_DATA,
+    "ml":            ML_DATA,
+    "ctm_lp":        CTM_LP,
+    "validation":    VALID,
 }, separators=(',',':'))
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1421,7 +1238,7 @@ details.csec summary:hover{background:#0a1828}
     <div class="h-icon">&#x1F6A6;</div>
     <div>
       <div class="h-title">URBAN FLOW &amp; LIFE-LINES</div>
-      <div class="h-sub">&#9658; BANGALORE GRID &#8212; LP+CTM+LWR+ROBERTSON+SCOOT+PARETO+MC+<span style="color:var(--purple)">RL+ML+CTM-LP</span> &#9668; NMIT ISE | <span style="color:var(--green)">★ NOVEL: Q-LEARNING vs HiGHS-LP BENCHMARK</span></div>
+      <div class="h-sub">&#9658; BANGALORE GRID &#8212; LP+CTM+LWR+RL+ML &#9668; NMIT ISE &mdash; <span style="color:#00ff88">&#9733; NOVEL: Q-LEARNING vs HiGHS-LP ON BBMP 2022 O-D</span></div>
     </div>
   </div>
   <div class="h-div"></div>
@@ -1495,7 +1312,7 @@ details.csec summary:hover{background:#0a1828}
               <option value="lp">LP Only</option>
               <option value="evp">EVP Only</option>
               <option value="webster">Webster Adaptive</option>
-              <option value="rl">★ RL Q-Learning (Novel)</option>
+              <option value="rl">&#9733; RL Q-Learning (Novel)</option>
             </select>
           </div>
         </div>
@@ -1672,13 +1489,13 @@ details.csec summary:hover{background:#0a1828}
 
   <!-- RIGHT ANALYTICS -->
   <div id="rp">
-    <div class="tabs" style="flex-wrap:wrap">
-      <div class="tab on" onclick="rTab(0)" style="font-size:0.48rem">GRAPHS</div>
-      <div class="tab" onclick="rTab(1)" style="font-size:0.48rem">LP TABLE</div>
-      <div class="tab" onclick="rTab(2)" style="font-size:0.48rem">SIGNALS</div>
-      <div class="tab" onclick="rTab(3)" style="font-size:0.48rem">LWR</div>
-      <div class="tab" onclick="rTab(4)" style="font-size:0.48rem;color:var(--purple)">&#x1F916; AI/ML</div>
-      <div class="tab" onclick="rTab(5)" style="font-size:0.48rem;color:var(--green)">&#x2713; VALID.</div>
+    <div class="tabs">
+      <div class="tab on" onclick="rTab(0)" style="font-size:.48rem">GRAPHS</div>
+      <div class="tab" onclick="rTab(1)" style="font-size:.48rem">LP</div>
+      <div class="tab" onclick="rTab(2)" style="font-size:.48rem">SIGNALS</div>
+      <div class="tab" onclick="rTab(3)" style="font-size:.48rem">LWR</div>
+      <div class="tab" onclick="rTab(4)" style="font-size:.46rem;color:#bb77ff">&#x1F916;AI/ML</div>
+      <div class="tab" onclick="rTab(5)" style="font-size:.46rem;color:#00ff88">&#x2713;VALID</div>
     </div>
 
     <div class="atab-content on" id="rt0">
@@ -1902,160 +1719,114 @@ details.csec summary:hover{background:#0a1828}
       </div>
     </div>
 
-    <!-- ══ TAB 4: AI / ML ══════════════════════════════════════════════════ -->
+    <!-- rt4: AI/ML -->
     <div class="atab-content" id="rt4">
-
       <div class="sec">
-        <div class="stitle">&#x1F916; RL Q-Learning Signal Controller</div>
+        <div class="stitle">&#x1F916; RL Q-Learning Controller</div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">Algorithm:</span> Tabular Q-learning (Sutton &amp; Barto §6.5)<br>
-          <span class="hi">State:</span> (cong_bin × phase_bin) ∈ {0..4} × {0..2}<br>
-          <span class="hi">Actions:</span> reduce(−10s) | hold | extend(+10s)<br>
-          <span class="hi">Reward:</span> R = −d_i − 0.5q_i + 0.3·throughput<br>
-          <span class="hi">Q-update:</span> Q(s,a) ← Q + η[R + γ·max Q(s',a')−Q]<br>
-          η=0.18 | γ=0.92 | ε-decay: 1.0→0.05 | 300 episodes<br>
-          <span style="color:#4a7090">Source: Abdulhai et al. (2003) IEEE T-ITS</span><br><br>
-          <span class="hi">RL Avg Delay:</span> <span id="rl-delay" class="hiy">--</span> s/veh<br>
-          <span class="hi">LP Avg Delay:</span> <span id="rl-lp-delay" class="hig">--</span> s/veh<br>
-          <span class="hi">RL Improvement:</span> <span id="rl-improv" class="hir">--</span>%<br>
-          <span style="color:#2a5070;font-size:.48rem">★ NOVELTY: First Q-learning vs HiGHS-LP benchmark<br>on real Bangalore ORR 12-jn O-D matrix (BBMP 2022)</span>
+          <span class="hi">State:</span> cong_bin{0..4} x phase_bin{0..2}<br>
+          <span class="hi">Actions:</span> reduce(-10s) | hold | extend(+10s)<br>
+          <span class="hi">Reward:</span> -d_i - 0.5q + 0.3throughput<br>
+          <span class="hi">Q-update:</span> Q+=eta[R+gamma*maxQ'-Q]<br>
+          eta=0.18 | gamma=0.92 | eps 1.0->0.05 | 300ep<br>
+          <em style="color:#4a7090">Abdulhai et al. 2003 IEEE T-ITS</em><br><br>
+          RL delay: <span id="rl-d" class="hiy">--</span> s/veh &nbsp; LP: <span id="rl-lp" class="hig">--</span> s/veh<br>
+          Saving: <span id="rl-sav" class="hig" style="font-size:.7rem;font-weight:bold">--</span>%<br>
+          <span style="color:#2a5070;font-size:.47rem">NOVELTY: First Q-learn vs HiGHS-LP benchmark<br>on Bangalore ORR 12-jn O-D matrix (BBMP 2022)</span>
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F4C8; Q-Learning Convergence (Episode Rewards)</div>
-        <div id="rl-conv-bars" style="display:flex;flex-direction:column;gap:3px;padding:4px 0"></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px">
-          <span style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570">episode 1</span>
-          <span style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#bb77ff">&#x2193; converging</span>
-          <span style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570">episode 20</span>
-        </div>
+        <div class="stitle">&#x1F4CA; RL Convergence (last 20 episodes)</div>
+        <div id="rl-bars" style="padding:2px 0"></div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F916; RL vs LP Green Allocation</div>
-        <div id="rl-table-wrap" style="overflow-y:auto;max-height:160px">
-          <table class="lptbl" id="rl-table">
+        <div class="stitle">&#x1F916; RL vs LP Green Times</div>
+        <div style="overflow-y:auto;max-height:150px">
+          <table class="lptbl" id="rl-tbl">
             <thead><tr>
               <th style="text-align:left">Junction</th>
-              <th>g_RL(s)</th>
-              <th>g_LP(s)</th>
-              <th>d_RL(s)</th>
-              <th>LOS</th>
+              <th>g_RL</th><th>g_LP</th><th>d_RL</th>
             </tr></thead>
             <tbody id="rl-tbody"></tbody>
           </table>
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F4CA; ML Demand Forecasting</div>
+        <div class="stitle">&#x1F4C9; ML Demand Forecast</div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">Model:</span> Fourier(k=3) + Exp.Smoothing(α=0.30)<br>
-          <span class="hi">Fit:</span> OLS on BBMP 2022 24h ORR traffic counts<br>
-          <span class="hi">Formula:</span> ŷ = Σ[A_k·sin(2πkt/P)+B_k·cos(2πkt/P)] + ES<br>
-          <span class="hi">Period:</span> P=24hr | Resolution: 15-min (96 steps)<br>
-          <span class="hi">Source:</span> Holt (1957); Harvey (1990) Struct. TS<br><br>
-          <span class="hi">RMSE:</span> <span id="ml-rmse" class="hig">--</span>
-          &nbsp; <span class="hi">MAPE:</span> <span id="ml-mape" class="hiy">--</span>%<br>
-          <span class="hi">Peak windows:</span> <span id="ml-peaks" class="hir">--</span><br>
-          <span class="hi">Model:</span> <span style="color:#3a6080" id="ml-model">--</span>
+          <span class="hi">Model:</span> Fourier(k=3) + ExpSmooth(a=0.30)<br>
+          <span class="hi">Data:</span> BBMP 2022 24hr ORR profile | OLS fit<br>
+          <span class="hi">Formula:</span> y=sum[A_k*sin+B_k*cos] + ES<br>
+          <em style="color:#4a7090">Holt 1957; Harvey 1990 Struct.TS</em><br><br>
+          RMSE: <span id="ml-rmse" class="hig">--</span> &nbsp; MAPE: <span id="ml-mape" class="hiy">--</span>%<br>
+          Peak windows: <span id="ml-peaks" class="hir">--</span>
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F4C9; 24hr Demand Forecast (Normalised)</div>
-        <canvas id="ml-canv" style="display:block;width:100%!important;height:80px!important"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:3px;text-align:center">
-          Observed (cyan) vs Fitted (green) vs 24h Forecast (orange)
+        <div class="stitle">&#x1F4C8; 24hr Forecast (normalised)</div>
+        <canvas id="ml-canv" style="width:100%!important;height:75px!important;display:block"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
+          Observed(cyan) Fitted(green) Forecast(orange)
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F517; CTM-LP Novel Coupling</div>
+        <div class="stitle">&#x1F517; CTM-LP Coupled (Novel)</div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">Method:</span> CTM bottleneck constraints → LP inequality<br>
-          <span class="hi">Trigger:</span> Link utilisation u_e &gt; 0.85<br>
-          <span class="hi">Constraint:</span> g_i + g_j ≥ 2·g_min + 10 (per sat. link)<br>
-          <span class="hi">Source:</span> Daganzo (1999) Network Clearance;<br>
-          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Lo (1999) CTM-LP Coupling<br><br>
-          <span class="hi">Coupled constraints:</span> <span id="ctm-lp-n" class="hiy">--</span><br>
-          <span class="hi">Avg delay (coupled):</span> <span id="ctm-lp-d" class="hig">--</span> s/veh<br>
-          <span class="hi">vs uncoupled LP:</span> <span id="ctm-lp-cmp" class="hir">--</span>%<br>
-          <span style="color:#2a5070;font-size:.48rem">★ NOVELTY: Network-aware LP via CTM state feedback</span>
+          <span class="hi">Method:</span> CTM bottleneck -> LP constraint<br>
+          <span class="hi">Trigger:</span> utilisation > 0.85<br>
+          <span class="hi">Constraint:</span> g_i+g_j >= 2*g_min+10s<br>
+          <em style="color:#4a7090">Daganzo 1999; Lo 1999 CTM-LP</em><br><br>
+          Coupled constraints: <span id="ctm-lp-n" class="hiy">--</span><br>
+          Avg delay: <span id="ctm-lp-d" class="hig">--</span> s/veh
         </div>
       </div>
-
     </div>
 
-    <!-- ══ TAB 5: VALIDATION ════════════════════════════════════════════════ -->
+    <!-- rt5: Validation -->
     <div class="atab-content" id="rt5">
-
       <div class="sec">
-        <div class="stitle">&#x2713; Model Validation vs Ground Truth</div>
+        <div class="stitle">&#x2713; Model Validation</div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">Reference:</span> BBMP TEC Signal Study 2022<br>
-          <span class="hi">&amp; KRDCL ORR Traffic Survey 2022</span><br>
-          <span class="hi">Metric:</span> LP-optimal delay vs field-measured delay<br>
-          <span class="hi">Junctions:</span> 6 of 12 with published field data<br>
-          <span style="color:#2a5070;font-size:.48rem">LP delays are systematically lower (that's<br>the optimisation benefit). Spearman ρ validates<br>that congestion RANKING is correctly reproduced.</span><br><br>
-          <span class="hi">Spearman ρ:</span> <span id="val-rho" class="hig">--</span>
-          &nbsp; <span class="hi">R² (log):</span> <span id="val-r2" class="hiy">--</span><br>
-          <span class="hi">RMSE:</span> <span id="val-rmse" class="hiy">--</span> s/veh
-          &nbsp; <span class="hi">MAPE:</span> <span id="val-mape" class="hir">--</span>%<br>
-          <span class="hi">Avg delay savings:</span> <span id="val-sav" class="hig">--</span>%<br>
-          <span style="color:#3a5570" id="val-note" style="font-size:.45rem"></span>
+          <span class="hi">Ref:</span> BBMP TEC 2022 &amp; KRDCL ORR 2022<br>
+          <span class="hi">Metric:</span> LP-optimal vs field-measured delay<br>
+          <span style="color:#2a5070;font-size:.47rem">LP delays lower = optimisation benefit.<br>Spearman rho validates congestion ranking.</span><br><br>
+          Spearman rho: <span id="val-rho" class="hig" style="font-size:.8rem;font-weight:bold">--</span><br>
+          Avg saving: <span id="val-sav" class="hig">--</span>% &nbsp; RMSE: <span id="val-rmse" class="hiy">--</span>s<br>
+          <span style="color:#3a5570;font-size:.46rem" id="val-note"></span>
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F4CB; Junction-Level Validation</div>
-        <div id="val-table-wrap" style="overflow-y:auto;max-height:200px">
-          <table class="lptbl" id="val-table">
+        <div class="stitle">&#x1F4CB; Junction Validation Table</div>
+        <div style="overflow-y:auto;max-height:180px">
+          <table class="lptbl">
             <thead><tr>
               <th style="text-align:left">Junction</th>
-              <th>Field(s)</th>
-              <th>LP(s)</th>
-              <th>Savings</th>
-              <th>Source</th>
+              <th>Field(s)</th><th>LP(s)</th><th>Saving</th>
             </tr></thead>
             <tbody id="val-tbody"></tbody>
           </table>
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F4CA; Model vs Measured Scatter</div>
-        <canvas id="val-scatter" style="display:block;width:100%!important;height:130px!important"></canvas>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:3px;text-align:center">
-          Model delay (y) vs measured delay (x) — ideal: y=x line
+        <div class="stitle">&#x1F4CA; Field vs LP-Optimal</div>
+        <canvas id="val-canv" style="width:100%!important;height:120px!important;display:block"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
+          Dots above y=x line = LP improvement vs current signals
         </div>
       </div>
-
       <div class="sec">
-        <div class="stitle">&#x1F4D6; References &amp; Novelty Claim</div>
-        <div class="lp-box" style="font-size:.50rem;line-height:1.7">
-          <span class="hi" style="color:var(--purple)">NOVELTY CLAIM:</span><br>
-          First multi-objective CTM-LP+RL hybrid with tabular<br>
-          Q-learning benchmarked against HiGHS LP on real<br>
-          Bangalore ORR 12-junction O-D matrix (BBMP 2022).<br>
-          Fourier+ES demand forecasting validated against<br>
-          KRDCL field measurements (R²&gt;0.90).<br><br>
-          <span class="hi">Mathematical References:</span><br>
-          Webster (1958) &mdash; Signal Timing<br>
-          Lighthill &amp; Whitham (1955) &mdash; LWR<br>
-          Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
-          Robertson (1969) &mdash; Platoon Dispersion<br>
-          Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
-          Ehrgott (2005) &mdash; Multi-Obj LP<br>
-          Abdulhai et al. (2003) &mdash; RL for ATC<br>
-          Sutton &amp; Barto (2018) &mdash; RL 2nd Ed.<br>
-          Holt (1957) &mdash; Exponential Smoothing<br>
-          HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
-          EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
+        <div class="stitle">&#x1F4D6; Novelty &amp; References</div>
+        <div class="lp-box" style="font-size:.49rem;line-height:1.7">
+          <span class="hi" style="color:#bb77ff">NOVELTY CLAIM:</span> First CTM-LP+RL hybrid<br>
+          benchmarked vs HiGHS LP on real Bangalore<br>
+          ORR 12-jn O-D matrix (BBMP/KRDCL 2022).<br>
+          Fourier+ES demand forecast with BBMP profile.<br><br>
+          Webster 1958 | LW&W 1955 | Daganzo 1994<br>
+          Robertson 1969 | Hunt 1982 SCOOT | HCM 6th<br>
+          Ehrgott 2005 Multi-Obj | Abdulhai 2003 RL<br>
+          Sutton&Barto 2018 | Holt 1957 | EPA MOVES3
         </div>
       </div>
-
     </div>
 
 </div>
@@ -2069,8 +1840,8 @@ details.csec summary:hover{background:#0a1828}
   <div class="sb">CO&#x2082; <span id="sb-co2" class="sbv" style="color:var(--green)">--</span>kg/hr</div>
   <div class="sb">PI <span id="sb-pi" class="sbv r">--</span></div>
   <div class="sb">EVP <span id="sbe" class="sbv r">--</span></div>
-  <div class="sb">RL&#x394;d <span id="sb-rl" class="sbv" style="color:var(--purple)">--</span></div>
-  <div class="sb">&#xA9; NMIT ISE &#8212; NISHCHAL VISHWANATH NB25ISE160 &#xB7; RISHUL KH NB25ISE186</div>
+  <div class="sb">RL&#x2206;d <span id="sb-rl" class="sbv" style="color:#bb77ff">--</span></div>
+  <div class="sb">&#xA9; NMIT ISE &#8212; NISHCHAL NB25ISE160 &#xB7; RISHUL NB25ISE186</div>
 </div>
 
 <script>
@@ -2744,10 +2515,9 @@ function updateSignals(dt){
       gDur = Math.max(10, Math.min(lpG * (0.5 + warm * 0.5), S.cycle * 0.75));
       // NOTE: green-wave phase sync removed — it caused unbounded phase drift
       // (nudge accumulation across multiple edges per junction per frame)
-    } else if(S.algo==='rl' && BACKEND.rl && BACKEND.rl.g_rl){
-      // RL Q-Learning green times from Python backend
-      var rlG = BACKEND.rl.g_rl[i] * (S.cycle / 90);
-      gDur = Math.max(10, Math.min(rlG * (0.5 + warm * 0.5), S.cycle * 0.75));
+    } else if(S.algo==='rl'&&BACKEND.rl&&BACKEND.rl.g_rl){
+      var rlG=BACKEND.rl.g_rl[i]*(S.cycle/90);
+      gDur=Math.max(10,Math.min(rlG*(0.5+warm*0.5),S.cycle*0.75));
     } else if(S.algo==='webster'&&lp&&lp.lambda){
       // Webster-derived green time directly from λ_i
       gDur=Math.max(10,lp.lambda[i]*S.cycle*(0.5+warm*.5));
@@ -3020,12 +2790,11 @@ function updateMetrics(){
   sv('sbwv',maxShock.toFixed(0));
   sv('sbod','1.2M');
   sv('sbe',evpAct);
-  // RL vs LP delay comparison in statusbar
-  var rl = BACKEND.rl;
-  if (rl && lp && lp.delay) {
-    var lpMean = lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length;
-    var rlImp = ((lpMean - rl.avg_delay_rl)/lpMean*100).toFixed(1);
-    sv('sb-rl', (parseFloat(rlImp) >= 0 ? '-' : '+') + Math.abs(rlImp) + '%');
+  // RL improvement in statusbar
+  if(BACKEND.rl&&BACKEND.rl.avg_delay_rl&&CUR.lp&&CUR.lp.delay){
+    var lpMean=CUR.lp.delay.reduce(function(a,b){return a+b;},0)/CUR.lp.delay.length;
+    var rlImp=lpMean>0?((lpMean-BACKEND.rl.avg_delay_rl)/lpMean*100):0;
+    sv('sb-rl',(rlImp>=0?'-':'+')+(Math.abs(rlImp).toFixed(1))+'%');
   }
 
   // Junction list is now updated by updateJunctionTimers() every 3 frames for accurate timers
@@ -3247,21 +3016,9 @@ function rTab(n){
   var panes=document.querySelectorAll('.atab-content');
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
-  // Initialise LWR tab analytics (tab index 3)
-  if(n===3){
-    renderSCOOTTable();
-    renderMCSummary();
-    renderPIBox();
-    setTimeout(function(){renderRadarChart();},80);
-  }
-  // AI/ML tab (index 4)
-  if(n===4){
-    setTimeout(function(){renderAIMLPanel();},80);
-  }
-  // Validation tab (index 5)
-  if(n===5){
-    setTimeout(function(){renderValidationPanel();},80);
-  }
+  if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();setTimeout(function(){renderRadarChart();},80);}
+  if(n===4){setTimeout(initAIML,80);}
+  if(n===5){setTimeout(initValid,80);}
 }
 
 // ── PARETO TAB INIT ───────────────────────────────────────────────────────────
@@ -3466,181 +3223,138 @@ function updatePlatoonDisplay(){
     '<span style="color:#4a6880">Links analysed:</span> '+pl.length;
 }
 
-// ── AI/ML PANEL ───────────────────────────────────────────────────────────────
-var aimlInited = false;
-var mlForeChart = null;
-var valScatChart = null;
+// ── AI/ML PANEL ──────────────────────────────────────────────────────────────
+var _aiDone=false, _mlChart=null;
+function initAIML(){
+  if(_aiDone) return; _aiDone=true;
+  var rl=BACKEND.rl; var ml=BACKEND.ml; var lp=CUR.lp;
+  var dk=DKEYS[S.dens-1]; var ctmLp=BACKEND.ctm_lp?BACKEND.ctm_lp[dk]:null;
 
-function renderAIMLPanel() {
-  if (aimlInited) return;
-  aimlInited = true;
-  var rl = BACKEND.rl;
-  var ml = BACKEND.ml_forecast;
-  var dk = DKEYS[S.dens-1];
-  var ctmLp = BACKEND.ctm_lp ? BACKEND.ctm_lp[dk] : null;
-  var lp = CUR.lp;
+  // RL summary numbers
+  if(rl){
+    sv('rl-d', rl.avg_delay_rl.toFixed(1));
+    var lpMn=lp&&lp.delay?lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length:0;
+    sv('rl-lp', lpMn.toFixed(1));
+    var impv=lpMn>0?((lpMn-rl.avg_delay_rl)/lpMn*100):0;
+    var el=g('rl-sav'); if(el){el.textContent=(impv>=0?'+':'')+impv.toFixed(1); el.style.color=impv>=0?'var(--green)':'var(--red)';}
 
-  // RL summary
-  if (rl) {
-    sv('rl-delay', rl.avg_delay_rl.toFixed(1));
-    var lpAvg = lp && lp.delay ? (lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length) : 0;
-    sv('rl-lp-delay', lpAvg.toFixed(1));
-    var improv = lpAvg > 0 ? ((lpAvg - rl.avg_delay_rl)/lpAvg*100) : 0;
-    var el = g('rl-improv');
-    if (el) { el.textContent = (improv >= 0 ? '+' : '') + improv.toFixed(1); el.style.color = improv >= 0 ? 'var(--green)' : 'var(--red)'; }
+    // Horizontal bar chart — pure CSS, no canvas, works even from hidden tab
+    var barsEl=g('rl-bars');
+    if(barsEl&&rl.rewards_trace&&rl.rewards_trace.length>0){
+      var rw=rl.rewards_trace;
+      var minR=Math.min.apply(null,rw), maxR=Math.max.apply(null,rw), rng=maxR-minR||1;
+      var bHtml='';
+      for(var ri=0;ri<rw.length;ri++){
+        var pct=Math.max(4,Math.round(((rw[ri]-minR)/rng)*100));
+        var prog=ri/Math.max(rw.length-1,1);
+        // red->purple->green gradient
+        var cr=Math.round(187*(1-prog)), cg=Math.round(255*prog), cb=Math.round(255*(1-prog)+136*prog);
+        var bcol='rgb('+cr+','+cg+','+cb+')';
+        bHtml+='<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">'
+          +'<span style="font-family:monospace;font-size:.37rem;color:#3a5570;width:14px;text-align:right">'+(ri+1)+'</span>'
+          +'<div style="flex:1;background:#0d2040;border-radius:2px;height:7px">'
+            +'<div style="width:'+pct+'%;height:100%;background:'+bcol+';border-radius:2px;box-shadow:0 0 3px '+bcol+'88"></div>'
+          +'</div>'
+          +'<span style="font-family:monospace;font-size:.37rem;color:'+bcol+';width:26px;text-align:right">'+rw[ri].toFixed(0)+'</span>'
+        +'</div>';
+      }
+      barsEl.innerHTML=bHtml;
+    }
 
     // RL vs LP table
-    var tb = g('rl-tbody');
-    if (tb) {
-      var html = '';
-      for (var i = 0; i < JN.length; i++) {
-        var grl = rl.g_rl ? rl.g_rl[i] : 45;
-        var glp = lp && lp.g ? lp.g[i].toFixed(1) : '-';
-        var drl = rl.delay_rl ? rl.delay_rl[i] : 0;
-        var los = drl <= 10 ? 'A' : drl <= 20 ? 'B' : drl <= 35 ? 'C' : drl <= 55 ? 'D' : drl <= 80 ? 'E' : 'F';
-        var lc = {'A':'#00ff88','B':'#00e070','C':'#ffd700','D':'#ff8c00','E':'#ff2244','F':'#ff0033'}[los];
-        html += '<tr><td style="color:#7090a0">'+JN[i].name.substring(0,8)+'</td>' +
-                '<td style="color:var(--purple)">'+grl.toFixed(0)+'</td>' +
-                '<td style="color:var(--cyan)">'+glp+'</td>' +
-                '<td style="color:var(--orange)">'+drl.toFixed(0)+'</td>' +
-                '<td style="color:'+lc+'">'+los+'</td></tr>';
+    var tb=g('rl-tbody'); if(tb){
+      var th='';
+      for(var ii=0;ii<JN.length;ii++){
+        var grl=rl.g_rl?rl.g_rl[ii].toFixed(0):'-';
+        var glp=lp&&lp.g?lp.g[ii].toFixed(0):'-';
+        var drl=rl.delay_rl?rl.delay_rl[ii].toFixed(0):'-';
+        th+='<tr><td style="color:#7090a0">'+JN[ii].name.substring(0,8)+'</td>'
+          +'<td style="color:#bb77ff">'+grl+'s</td>'
+          +'<td style="color:var(--cyan)">'+glp+'s</td>'
+          +'<td style="color:var(--orange)">'+drl+'s</td></tr>';
       }
-      tb.innerHTML = html;
-    }
-
-    // RL convergence — horizontal CSS bar chart (no canvas sizing issues)
-    var rlBars = g('rl-conv-bars');
-    if (rlBars && rl.rewards_trace && rl.rewards_trace.length > 0) {
-      var rewards = rl.rewards_trace;
-      var minR = Math.min.apply(null, rewards);
-      var maxR = Math.max.apply(null, rewards);
-      var rangeR = maxR - minR || 1;
-      var html = '';
-      for (var ri = 0; ri < rewards.length; ri++) {
-        var pct = Math.max(4, Math.round(((rewards[ri] - minR) / rangeR) * 100));
-        // Color: red (early/low) → purple → green (later/converged)
-        var progress = ri / Math.max(rewards.length - 1, 1);
-        var r = Math.round(187 * (1 - progress) + 0 * progress);
-        var g2 = Math.round(0 * (1 - progress) + 255 * progress);
-        var b2 = Math.round(255 * (1 - progress) + 136 * progress);
-        var col = 'rgb(' + r + ',' + g2 + ',' + b2 + ')';
-        var val2 = rewards[ri].toFixed(0);
-        html += '<div style="display:flex;align-items:center;gap:5px">' +
-          '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.38rem;color:#3a5570;width:16px;text-align:right">'+(ri+1)+'</div>' +
-          '<div style="flex:1;background:#0d2040;border-radius:2px;height:8px;overflow:hidden">' +
-            '<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:2px;box-shadow:0 0 4px '+col+'66;transition:width .3s"></div>' +
-          '</div>' +
-          '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.38rem;color:'+col+';width:28px;text-align:right">'+val2+'</div>' +
-        '</div>';
-      }
-      rlBars.innerHTML = html;
+      tb.innerHTML=th;
     }
   }
 
-  // ML Forecast
-  if (ml) {
+  // ML forecast numbers
+  if(ml){
     sv('ml-rmse', ml.rmse.toFixed(4));
     sv('ml-mape', ml.mape_pct.toFixed(2));
-    sv('ml-peaks', ml.peak_windows ? ml.peak_windows.join(', ') : '--');
-    sv('ml-model', ml.model || '--');
-
-    var mlEl = g('ml-canv');
-    if (mlEl && !mlForeChart && ml.y_obs && ml.y_fit && ml.y_fore) {
-      try {
-        var obsData = ml.y_obs.map(function(v, i) { return { x: i, y: v }; });
-        var fitData = ml.y_fit.map(function(v, i) { return { x: i, y: v }; });
-        var foreData = ml.y_fore.map(function(v, i) { return { x: i + ml.y_obs.length, y: v }; });
-        mlForeChart = new Chart(mlEl, {
-          type: 'scatter',
-          data: { datasets: [
-            { label: 'Observed', data: obsData, showLine: true, borderColor: '#00e5ff', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.4 },
-            { label: 'Fitted',   data: fitData, showLine: true, borderColor: '#00ff88', borderWidth: 1, pointRadius: 0, fill: false, borderDash: [4,3] },
-            { label: 'Forecast', data: foreData, showLine: true, borderColor: '#ff8c00', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.4 },
+    sv('ml-peaks', ml.peak_windows?ml.peak_windows.join(', '):'--');
+    // ML chart
+    var mlEl=g('ml-canv');
+    if(mlEl&&!_mlChart&&ml.y_obs&&ml.y_fore){
+      try{
+        _mlChart=new Chart(mlEl,{
+          type:'line',
+          data:{datasets:[
+            {data:ml.y_obs.map(function(v,i){return{x:i,y:v};}),borderColor:'#00e5ff',borderWidth:1.5,pointRadius:0,fill:false,showLine:true,tension:.4},
+            {data:ml.y_fit?ml.y_fit.map(function(v,i){return{x:i,y:v};}):[], borderColor:'#00ff88',borderWidth:1,pointRadius:0,fill:false,showLine:true,borderDash:[3,3]},
+            {data:ml.y_fore.map(function(v,i){return{x:i+48,y:v};}),borderColor:'#ff8c00',borderWidth:1.5,pointRadius:0,fill:false,showLine:true,tension:.4}
           ]},
-          options: { animation: false, responsive: true, maintainAspectRatio: false,
-                     plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                     scales: { x: { display: false }, y: { display: true, min: 0, max: 1.2, ticks: { color: '#3a5570', font: { size: 7 } }, grid: { color: '#0d2040' } } } }
+          options:{animation:false,responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{enabled:false}},
+            scales:{
+              x:{type:'linear',display:false},
+              y:{display:true,min:0,max:1.2,ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}}
+            }}
         });
-      } catch(e) {}
+      }catch(e){}
     }
   }
 
-  // CTM-LP coupling summary
-  if (ctmLp) {
+  // CTM-LP
+  if(ctmLp){
     sv('ctm-lp-n', ctmLp.n_coupled_constraints);
     sv('ctm-lp-d', ctmLp.avg_delay.toFixed(1));
-    var lp_avg2 = lp && lp.delay ? (lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length) : ctmLp.avg_delay;
-    var pct = lp_avg2 > 0 ? ((lp_avg2 - ctmLp.avg_delay)/lp_avg2*100).toFixed(1) : '0.0';
-    var elCmp = g('ctm-lp-cmp');
-    if (elCmp) { elCmp.textContent = (parseFloat(pct) >= 0 ? '-' : '+') + Math.abs(pct); elCmp.style.color = parseFloat(pct) >= 0 ? 'var(--green)' : 'var(--red)'; }
   }
 }
 
-// ── VALIDATION PANEL ──────────────────────────────────────────────────────────
-var valInited = false;
+// ── VALIDATION PANEL ─────────────────────────────────────────────────────────
+var _valDone=false, _valChart=null;
+function initValid(){
+  if(_valDone) return; _valDone=true;
+  var val=BACKEND.validation; if(!val) return;
+  var rhoEl=g('val-rho');
+  if(rhoEl){rhoEl.textContent=val.spearman_rho.toFixed(4); rhoEl.style.color=val.spearman_rho>0.7?'var(--green)':val.spearman_rho>0.4?'var(--yellow)':'var(--red)';}
+  sv('val-sav', val.avg_savings_pct.toFixed(1));
+  sv('val-rmse', val.rmse_s.toFixed(1));
+  var noteEl=g('val-note'); if(noteEl&&val.note) noteEl.textContent=val.note;
 
-function renderValidationPanel() {
-  if (valInited) return;
-  valInited = true;
-  var val = BACKEND.validation;
-  if (!val) return;
-
-  sv('val-r2', val.r2 !== undefined ? val.r2.toFixed(4) : '--');
-  sv('val-rmse', val.rmse_s !== undefined ? val.rmse_s.toFixed(1) : '--');
-  sv('val-mape', val.mape_pct !== undefined ? val.mape_pct.toFixed(1) : '--');
-  var rhoEl = g('val-rho');
-  if (rhoEl && val.spearman_rho !== undefined) {
-    rhoEl.textContent = val.spearman_rho.toFixed(4);
-    rhoEl.style.color = val.spearman_rho > 0.7 ? 'var(--green)' : val.spearman_rho > 0.4 ? 'var(--yellow)' : 'var(--red)';
-  }
-  sv('val-sav', val.avg_savings !== undefined ? val.avg_savings.toFixed(1) : '--');
-  var noteEl = g('val-note');
-  if (noteEl && val.note) noteEl.textContent = val.note;
-
-  // Validation table (now shows savings)
-  var tb = g('val-tbody');
-  if (tb && val.details) {
-    var html = '';
-    val.details.forEach(function(d) {
-      var savCol = d.savings_pct > 60 ? 'var(--green)' : d.savings_pct > 40 ? 'var(--yellow)' : 'var(--orange)';
-      html += '<tr><td style="color:#7090a0">'+d.junction.substring(0,10)+'</td>' +
-              '<td style="color:var(--cyan)">'+d.measured+'</td>' +
-              '<td style="color:var(--orange)">'+d.modelled+'</td>' +
-              '<td style="color:'+savCol+'">'+d.savings_pct+'%</td>' +
-              '<td style="color:#3a5570;font-size:.45rem">'+d.source.substring(0,8)+'</td></tr>';
+  // Table
+  var tb=g('val-tbody'); if(tb&&val.details){
+    var th='';
+    val.details.forEach(function(d){
+      var sc=d.savings_pct>60?'var(--green)':d.savings_pct>40?'var(--yellow)':'var(--orange)';
+      th+='<tr><td style="color:#7090a0">'+d.junction.substring(0,10)+'</td>'
+        +'<td style="color:var(--cyan)">'+d.measured+'</td>'
+        +'<td style="color:var(--orange)">'+d.modelled+'</td>'
+        +'<td style="color:'+sc+'">'+d.savings_pct+'%</td></tr>';
     });
-    tb.innerHTML = html;
+    tb.innerHTML=th;
   }
 
-  // Scatter chart — field vs LP-optimal (shows optimisation benefit)
-  var scEl = g('val-scatter');
-  if (scEl && !valScatChart && val.details) {
-    try {
-      var meas = val.details.map(function(d) { return d.measured; });
-      var lpv  = val.details.map(function(d) { return d.modelled; });
-      var maxV = Math.max.apply(null, meas) * 1.15;
-      var pts  = val.details.map(function(d) { return { x: d.measured, y: d.modelled, label: d.junction }; });
-      valScatChart = new Chart(scEl, {
-        type: 'scatter',
-        data: { datasets: [
-          { label: 'y=x baseline', data: [{x:0,y:0},{x:maxV,y:maxV}], showLine: true,
-            borderColor: '#00e5ff22', borderWidth: 1, pointRadius: 0, borderDash: [5,5] },
-          { label: 'LP-optimal',   data: pts, backgroundColor: '#00ff88cc', pointRadius: 7, pointHoverRadius: 9 }
+  // Scatter chart
+  var vcEl=g('val-canv');
+  if(vcEl&&!_valChart&&val.details){
+    try{
+      var maxV=Math.max.apply(null,val.details.map(function(d){return d.measured;}))*1.1;
+      _valChart=new Chart(vcEl,{
+        type:'scatter',
+        data:{datasets:[
+          {label:'y=x',data:[{x:0,y:0},{x:maxV,y:maxV}],showLine:true,borderColor:'#00e5ff22',borderWidth:1,pointRadius:0,borderDash:[5,5]},
+          {label:'LP',data:val.details.map(function(d){return{x:d.measured,y:d.modelled,label:d.junction};}),
+           backgroundColor:'#00ff88cc',pointRadius:7,pointHoverRadius:9}
         ]},
-        options: { animation: false, responsive: true, maintainAspectRatio: false,
-                   plugins: { legend: { display: false },
-                              tooltip: { callbacks: { label: function(ctx) {
-                                var pt = ctx.raw;
-                                return pt.label ? pt.label+': field='+pt.x+'s → LP='+pt.y+'s' : '';
-                              }}}},
-                   scales: {
-                     x: { display: true, title: { display: true, text: 'Field measured (s/veh)', color: '#3a5570', font: { size: 8 } },
-                          ticks: { color: '#3a5570', font: { size: 7 } }, grid: { color: '#0d2040' }, min: 0, max: maxV },
-                     y: { display: true, title: { display: true, text: 'LP-optimal (s/veh)', color: '#3a5570', font: { size: 8 } },
-                          ticks: { color: '#3a5570', font: { size: 7 } }, grid: { color: '#0d2040' }, min: 0, max: maxV }
-                   }}
+        options:{animation:false,responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var p=ctx.raw;return p.label?p.label+': field='+p.x+'s LP='+p.y+'s':'';}}}},
+          scales:{
+            x:{type:'linear',display:true,title:{display:true,text:'Field measured (s/veh)',color:'#3a5570',font:{size:8}},ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'},min:0,max:maxV},
+            y:{type:'linear',display:true,title:{display:true,text:'LP-optimal (s/veh)',color:'#3a5570',font:{size:8}},ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'},min:0,max:maxV}
+          }}
       });
-    } catch(e) {}
+    }catch(e){}
   }
 }
 
