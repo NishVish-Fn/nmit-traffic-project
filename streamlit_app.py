@@ -1019,7 +1019,6 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
   padding:3px 8px;background:#ff224418;border:1px solid var(--red);color:var(--red);
   border-radius:2px;animation:blink 1.2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 /* BODY */
 #body{flex:1;min-height:0;display:flex;overflow:hidden}
@@ -1497,7 +1496,6 @@ details.csec summary:hover{background:#0a1828}
       <div class="tab" onclick="rTab(3)" style="font-size:.48rem">LWR</div>
       <div class="tab" onclick="rTab(4)" style="font-size:.46rem;color:#bb77ff">&#x1F916;AI/ML</div>
       <div class="tab" onclick="rTab(5)" style="font-size:.46rem;color:#00ff88">&#x2713;VALID</div>
-      <div class="tab" onclick="rTab(6)" style="font-size:.46rem;color:#ffd700;animation:blink 2s infinite">&#x2728;CLAUDE</div>
     </div>
 
     <div class="atab-content on" id="rt0">
@@ -1838,61 +1836,6 @@ details.csec summary:hover{background:#0a1828}
       </div>
     </div>
 
-    <!-- rt6: Claude AI Advisor -->
-    <div class="atab-content" id="rt6">
-      <div class="sec">
-        <div class="stitle">&#x2728; Claude AI Traffic Advisor</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.7">
-          <span class="hi">Model:</span> claude-sonnet-4-20250514<br>
-          <span class="hi">Input:</span> Live junction LOS, delay, v/c, CO&#x2082;<br>
-          <span class="hi">Output:</span> Natural-language network advisory<br>
-          <span style="color:#2a5070;font-size:.47rem">Real Anthropic API call — reads current<br>simulation state and generates expert analysis</span>
-        </div>
-        <button onclick="runClaudeAnalysis()" id="claude-btn"
-          style="margin-top:8px;width:100%;padding:7px;background:transparent;
-          border:1px solid #ffd700;color:#ffd700;font-family:'Share Tech Mono',monospace;
-          font-size:.6rem;letter-spacing:2px;border-radius:3px;cursor:pointer;
-          text-transform:uppercase;transition:all .2s"
-          onmouseover="this.style.background='#ffd70022'"
-          onmouseout="this.style.background='transparent'">
-          &#x2728; Generate Traffic Advisory
-        </button>
-        <div style="margin-top:6px">
-          <select id="analysis-type" style="width:100%;background:var(--bg);border:1px solid #0d2040;
-            color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:.55rem;
-            padding:5px;border-radius:3px;outline:none">
-            <option value="advisory">Network Status Advisory</option>
-            <option value="incidents">Incident &amp; Bottleneck Analysis</option>
-            <option value="optimize">Optimization Recommendations</option>
-            <option value="emissions">Emissions &amp; Sustainability Report</option>
-            <option value="compare">Algorithm Comparison (RL vs LP)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="sec" id="claude-status-sec" style="display:none">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div id="claude-spinner" style="width:10px;height:10px;border:2px solid #ffd70033;
-            border-top-color:#ffd700;border-radius:50%;animation:spin .8s linear infinite"></div>
-          <span id="claude-status" style="font-family:'Share Tech Mono',monospace;
-            font-size:.53rem;color:#ffd700">Calling Claude API...</span>
-        </div>
-      </div>
-
-      <div class="sec" id="claude-output-sec" style="display:none">
-        <div class="stitle" id="claude-output-title">&#x1F4AC; Advisory</div>
-        <div id="claude-output" style="font-family:'Rajdhani',sans-serif;font-size:.62rem;
-          line-height:1.7;color:#a0c8e0;padding:4px 0;white-space:pre-wrap"></div>
-        <div id="claude-meta" style="margin-top:6px;font-family:'Share Tech Mono',monospace;
-          font-size:.42rem;color:#3a5570;border-top:1px solid #0d2040;padding-top:5px"></div>
-      </div>
-
-      <div class="sec" id="claude-history-sec" style="display:none">
-        <div class="stitle">&#x1F4CB; Analysis History</div>
-        <div id="claude-history" style="font-family:'Share Tech Mono',monospace;
-          font-size:.45rem;color:#3a5570;max-height:120px;overflow-y:auto"></div>
-      </div>
-    </div>
 
 </div>
 <div id="statusbar">
@@ -3084,7 +3027,6 @@ function rTab(n){
   if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();setTimeout(function(){renderRadarChart();},80);}
   if(n===4){setTimeout(initAIML,80);}
   if(n===5){setTimeout(initValid,80);}
-  if(n===6){setTimeout(initClaudeTab,80);}
 }
 
 // ── PARETO TAB INIT ───────────────────────────────────────────────────────────
@@ -3432,177 +3374,6 @@ function initValid(){
     vsvg.innerHTML=svgH;
   }
 }
-
-// ── CLAUDE AI ADVISOR ────────────────────────────────────────────────────────
-var _claudeHistory = [];
-var _claudeRunning = false;
-
-function initClaudeTab(){
-  // Nothing to pre-render — user triggers via button
-}
-
-function buildNetworkContext(){
-  // Gather live simulation state for Claude's context
-  var lp = CUR.lp;
-  var pi = CUR.pi;
-  var rl = BACKEND.rl;
-  var dk = DKEYS[S.dens-1];
-  var densName = ['Very Low','Low','Medium','High','Peak'][S.dens-1];
-  var algoName = {optimal:'GW+LP+EVP',fixed:'Fixed Timer',lp:'LP Only',evp:'EVP Only',webster:'Webster Adaptive',rl:'RL Q-Learning'}[S.algo]||S.algo;
-
-  var jnLines = JN.map(function(j,i){
-    var d = lp&&lp.delay ? lp.delay[i].toFixed(1) : '?';
-    var x = lp&&lp.x    ? lp.x[i].toFixed(3)     : '?';
-    var los = lp&&lp.los ? lp.los[i]               : '?';
-    var g  = lp&&lp.g   ? lp.g[i].toFixed(0)+'s'  : '?';
-    var q  = lp&&lp.q_len ? lp.q_len[i]+'veh'     : '?';
-    return '  '+j.name+': LOS='+los+' delay='+d+'s v/c='+x+' green='+g+' queue='+q;
-  }).join('\n');
-
-  var ctmLp = BACKEND.ctm_lp ? BACKEND.ctm_lp[dk] : null;
-  var rlLine = rl ? 'RL Q-Learning avg delay: '+rl.avg_delay_rl+'s/veh (vs LP: '+(lp&&lp.delay?(lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length).toFixed(1):'?')+'s/veh)' : '';
-
-  return [
-    '=== BANGALORE ORR TRAFFIC NETWORK — LIVE STATE ===',
-    'Simulation time: '+document.getElementById('sbt').textContent,
-    'Traffic density: '+densName+' (factor '+(['0.2','0.4','0.7','1.0','1.4'][S.dens-1])+')',
-    'Active algorithm: '+algoName,
-    'Cycle length: '+S.cycle+'s | Emergency vehicles: '+S.emergDots,
-    '',
-    'JUNCTION STATUS (12 junctions on Outer Ring Road):',
-    jnLines,
-    '',
-    'NETWORK PERFORMANCE:',
-    '  Total PI: '+(pi&&pi.PI_total?pi.PI_total:'?'),
-    '  CO2: '+(pi&&pi.co2_kph?pi.co2_kph+'kg/hr':'?'),
-    '  Fuel: '+(pi&&pi.fuel_lph?pi.fuel_lph+'L/hr':'?'),
-    '  CTM-LP coupled constraints: '+(ctmLp?ctmLp.n_coupled_constraints:'?'),
-    rlLine,
-    '',
-    'DATA SOURCES: BBMP Traffic Engineering Cell 2022, KRDCL ORR Study 2019',
-    'MODEL: Webster HCM delay + HiGHS LP + CTM + LWR + Robertson + SCOOT + RL Q-learning',
-  ].join('\n');
-}
-
-function buildPrompt(analysisType, context){
-  var prompts = {
-    advisory: 'You are an expert traffic engineering advisor specialising in Indian urban road networks. Based on the following live simulation data from Bangalore\'s Outer Ring Road network, provide a concise professional traffic advisory (150-200 words). Identify the 3 most congested junctions, explain why, and give one actionable recommendation for each. Use technical traffic engineering terminology (LOS, v/c ratio, Webster delay, PCU). Be specific and data-driven.\n\n',
-    incidents: 'You are an expert traffic operations analyst. Based on the following Bangalore ORR network data, identify all junctions showing LOS D, E, or F and explain the likely root causes (demand exceeding capacity, poor signal timing, platoon dispersion). Quantify the network-wide delay impact in vehicle-hours lost per hour. Give specific incident hotspot locations.\n\n',
-    optimize: 'You are a senior traffic engineer reviewing signal optimisation results. Compare the current algorithm\'s performance against what the LP optimal solution and RL Q-learning controller achieve. Explain in 150 words which junctions would benefit most from adaptive signal control, citing specific delay values and v/c ratios from the data. Recommend the optimal cycle length.\n\n',
-    emissions: 'You are a transport sustainability consultant. Based on the following traffic network data for Bangalore\'s ORR, calculate and explain the CO2 and fuel consumption implications of the current signal strategy. How much CO2 could be saved by switching from fixed timers to LP-optimal control? Express in kg/hr and annual tonnes. Use the MOVES-lite emission model parameters shown.\n\n',
-    compare: 'You are a research engineer presenting to a PhD committee. Compare the three signal control approaches in this simulation: Fixed Timer (baseline), HiGHS LP optimisation (proposed), and RL Q-learning (novel contribution). For each, explain the mathematical basis, performance on the Bangalore ORR network, and practical deployment challenges. Write in academic style (200 words) suitable for a PhD competition presentation.\n\n'
-  };
-  return (prompts[analysisType]||prompts.advisory) + context;
-}
-
-async function runClaudeAnalysis(){
-  if(_claudeRunning) return;
-  _claudeRunning = true;
-
-  var analysisType = g('analysis-type') ? g('analysis-type').value : 'advisory';
-  var titleMap = {
-    advisory:'Network Status Advisory',
-    incidents:'Incident & Bottleneck Analysis',
-    optimize:'Optimization Recommendations',
-    emissions:'Emissions & Sustainability',
-    compare:'Algorithm Comparison (RL vs LP)'
-  };
-
-  // Show spinner
-  var statusSec = g('claude-status-sec');
-  var outputSec = g('claude-output-sec');
-  var historySec = g('claude-history-sec');
-  var btn = g('claude-btn');
-  if(statusSec) statusSec.style.display='block';
-  if(outputSec) outputSec.style.display='none';
-  if(btn){ btn.disabled=true; btn.textContent='Analysing...'; }
-  sv('claude-status','Calling Claude API...');
-
-  var context = buildNetworkContext();
-  var prompt  = buildPrompt(analysisType, context);
-  var t0 = Date.now();
-
-  try {
-    sv('claude-status','Sending network state to Claude...');
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: 'You are an expert traffic engineering AI assistant specialising in urban signal optimisation for Indian cities. You are embedded in a PhD-level traffic simulation system for Bangalore\'s Outer Ring Road. Be precise, cite the numbers given, use traffic engineering terminology, and keep responses concise and technically rigorous.',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    if(!response.ok){
-      var errText = await response.text();
-      throw new Error('API error '+response.status+': '+errText.substring(0,120));
-    }
-
-    var data = await response.json();
-    var elapsed = ((Date.now()-t0)/1000).toFixed(1);
-    var text = data.content && data.content[0] && data.content[0].text
-      ? data.content[0].text : '(no response)';
-    var tokens = data.usage ? (data.usage.input_tokens||0)+' in / '+(data.usage.output_tokens||0)+' out' : '';
-
-    // Show output
-    if(statusSec) statusSec.style.display='none';
-    if(outputSec){
-      outputSec.style.display='block';
-      var titleEl = g('claude-output-title');
-      if(titleEl) titleEl.textContent='\u2728 '+titleMap[analysisType];
-      var outEl = g('claude-output');
-      if(outEl){
-        outEl.textContent='';
-        // Typewriter effect
-        var chars=text.split('');
-        var ci=0;
-        function typeNext(){
-          if(ci<chars.length){
-            outEl.textContent+=chars[ci++];
-            setTimeout(typeNext, ci<50?5:8);
-          }
-        }
-        typeNext();
-      }
-      var metaEl = g('claude-meta');
-      if(metaEl) metaEl.textContent='Model: claude-sonnet-4-20250514 | Tokens: '+tokens+' | Time: '+elapsed+'s | Density: '+['Very Low','Low','Medium','High','Peak'][S.dens-1]+' | Algo: '+(({optimal:'GW+LP+EVP',fixed:'Fixed',lp:'LP',evp:'EVP',webster:'Webster',rl:'RL'})[S.algo]||S.algo);
-    }
-
-    // Add to history
-    var ts = document.getElementById('sbt').textContent;
-    _claudeHistory.unshift({type:titleMap[analysisType], time:ts, snippet:text.substring(0,80)+'...'});
-    if(_claudeHistory.length>5) _claudeHistory.pop();
-    if(historySec){
-      historySec.style.display='block';
-      var hEl=g('claude-history'); if(hEl){
-        hEl.innerHTML=_claudeHistory.map(function(h){
-          return '<div style="border-bottom:1px solid #0d2040;padding:3px 0;margin-bottom:3px">'
-            +'<span style="color:var(--yellow)">'+h.type+'</span>'
-            +' <span style="color:#2a4060">@ '+h.time+'</span><br>'
-            +'<span style="color:#3a5570">'+h.snippet+'</span></div>';
-        }).join('');
-      }
-    }
-
-  } catch(err){
-    if(statusSec) statusSec.style.display='none';
-    if(outputSec){
-      outputSec.style.display='block';
-      var outEl2=g('claude-output');
-      if(outEl2) outEl2.textContent='Error: '+err.message;
-      var metaEl2=g('claude-meta');
-      if(metaEl2) metaEl2.textContent='Check network / API access';
-    }
-  }
-
-  _claudeRunning=false;
-  if(btn){ btn.disabled=false; btn.textContent='\u2728 Generate Traffic Advisory'; }
-}
-
-window.runClaudeAnalysis=runClaudeAnalysis;
-
 window.cycleAlgo=cycleAlgo;window.massEVP=massEVP;window.togglePause=togglePause;
 window.setDens=setDens;window.setEmerg=setEmerg;window.setWave=setWave;
 window.setCycle=setCycle;window.setSS=setSS;window.setAlgoSel=setAlgoSel;
