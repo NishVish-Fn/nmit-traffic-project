@@ -2170,7 +2170,8 @@ function updateSignals(dt){
     // Wall-clock accurate: advance phase by real elapsed sim-seconds per frame
     // _sigDtSec is computed from performance.now() delta → exact second countdown
     sig.phase += _sigDtSec;
-    if(sig.phase>=sig.cycle) sig.phase-=sig.cycle;
+    // Hard clamp: phase MUST stay in [0, cycle) — catches any edge case drift
+    sig.phase = ((sig.phase % sig.cycle) + sig.cycle) % sig.cycle;
 
     var nearEvp=false;
     for(var pi=0;pi<particles.length;pi++){
@@ -2192,24 +2193,11 @@ function updateSignals(dt){
     // LP-optimal green time (from Python scipy solver)
     var gDur=S.cycle*.5;
     if((S.algo==='optimal'||S.algo==='lp')&&lp&&lp.g){
-      // Scale LP result from base 90s cycle to current cycle
-      var lpG=lp.g[i]*(S.cycle/90);
-      gDur=Math.max(10,Math.min(lpG*(0.5+warm*.5), S.cycle*.75));
-      // Green wave phase offset sync
-      if(S.algo==='optimal'){
-        for(var ei=0;ei<ED.length;ei++){
-          if(ED[ei][0]===i||ED[ei][1]===i){
-            var oth=ED[ei][0]===i?ED[ei][1]:ED[ei][0];
-            var ja2=JN[i],jb2=JN[oth];
-            var dx=(ja2.lat-jb2.lat)*111;
-            var dy=(ja2.lng-jb2.lng)*111*Math.cos(ja2.lat*Math.PI/180);
-            var distKm=Math.sqrt(dx*dx+dy*dy);
-            var phi=(distKm/S.wave*3600)%S.cycle;
-            var pd=(SIG[oth].phase-sig.phase+S.cycle)%S.cycle;
-            if(Math.abs(pd-phi)>4) SIG[oth].phase+=(phi-pd)*.025;
-          }
-        }
-      }
+      // LP-optimal green time scaled to current cycle
+      var lpG = lp.g[i] * (S.cycle / 90);
+      gDur = Math.max(10, Math.min(lpG * (0.5 + warm * 0.5), S.cycle * 0.75));
+      // NOTE: green-wave phase sync removed — it caused unbounded phase drift
+      // (nudge accumulation across multiple edges per junction per frame)
     } else if(S.algo==='webster'&&lp&&lp.lambda){
       // Webster-derived green time directly from λ_i
       gDur=Math.max(10,lp.lambda[i]*S.cycle*(0.5+warm*.5));
@@ -2496,7 +2484,9 @@ function updateMetrics(){
     var s2=SIG[i];
     var stateColor=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
     var pct=Math.round(s2.phase/s2.cycle*100);
-    var remain=s2.state==='green'?Math.max(0,s2.gDur-s2.phase):Math.max(0,s2.cycle-s2.phase);
+    var remain=s2.state==='green' ? Math.max(0,s2.gDur-s2.phase)
+              :s2.state==='yellow'? Math.max(0,s2.gDur+s2.cycle*0.07-s2.phase)
+              : Math.max(0,s2.cycle-s2.phase);
     var tl2=remain.toFixed(0)+'s '+(s2.state==='green'?'GO':(s2.state==='yellow'?'YLW':'WAIT'));
     var lam2=lp&&lp.lambda?lp.lambda[i].toFixed(3):'-';
     var x2num=lp&&lp.x?lp.x[i]:null;
@@ -2918,8 +2908,9 @@ window.lTab=lTab;window.rTab=rTab;
 
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 // Wall-clock reference for accurate per-second signal phase advance
-var _sigLastWall = performance.now();
-var _sigDtSec = 0;  // real elapsed sim-seconds this frame
+// Declared at module scope so updateSignals() can always read a valid value
+var _sigLastWall = 0;  // set properly on first loop tick
+var _sigDtSec    = 0;  // real elapsed sim-seconds this frame (clamped 0..0.1)
 var lastT=0,roadTick=0;
 function loop(ts){
   try{
@@ -2929,11 +2920,14 @@ function loop(ts){
     }
     var dt=Math.min((ts-lastT)/1000*60,4);
     lastT=ts; S.frame++;
-    // Compute wall-clock elapsed real seconds × sim speed for signal phase
+
+    // ── WALL-CLOCK dt for signal phase (MUST be computed BEFORE updateSignals) ──
     var _nowWall = performance.now();
+    if(_sigLastWall === 0) _sigLastWall = _nowWall;  // first-frame init
+    // Clamp to 100ms max to prevent huge jumps after tab unfocus/pause
     _sigDtSec = Math.min((_nowWall - _sigLastWall) / 1000.0, 0.1) * S.speed;
     _sigLastWall = _nowWall;
-    S.simTime+=_sigDtSec;
+    S.simTime += _sigDtSec;
     updateSignals(dt);
     for(var i=0;i<particles.length;i++) particles[i].update(dt);
     renderParticles();
@@ -2958,7 +2952,9 @@ function loop(ts){
           var _s=SIG[_i];
           var _card=spRT2.children[_i];
           if(!_card) continue;
-          var _rem=_s.state==='green'?Math.max(0,_s.gDur-_s.phase):Math.max(0,_s.cycle-_s.phase);
+          var _rem=_s.state==='green' ? Math.max(0,_s.gDur-_s.phase)
+                  :_s.state==='yellow'? Math.max(0,_s.gDur+_s.cycle*0.07-_s.phase)
+                  : Math.max(0,_s.cycle-_s.phase);
           var _col=_s.evp?'#ff2244':_s.state==='green'?'#00ff88':_s.state==='yellow'?'#ffd700':'#ff2244';
           var _lbl=_s.evp?'EVP!':_s.state.toUpperCase();
           var _pct=Math.round(_s.phase/_s.cycle*100);
