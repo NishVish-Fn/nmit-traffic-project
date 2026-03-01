@@ -1783,7 +1783,9 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F4CA; Algorithm Radar (5-Metric)</div>
-        <canvas id="radar-canv" style="display:block;width:100%!important;height:160px!important;margin-top:4px"></canvas>
+        <div id="radar-wrap" style="position:relative;width:100%;height:180px;background:#030d1a;border-radius:4px;margin-top:4px">
+          <canvas id="radar-canv" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+        </div>
         <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
           GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
         </div>
@@ -3266,7 +3268,7 @@ function rTab(n){
   var panes=document.querySelectorAll('.atab-content');
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
-  if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();setTimeout(function(){renderRadarChart();},80);}
+  if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();setTimeout(function(){renderRadarChart();},120);}
   if(n===4){setTimeout(initAIML,80);}
   if(n===5){setTimeout(initValid,80);}
   if(n===6){setTimeout(initRF,80);}
@@ -3283,18 +3285,17 @@ var paretoChart2 = null;
 function initParetoTab(){
   if(!paretoInited){
     paretoInited=true;
-    // Delay slightly so the tab's display:flex has applied and canvas has real dimensions
     setTimeout(function(){
       renderParetoChart();
       renderMCSummary();
       renderSCOOTTable();
       renderPIBox();
-      setTimeout(function(){renderRadarChart();},150);
+      setTimeout(function(){renderRadarChart();},200);
     },50);
   } else {
-    // Re-render on every tab visit to handle resize/layout changes
+    // Always re-render radar (never just resize — canvas may have been 0×0 before)
     if(paretoChart2){try{paretoChart2.resize();}catch(e){}}
-    if(radarChart){try{radarChart.resize();}catch(e){}}
+    setTimeout(function(){renderRadarChart();},120);
   }
 }
 
@@ -3400,47 +3401,67 @@ function renderPIBox(){
 }
 
 function renderRadarChart(){
+  var wrap=g('radar-wrap');
   var el=g('radar-canv');
   if(!el) return;
+  // Always destroy previous instance so re-renders work
   if(radarChart){try{radarChart.destroy();}catch(e){} radarChart=null;}
-  radarInited=true;
+  // Set explicit pixel dimensions — Chart.js fails on 0×0 canvas in hidden tabs
+  var W=wrap?Math.max(wrap.clientWidth,200):260;
+  var H=wrap?Math.max(wrap.clientHeight,180):180;
+  el.width=W;
+  el.height=H;
   try{
     var warm=Math.min(S.booted/500,1);
     var mul=DMUL[S.dens-1];
-    // Scores scale dynamically with current density and algorithm
     var algoBoost = S.algo==='optimal'?warm : S.algo==='lp'?warm*0.7 : S.algo==='webster'?warm*0.4 : 0;
     var optVals  = [
-      Math.round(60+algoBoost*28),   // Throughput
-      Math.round(55+algoBoost*27),   // Delay-Eff
-      Math.round(65-mul*8+algoBoost*15),  // v/c Control
-      Math.round(60+algoBoost*20),   // LOS
-      S.algo==='fixed'?20:Math.round(70+algoBoost*25)  // EVP Response
+      Math.round(60+algoBoost*28),
+      Math.round(55+algoBoost*27),
+      Math.round(Math.max(10, 65-mul*8+algoBoost*15)),
+      Math.round(60+algoBoost*20),
+      S.algo==='fixed'?20:Math.round(70+algoBoost*25)
     ];
     var fixedVals= [62, 45, 60, 52, 20];
-    radarChart = new Chart(el,{
+    var ctx=el.getContext('2d');
+    radarChart = new Chart(ctx,{
       type:'radar',
       data:{
         labels:['Throughput','Delay-Eff','v/c Ctrl','LOS','EVP Resp'],
         datasets:[
           {label:'Current Algo',data:optVals,
-           borderColor:'#00e5ff',backgroundColor:'#00e5ff22',
-           pointBackgroundColor:'#00e5ff',borderWidth:2,pointRadius:3},
+           borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.12)',
+           pointBackgroundColor:'#00e5ff',borderWidth:2.5,pointRadius:4,
+           pointHoverRadius:6},
           {label:'Fixed Timer',data:fixedVals,
-           borderColor:'#ff2244',backgroundColor:'#ff224422',
-           pointBackgroundColor:'#ff2244',borderWidth:2,pointRadius:3}
+           borderColor:'#ff2244',backgroundColor:'rgba(255,34,68,0.10)',
+           pointBackgroundColor:'#ff2244',borderWidth:2,pointRadius:4,
+           pointHoverRadius:6}
         ]
       },
       options:{
-        animation:false,responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:true,position:'bottom',labels:{
-          color:'#4a6880',font:{size:8,family:"'Share Tech Mono',monospace"},boxWidth:10}}},
+        animation:false,
+        responsive:false,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{
+            display:true,position:'bottom',
+            labels:{color:'#6a8090',font:{size:9,family:"'Share Tech Mono',monospace"},
+              boxWidth:12,padding:8}
+          },
+          tooltip:{enabled:true}
+        },
         scales:{r:{
-          ticks:{color:'#3a5570',font:{size:7},backdropColor:'transparent'},
-          grid:{color:'#0d2040'},pointLabels:{color:'#7090b0',font:{size:7.5}},
+          ticks:{color:'#4a6880',font:{size:8},backdropColor:'transparent',
+            stepSize:20},
+          grid:{color:'#0d2040'},
+          angleLines:{color:'#0d2040'},
+          pointLabels:{color:'#7090b0',font:{size:9,family:"'Rajdhani',sans-serif"}},
           min:0,max:100,beginAtZero:true
         }}
       }
     });
+    radarInited=true;
   }catch(e){console.warn('Radar chart error:',e);}
 }
 
