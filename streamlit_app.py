@@ -1068,14 +1068,26 @@ if "lp_result" not in st.session_state:
 # Precompute for each density level used in the frontend
 dens_precomp = {}
 for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]:
-    lp_r  = run_lp(C=90, density_factor=df)
+    lp_r    = run_lp(C=90, density_factor=df)
+    lwr_full = lwr_shock_waves(density_factor=df)
+    ctm_full = ctm_analysis(density_factor=df)
+    pl_full  = robertson_platoon_dispersion(density_factor=df)
+    sc_full  = scoot_adaptive_cycles(density_factor=df)
+    pi_r     = network_performance_index(lp_r, density_factor=df)
+    # ── Slim each sub-object to only fields the JS actually reads ──
+    lwr_slim = [{"w_km_h": e["w_km_h"]} for e in lwr_full]
+    ctm_slim = [{"los": e["los"], "utilisation": e["utilisation"]} for e in ctm_full]
+    pl_slim  = [{"F": e["F"], "phi": e["phi"]} for e in pl_full]
+    sc_slim  = [{"C_opt": e["C_opt"], "C_rec": e["C_rec"], "action": e["action"]}
+                for e in sc_full]
+    pi_slim  = {k: pi_r[k] for k in ("PI_total","co2_kph","fuel_lph","per_jct") if k in pi_r}
     dens_precomp[name] = {
         "lp":      lp_r,
-        "lwr":     lwr_shock_waves(density_factor=df),
-        "ctm":     ctm_analysis(density_factor=df),
-        "platoon": robertson_platoon_dispersion(density_factor=df),
-        "scoot":   scoot_adaptive_cycles(density_factor=df),
-        "pi":      network_performance_index(lp_r, density_factor=df),
+        "lwr":     lwr_slim,
+        "ctm":     ctm_slim,
+        "platoon": pl_slim,
+        "scoot":   sc_slim,
+        "pi":      pi_slim,
     }
 
 # Heavy one-time computations (run once at startup)
