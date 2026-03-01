@@ -42,6 +42,13 @@ html,body,[data-testid="stAppViewContainer"]{background:#020810!important}
 section[data-testid="stSidebar"]{display:none!important}
 .block-container{padding:0!important;max-width:100%!important}
 iframe{border:none!important;display:block}
+/* Hide Streamlit bottom toolbar / Manage app button */
+[data-testid="stBottomBlockContainer"]{display:none!important}
+.stDeployButton{display:none!important}
+footer{display:none!important}
+#MainMenu{display:none!important}
+[data-testid="manage-app-button"]{display:none!important}
+iframe + div{display:none!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -772,9 +779,12 @@ HTML = """<!DOCTYPE html>
 <style>
 :root{
   --bg:#020810;--bg2:#06101e;--bg3:#0b1a2e;
-  --cyan:#00e5ff;--green:#00ff88;--red:#ff2244;
-  --orange:#ff8c00;--yellow:#ffd700;--purple:#bb77ff;--pink:#ff44aa;
-  --cdim:#00e5ff22;
+  /* Realistic traffic palette — muted, professional */
+  --cyan:#4fc3f7;--green:#2ecc71;--red:#e74c3c;
+  --orange:#e67e22;--yellow:#f1c40f;--purple:#9b59b6;--pink:#fd79a8;
+  --cdim:#4fc3f722;
+  /* Traffic-specific */
+  --free:#27ae60;--moderate:#f39c12;--heavy:#e67e22;--gridlock:#c0392b;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
@@ -816,11 +826,30 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* BODY */
-#body{flex:1;min-height:0;display:flex;overflow:hidden}
+#body{flex:1;min-height:0;display:flex;overflow:hidden;position:relative}
 
-/* LEFT PANEL */
-#lp{width:286px;flex-shrink:0;background:var(--bg2);
-  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+/* LEFT PANEL — floating dropdown overlay, no longer in the flex flow */
+#lp{position:absolute;top:57px;left:0;z-index:1500;
+  width:296px;background:rgba(3,10,22,.97);
+  border:1px solid var(--cdim);border-top:none;border-left:none;
+  display:flex;flex-direction:column;overflow:hidden;
+  max-height:calc(100vh - 84px);
+  transform:translateX(-100%);
+  transition:transform .25s cubic-bezier(.4,0,.2,1);
+  backdrop-filter:blur(8px);box-shadow:4px 0 24px #000a}
+#lp.open{transform:translateX(0)}
+/* Toggle button — always visible on map edge */
+#lp-toggle{position:absolute;top:57px;left:0;z-index:1600;
+  width:32px;height:72px;background:rgba(3,10,22,.92);
+  border:1px solid var(--cdim);border-left:none;border-top:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  cursor:pointer;transition:all .2s;border-radius:0 4px 4px 0}
+#lp-toggle:hover{background:var(--cdim);border-color:var(--cyan)}
+#lp-toggle span{display:block;width:14px;height:2px;background:var(--cyan);
+  border-radius:1px;transition:all .25s}
+#lp-toggle.open span:nth-child(1){transform:rotate(45deg) translate(3px,3px)}
+#lp-toggle.open span:nth-child(2){opacity:0}
+#lp-toggle.open span:nth-child(3){transform:rotate(-45deg) translate(3px,-3px)}
 .tabs{display:flex;border-bottom:1px solid var(--cdim)}
 .tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
   font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
@@ -867,7 +896,7 @@ select{width:100%;background:var(--bg);border:1px solid #0d2040;
 .dt td:last-child{text-align:right;font-weight:bold}
 
 /* MAP */
-#mw{flex:1;position:relative;overflow:hidden}
+#mw{flex:1;position:relative;overflow:hidden;width:100%}
 #map{width:100%;height:100%}
 #fc{position:absolute;top:0;left:0;pointer-events:none;z-index:400}
 .evpo{position:absolute;inset:0;pointer-events:none;z-index:450;
@@ -955,8 +984,8 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .sb:last-child{border-right:none;margin-left:auto}
 .sbv{color:var(--cyan);font-weight:bold}
 .sbv.r{color:var(--red)}.sbv.g{color:var(--green)}.sbv.y{color:var(--yellow)}.sbv.p{color:var(--purple)}
-.leaflet-tile-pane{filter:brightness(.28) saturate(.2) hue-rotate(195deg)!important}
-.leaflet-container{background:var(--bg)}
+.leaflet-tile-pane{filter:brightness(.38) saturate(.35) contrast(1.1)!important}
+.leaflet-container{background:#0a1018}
 .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
 /* LWR shock wave canvas */
 #lwrcanv{display:block;width:100%!important;height:90px!important}
@@ -1055,7 +1084,12 @@ details.csec summary:hover{background:#0a1828}
 </div>
 
 <div id="body">
-  <!-- LEFT -->
+  <!-- FLOATING PANEL TOGGLE — always visible, top-left of map -->
+  <div id="lp-toggle" onclick="toggleLP()" title="Toggle Controls Panel">
+    <span></span><span></span><span></span>
+  </div>
+
+  <!-- LEFT PANEL — floating dropdown overlay -->
   <div id="lp">
     <div class="tabs">
       <div class="tab on" onclick="lTab(0)">CONTROLS</div>
@@ -1267,10 +1301,10 @@ details.csec summary:hover{background:#0a1828}
     </div>
     <div class="mpill" id="mleg">
       <div class="lt">ROAD DENSITY</div>
-      <div class="lr"><div class="lb" style="background:var(--green)"></div>Free-flow &lt;40%</div>
-      <div class="lr"><div class="lb" style="background:var(--yellow)"></div>Moderate 40-65%</div>
-      <div class="lr"><div class="lb" style="background:var(--orange)"></div>Congested 65-85%</div>
-      <div class="lr"><div class="lb" style="background:var(--red)"></div>Gridlock &gt;85%</div>
+      <div class="lr"><div class="lb" style="background:var(--free)"></div>Free-flow &lt;40%</div>
+      <div class="lr"><div class="lb" style="background:var(--moderate)"></div>Moderate 40–65%</div>
+      <div class="lr"><div class="lb" style="background:var(--heavy)"></div>Congested 65–85%</div>
+      <div class="lr"><div class="lb" style="background:var(--gridlock)"></div>Gridlock &gt;85%</div>
       <div class="lr"><div class="lb" style="background:var(--pink)"></div>EVP Corridor</div>
     </div>
     <div class="mpill" id="mscl">
@@ -1863,10 +1897,10 @@ Particle.prototype.update = function(dt) {
 };
 
 Particle.prototype.col = function() {
-  if(this.isE) return '#ff2244';
-  if(this.state==='stopped') return '#ff5500';
-  if(this.state==='slow') return '#ffcc00';
-  return '#00ccff';
+  if(this.isE) return '#e74c3c';           // emergency: red
+  if(this.state==='stopped') return '#e67e22';  // stopped: amber
+  if(this.state==='slow') return '#f1c40f';     // slow: yellow
+  return '#5dade2';                              // moving: steel blue (realistic headlights)
 };
 
 function spawnParticles() {
@@ -1898,8 +1932,11 @@ function drawRoads() {
     var ar=S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:0;
     var cong=Math.min((ja.cong+jb.cong)/2*mul*af*(1-ar),1);
     var wv=lwr[ri]?Math.abs(lwr[ri].w_km_h):0;
-    var col=cong>.85?'#ff2244':cong>.65?'#ff8c00':cong>.4?'#ffd700':'#00ff88';
-    var w=4+cong*7;
+    // Realistic traffic map colors (Google Maps / TomTom style):
+    // Free-flow: muted teal-grey | Moderate: amber | Heavy: deep orange | Gridlock: crimson
+    var col=cong>.85?'#c0392b':cong>.65?'#e67e22':cong>.4?'#f1c40f':'#27ae60';
+    // Road width scales with congestion (queued vehicles widen visually)
+    var w=3+cong*5;
     // Full curved road path via waypoints
     var path=getEdgePath(ri);
     var latLngs=path.map(function(p){return[p[0],p[1]];});
@@ -1907,20 +1944,20 @@ function drawRoads() {
     for(var pi=0;pi<particles.length;pi++){
       if(particles[pi].isE&&particles[pi].ei===ri){hasEvp=true;break;}
     }
-    // Road glow shadow (wider, very faint)
+    // Road subtle glow (narrower, less garish)
     try{
       roadLines.push(L.polyline(latLngs,
-        {color:col+'33',weight:w+8,opacity:.3,lineJoin:'round',lineCap:'round'}).addTo(map));
+        {color:col+'44',weight:w+5,opacity:.25,lineJoin:'round',lineCap:'round'}).addTo(map));
     }catch(ex){}
-    // Road base (solid, congestion coloured)
+    // Road base (solid, congestion coloured — realistic opacity)
     try{
       roadLines.push(L.polyline(latLngs,
-        {color:col+'aa',weight:w,opacity:.9,lineJoin:'round',lineCap:'round'}).addTo(map));
+        {color:col+'cc',weight:w,opacity:.85,lineJoin:'round',lineCap:'round'}).addTo(map));
     }catch(ex){}
-    // Road centre divider line (dashed white)
+    // Road centre divider line (subtle)
     try{
       roadLines.push(L.polyline(latLngs,
-        {color:'#ffffff1a',weight:1,opacity:.6,dashArray:'5 9'}).addTo(map));
+        {color:'#ffffff11',weight:1,opacity:.4,dashArray:'4 10'}).addTo(map));
     }catch(ex){}
     // EVP corridor overlay
     if(hasEvp){
@@ -1944,10 +1981,12 @@ function drawRoads() {
 
 var jmkrs=JN.map(function(j,i){
   var lanes = j.lanes || 3;
-  var r = 6 + lanes*1.5;
+  var r = 5 + lanes*1.2;
+  // Realistic junction color: dark fill with congestion-colored ring
+  var jcol = j.cong>.65 ? '#c0392b' : j.cong>.45 ? '#e67e22' : '#27ae60';
   var m=L.circleMarker([j.lat,j.lng],
-    {radius:r,color:'#ffffff',weight:2,fillColor:'#ff2244',fillOpacity:.92}).addTo(map);
-  var tc=j.cong>.65?'#ff2244':j.cong>.45?'#ff8c00':'#00ff88';
+    {radius:r,color:jcol,weight:2.5,fillColor:'#0d1f33',fillOpacity:.88}).addTo(map);
+  var tc=j.cong>.65?'#e74c3c':j.cong>.45?'#e67e22':'#2ecc71';
   var lp=CUR.lp;
   m.bindTooltip(
     '<div style="font-family:monospace;font-size:11px;line-height:1.6;min-width:180px">'+
@@ -1980,7 +2019,7 @@ function renderParticles(){
   for(var ji=0;ji<JN.length;ji++){
     var j=JN[ji]; var sig=SIG[ji];
     var jpt=ll2px(j.lat,j.lng);
-    var col=sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    var col=sig.evp?'#e74c3c':sig.state==='green'?'#2ecc71':sig.state==='yellow'?'#f39c12':'#e74c3c';
     var R=8+(j.lanes||3)*1.5;
     // 4 signal arms (N/S/E/W)
     var arms=[{dx:0,dy:-(R+6)},{dx:0,dy:R+6},{dx:R+6,dy:0},{dx:-(R+6),dy:0}];
@@ -2054,13 +2093,13 @@ function renderParticles(){
       for(var t=1;t<p.trail.length;t++){
         var t1=ll2px(p.trail[t-1].lat,p.trail[t-1].lng);
         var t3=ll2px(p.trail[t].lat,p.trail[t].lng);
-        cx.strokeStyle='rgba(255,34,68,'+(((1-t/p.trail.length)*.6).toFixed(2))+')';
+        cx.strokeStyle='rgba(231,76,60,'+(((1-t/p.trail.length)*.6).toFixed(2))+')';
         cx.lineWidth=Math.max(.5,4-t*.35);
         cx.beginPath();cx.moveTo(t1.x,t1.y);cx.lineTo(t3.x,t3.y);cx.stroke();
       }
       var pos2=p.pos(); var pt4=ll2px(pos2.lat,pos2.lng);
       var pulse2=.55+.45*Math.sin(S.frame*.25+p.ph);
-      cx.shadowBlur=18*pulse2;cx.shadowColor='#ff2244';cx.fillStyle='#ff2244';
+      cx.shadowBlur=16*pulse2;cx.shadowColor='#e74c3c';cx.fillStyle='#e74c3c';
       cx.beginPath();cx.arc(pt4.x,pt4.y,8,0,Math.PI*2);cx.fill();
       cx.shadowBlur=0;cx.strokeStyle='#ffffff';cx.lineWidth=2;
       cx.beginPath();
@@ -2219,8 +2258,11 @@ function updateSignals(dt){
 function updateJMkrs(){
   for(var i=0;i<JN.length;i++){
     var s=SIG[i];
-    var c=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
-    try{jmkrs[i].setStyle({fillColor:c,color:s.evp?'#ff4466':'#ffffff'});}catch(e){}
+    // Signal state colors: realistic traffic light palette
+    var sigCol = s.evp?'#e74c3c':s.state==='green'?'#2ecc71':s.state==='yellow'?'#f39c12':'#e74c3c';
+    var ringCol = JN[i].cong>.65?'#c0392b':JN[i].cong>.45?'#e67e22':'#27ae60';
+    try{jmkrs[i].setStyle({fillColor:'#0d1f33',color:s.evp?'#e74c3c':ringCol,
+      weight:s.evp?3:2.5,fillOpacity:.88});}catch(e){}
   }
 }
 
@@ -2901,10 +2943,16 @@ function updatePlatoonDisplay(){
     '<span style="color:#4a6880">Links analysed:</span> '+pl.length;
 }
 
-window.cycleAlgo=cycleAlgo;window.massEVP=massEVP;window.togglePause=togglePause;
+function toggleLP(){
+  var lp=g('lp'), btn=g('lp-toggle');
+  if(!lp) return;
+  var open=lp.classList.toggle('open');
+  if(btn) btn.classList.toggle('open', open);
+}
+window.toggleLP=toggleLP;
 window.setDens=setDens;window.setEmerg=setEmerg;window.setWave=setWave;
 window.setCycle=setCycle;window.setSS=setSS;window.setAlgoSel=setAlgoSel;
-window.lTab=lTab;window.rTab=rTab;
+window.lTab=lTab;window.rTab=rTab;window.toggleLP=toggleLP;
 
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 // Wall-clock reference for accurate per-second signal phase advance
