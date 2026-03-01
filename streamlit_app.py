@@ -1862,7 +1862,57 @@ details.csec summary:hover{background:#0a1828}
     <!-- rt5: Validation -->
     <div class="atab-content" id="rt5">
       <div class="sec">
-        <div class="stitle">&#x2713; Model Validation</div>
+        <div class="stitle">&#x1F4CA; Key Results Summary</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+          <div class="scard" style="border-left-color:var(--cyan)">
+            <div class="sv" style="color:var(--cyan)" id="res-p95">--</div>
+            <div class="sl">MC P95 Delay</div>
+            <div class="ss">s/veh (±15% demand)</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--yellow)">
+            <div class="sv" style="color:var(--yellow)" id="res-mc-mean">--</div>
+            <div class="sl">MC Mean Delay</div>
+            <div class="ss">n=200 samples</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--purple)">
+            <div class="sv" style="color:var(--purple)" id="res-mc-sens">--</div>
+            <div class="sl">Most Sensitive Jn</div>
+            <div class="ss">highest demand σ</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--orange)">
+            <div class="sv" style="color:var(--orange)" id="res-ctm-n">--</div>
+            <div class="sl">CTM-LP Constraints</div>
+            <div class="ss">bottleneck links active</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--green)">
+            <div class="sv" style="color:var(--green)" id="res-plat-f">--</div>
+            <div class="sl">Robertson Avg F</div>
+            <div class="ss">platoon dispersion factor</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--pink)">
+            <div class="sv" style="color:var(--pink)" id="res-plat-phi">--</div>
+            <div class="sl">Avg Progression φ</div>
+            <div class="ss">platoon integrity</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--red)">
+            <div class="sv" style="color:var(--red)" id="res-co2">--</div>
+            <div class="sl">CO₂ Emissions</div>
+            <div class="ss">kg/hr network total</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--cyan)">
+            <div class="sv" style="color:var(--cyan)" id="res-pi">--</div>
+            <div class="sl">Network PI</div>
+            <div class="ss">HCM performance index</div>
+          </div>
+        </div>
+        <div class="lp-box" style="font-size:.5rem;line-height:1.8">
+          <span class="hi">MC σ:</span> <span id="res-mc-std" class="hiy">--</span>
+          &nbsp;<span class="hi">CTM-LP avg delay:</span> <span id="res-ctm-d" class="hig">--</span>s
+          &nbsp;<span class="hi">Fuel:</span> <span id="res-fuel" class="hio">--</span>L/hr<br>
+          <span class="hi">Robertson delay corr.:</span> <span id="res-plat-dc" style="color:var(--green)">--</span>
+          &nbsp;<span class="hi">Links analysed:</span> <span id="res-plat-links" class="hiy">--</span>
+        </div>
+      </div>
         <div class="lp-box" style="font-size:.52rem;line-height:1.8">
           <span class="hi">Ref:</span> BBMP TEC 2022 &amp; KRDCL ORR 2022<br>
           <span class="hi">Metric:</span> LP-optimal vs field-measured delay<br>
@@ -3683,6 +3733,40 @@ function initValid(){
       });
       vsvg.innerHTML=svgH;
     }
+  }
+  // ── Populate Key Results Summary panel ──────────────────────────────────
+  // Monte Carlo sensitivity
+  var mc=BACKEND.mc_sensitivity;
+  if(mc){
+    sv('res-p95',   mc.p95_delay.toFixed(1)+'s');
+    sv('res-mc-mean', mc.mean_delay.toFixed(1)+'s');
+    sv('res-mc-std', '±'+mc.std_obj.toFixed(1));
+    var sensEl=g('res-mc-sens');
+    if(sensEl) sensEl.textContent=mc.sensitive_name;
+  }
+  // CTM-LP coupled constraints (use 'high' density as reference)
+  var ctmLpH=BACKEND.ctm_lp?BACKEND.ctm_lp['high']:null;
+  if(ctmLpH){
+    sv('res-ctm-n', ctmLpH.n_coupled_constraints);
+    sv('res-ctm-d', ctmLpH.avg_delay.toFixed(1));
+  }
+  // Robertson platoon dispersion (high density)
+  var plH=BACKEND.dens_precomp['high'].platoon;
+  if(plH&&plH.length>0){
+    var sumF=0,sumPhi=0,sumDC=0;
+    for(var _pi=0;_pi<plH.length;_pi++){sumF+=plH[_pi].F;sumPhi+=plH[_pi].phi;sumDC+=plH[_pi].delay_corr;}
+    var nPl=plH.length;
+    sv('res-plat-f',   (sumF/nPl).toFixed(3));
+    sv('res-plat-phi', (sumPhi/nPl).toFixed(3));
+    sv('res-plat-dc',  (sumDC/nPl).toFixed(3));
+    sv('res-plat-links', nPl);
+  }
+  // Network PI + CO2 (high density)
+  var piH=BACKEND.dens_precomp['high'].pi;
+  if(piH){
+    sv('res-co2',  piH.co2_kph  ? piH.co2_kph.toFixed(0)  : '--');
+    sv('res-pi',   piH.PI_total ? (piH.PI_total/1000).toFixed(1)+'K' : '--');
+    sv('res-fuel', piH.fuel_lph ? piH.fuel_lph.toFixed(0)  : '--');
   }
   // Render Pareto chart as SVG — works immediately, no canvas sizing issues
   renderParetoChart();
