@@ -1895,16 +1895,35 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </div>
       <div class="sec">
+        <div class="stitle">&#x2696; Delay vs CO&#x2082; Pareto Front</div>
+        <div class="lp-box" style="font-size:.5rem;line-height:1.7;margin-bottom:6px">
+          <span class="hi">Method:</span> &#x03B5;-constraint multi-objective LP (Ehrgott 2005)<br>
+          <span class="hi">f1:</span> Weighted delay &#x2211;w&#x1D62;&#xB7;d&#x1D62; &nbsp;
+          <span class="hi">f2:</span> CO&#x2082; proxy = idle time fraction &#xD7; flow<br>
+          <span class="hi">Points:</span> <span id="pf-n" class="hig">--</span> Pareto-optimal solutions &nbsp;
+          <span class="hi">Min delay:</span> <span id="pf-d1" class="hir">--</span>s &nbsp;
+          <span class="hi">Min CO&#x2082;:</span> <span id="pf-d2" style="color:var(--purple)">--</span>
+        </div>
+        <div id="pareto-wrap" style="position:relative;width:100%;height:160px;background:#030d1a;border-radius:4px;overflow:hidden">
+          <canvas id="pareto-canv" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:5px">
+          <span style="font-family:monospace;font-size:.38rem;color:#00e5ff">&#9644; Pareto front</span>
+          <span style="font-family:monospace;font-size:.38rem;color:#00ff88">&#9679; Min-delay point</span>
+          <span style="font-family:monospace;font-size:.38rem;color:#3a5570">&#x2190; Better delay &nbsp; Better CO&#x2082; &#x2193;</span>
+        </div>
+      </div>
+      <div class="sec">
         <div class="stitle">&#x1F4D6; Novelty &amp; References</div>
         <div class="lp-box" style="font-size:.49rem;line-height:1.7">
           <span class="hi" style="color:#bb77ff">NOVELTY CLAIM:</span> First CTM-LP+RL hybrid<br>
           benchmarked vs HiGHS LP on real Bangalore<br>
           ORR 12-jn O-D matrix (BBMP/KRDCL 2022).<br>
           Fourier+ES demand forecast with BBMP profile.<br><br>
-          Webster 1958 | LW&W 1955 | Daganzo 1994<br>
+          Webster 1958 | LW&amp;W 1955 | Daganzo 1994<br>
           Robertson 1969 | Hunt 1982 SCOOT | HCM 6th<br>
           Ehrgott 2005 Multi-Obj | Abdulhai 2003 RL<br>
-          Sutton&Barto 2018 | Holt 1957 | EPA MOVES3
+          Sutton&amp;Barto 2018 | Holt 1957 | EPA MOVES3
         </div>
       </div>
     </div>
@@ -3306,12 +3325,18 @@ function renderParetoChart(){
   var minD=pf[0].f1_delay, minE=pf[pf.length-1].f2_emiss;
   sv('pf-d1', minD.toFixed(1));
   sv('pf-d2', minE.toFixed(4));
+  var wrap=g('pareto-wrap');
   var el = g('pareto-canv');
   if(!el) return;
   if(paretoChart2){try{paretoChart2.destroy();}catch(e){} paretoChart2=null;}
+  // Set explicit pixel dimensions so Chart.js never gets 0×0 canvas
+  var W=wrap?Math.max(wrap.clientWidth,200):260;
+  var H=wrap?Math.max(wrap.clientHeight,160):160;
+  el.width=W; el.height=H;
   try{
     var pts = pf.map(function(p){return {x:p.f1_delay, y:p.f2_emiss};});
-    paretoChart2 = new Chart(el,{
+    var ctx=el.getContext('2d');
+    paretoChart2 = new Chart(ctx,{
       type:'line',
       data:{
         labels: pf.map(function(p){return p.f1_delay.toFixed(0);}),
@@ -3319,37 +3344,43 @@ function renderParetoChart(){
           label:'Pareto Front',
           data: pts.map(function(p){return p.y;}),
           borderColor:'#00e5ff',
-          backgroundColor:'#00e5ff22',
+          backgroundColor:'rgba(0,229,255,0.12)',
           pointBackgroundColor:'#00e5ff',
-          pointRadius:4,
-          borderWidth:2,
+          pointRadius:5,
+          pointHoverRadius:7,
+          borderWidth:2.5,
           fill:true,
-          tension:0.3
+          tension:0.35
         },{
-          label:'Min Delay',
+          label:'Min Delay Point',
           data: pts.map(function(p,i){return i===0?p.y:null;}),
           borderColor:'#00ff88',
-          backgroundColor:'#00ff8866',
+          backgroundColor:'#00ff8888',
           pointBackgroundColor:'#00ff88',
-          pointRadius:7,
+          pointRadius:9,
+          pointHoverRadius:11,
           borderWidth:0,
           fill:false
         }]
       },
       options:{
-        animation:false,responsive:true,maintainAspectRatio:false,
+        animation:false,responsive:false,maintainAspectRatio:false,
         plugins:{
-          legend:{display:false},
+          legend:{display:true,position:'bottom',labels:{
+            color:'#6a8090',font:{size:8,family:"'Share Tech Mono',monospace"},
+            boxWidth:12,padding:8}},
           tooltip:{callbacks:{label:function(ctx){
             var i=ctx.dataIndex;
-            return 'Delay:'+pf[i].f1_delay.toFixed(1)+' | CO₂:'+pf[i].f2_emiss.toFixed(4);
+            return 'Delay: '+pf[i].f1_delay.toFixed(1)+'s  |  CO\u2082: '+pf[i].f2_emiss.toFixed(4);
           }}}
         },
         scales:{
-          x:{display:true,title:{display:true,text:'f1 Delay (weighted s)',color:'#4a6880',font:{size:8}},
-             ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}},
-          y:{display:true,title:{display:true,text:'f2 CO₂ proxy',color:'#4a6880',font:{size:8}},
-             ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}}
+          x:{display:true,
+             title:{display:true,text:'f1: Weighted Delay (s)',color:'#4a6880',font:{size:8}},
+             ticks:{color:'#3a5570',font:{size:7.5}},grid:{color:'#0d2040'}},
+          y:{display:true,
+             title:{display:true,text:'f2: CO\u2082 Proxy (PCU\xB7idle)',color:'#4a6880',font:{size:8}},
+             ticks:{color:'#3a5570',font:{size:7.5}},grid:{color:'#0d2040'}}
         }
       }
     });
@@ -3591,54 +3622,54 @@ function initAIML(){
 // ── VALIDATION PANEL ─────────────────────────────────────────────────────────
 var _valDone=false;
 function initValid(){
-  if(_valDone) return; _valDone=true;
   var val=BACKEND.validation; if(!val) return;
-  var rhoEl=g('val-rho');
-  if(rhoEl){rhoEl.textContent=val.spearman_rho.toFixed(4); rhoEl.style.color=val.spearman_rho>0.7?'var(--green)':val.spearman_rho>0.4?'var(--yellow)':'var(--red)';}
-  sv('val-sav', val.avg_savings_pct.toFixed(1));
-  sv('val-rmse', val.rmse_s.toFixed(1));
-  var noteEl=g('val-note'); if(noteEl&&val.note) noteEl.textContent=val.note;
+  // Static content only needs to render once
+  if(!_valDone){
+    _valDone=true;
+    var rhoEl=g('val-rho');
+    if(rhoEl){rhoEl.textContent=val.spearman_rho.toFixed(4); rhoEl.style.color=val.spearman_rho>0.7?'var(--green)':val.spearman_rho>0.4?'var(--yellow)':'var(--red)';}
+    sv('val-sav', val.avg_savings_pct.toFixed(1));
+    sv('val-rmse', val.rmse_s.toFixed(1));
+    var noteEl=g('val-note'); if(noteEl&&val.note) noteEl.textContent=val.note;
 
-  // Table
-  var tb=g('val-tbody'); if(tb&&val.details){
-    var th='';
-    val.details.forEach(function(d){
-      var sc=d.savings_pct>60?'var(--green)':d.savings_pct>40?'var(--yellow)':'var(--orange)';
-      th+='<tr><td style="color:#7090a0">'+d.junction.substring(0,10)+'</td>'
-        +'<td style="color:var(--cyan)">'+d.measured+'</td>'
-        +'<td style="color:var(--orange)">'+d.modelled+'</td>'
-        +'<td style="color:'+sc+'">'+d.savings_pct+'%</td></tr>';
-    });
-    tb.innerHTML=th;
-  }
+    // Table
+    var tb=g('val-tbody'); if(tb&&val.details){
+      var th='';
+      val.details.forEach(function(d){
+        var sc=d.savings_pct>60?'var(--green)':d.savings_pct>40?'var(--yellow)':'var(--orange)';
+        th+='<tr><td style="color:#7090a0">'+d.junction.substring(0,10)+'</td>'
+          +'<td style="color:var(--cyan)">'+d.measured+'</td>'
+          +'<td style="color:var(--orange)">'+d.modelled+'</td>'
+          +'<td style="color:'+sc+'">'+d.savings_pct+'%</td></tr>';
+      });
+      tb.innerHTML=th;
+    }
 
-  // SVG scatter — works from hidden tab, no canvas needed
-  var vsvg=g('val-svg');
-  if(vsvg&&val.details){
-    var meas2=val.details.map(function(d){return d.measured;});
-    var lps=val.details.map(function(d){return d.modelled;});
-    var maxF=Math.max.apply(null,meas2)*1.1;
-    var W2=260,H2=110,pad2=14;
-    function fx(v){return pad2+(v/maxF)*(W2-2*pad2);}
-    function fy(v){return H2-pad2-(v/maxF)*(H2-2*pad2);}
-    // y=x diagonal
-    var svgH='<line x1="'+fx(0)+'" y1="'+fy(0)+'" x2="'+fx(maxF)+'" y2="'+fy(maxF)+'" stroke="#00e5ff22" stroke-width="1" stroke-dasharray="5 4"/>';
-    // Axis labels
-    svgH+='<text x="'+pad2+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">0</text>';
-    svgH+='<text x="'+(W2-20)+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'s</text>';
-    svgH+='<text x="2" y="'+(pad2+4)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'</text>';
-    // Dots
-    val.details.forEach(function(d,idx){
-      var cx2=fx(d.measured), cy2=fy(d.modelled);
-      // color by saving: green=big saving, orange=moderate
-      var dotCol=d.savings_pct>70?'#00ff88':d.savings_pct>50?'#ffd700':'#ff8c00';
-      svgH+='<circle cx="'+cx2.toFixed(1)+'" cy="'+cy2.toFixed(1)+'" r="5" fill="'+dotCol+'" fill-opacity="0.85"/>';
-      // Label
-      var lx=cx2>W2-50?cx2-2:cx2+7;
-      svgH+='<text x="'+lx.toFixed(0)+'" y="'+(cy2-3).toFixed(0)+'" fill="'+dotCol+'" font-size="5.5">'+d.junction.substring(0,6)+'</text>';
-    });
-    vsvg.innerHTML=svgH;
+    // SVG scatter — works from hidden tab, no canvas needed
+    var vsvg=g('val-svg');
+    if(vsvg&&val.details){
+      var meas2=val.details.map(function(d){return d.measured;});
+      var lps=val.details.map(function(d){return d.modelled;});
+      var maxF=Math.max.apply(null,meas2)*1.1;
+      var W2=260,H2=110,pad2=14;
+      function fx(v){return pad2+(v/maxF)*(W2-2*pad2);}
+      function fy(v){return H2-pad2-(v/maxF)*(H2-2*pad2);}
+      var svgH='<line x1="'+fx(0)+'" y1="'+fy(0)+'" x2="'+fx(maxF)+'" y2="'+fy(maxF)+'" stroke="#00e5ff22" stroke-width="1" stroke-dasharray="5 4"/>';
+      svgH+='<text x="'+pad2+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">0</text>';
+      svgH+='<text x="'+(W2-20)+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'s</text>';
+      svgH+='<text x="2" y="'+(pad2+4)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'</text>';
+      val.details.forEach(function(d,idx){
+        var cx2=fx(d.measured), cy2=fy(d.modelled);
+        var dotCol=d.savings_pct>70?'#00ff88':d.savings_pct>50?'#ffd700':'#ff8c00';
+        svgH+='<circle cx="'+cx2.toFixed(1)+'" cy="'+cy2.toFixed(1)+'" r="5" fill="'+dotCol+'" fill-opacity="0.85"/>';
+        var lx=cx2>W2-50?cx2-2:cx2+7;
+        svgH+='<text x="'+lx.toFixed(0)+'" y="'+(cy2-3).toFixed(0)+'" fill="'+dotCol+'" font-size="5.5">'+d.junction.substring(0,6)+'</text>';
+      });
+      vsvg.innerHTML=svgH;
+    }
   }
+  // Always re-render Pareto chart (canvas-based, must have real dimensions)
+  setTimeout(function(){renderParetoChart();}, 150);
 }
 // ── RANDOM FOREST PANEL ──────────────────────────────────────────────────────
 var _rfDone = false;
