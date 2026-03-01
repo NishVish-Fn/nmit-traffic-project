@@ -965,784 +965,2760 @@ BACKEND_JSON = json.dumps({
 # HTML / JS FRONTEND
 # ─────────────────────────────────────────────────────────────────────────────
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FRONTEND — 100% self-contained, zero external dependencies
-# ─────────────────────────────────────────────────────────────────────────────
-
-HTML_TEMPLATE = r"""<!DOCTYPE html>
-<html>
+HTML = """<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>Urban Flow & Life-Lines — PhD Competition | Bangalore</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg:#020810;--bg2:#06101e;--bg3:#0b1a2e;
+  --cyan:#00e5ff;--green:#00ff88;--red:#ff2244;
+  --orange:#ff8c00;--yellow:#ffd700;--purple:#bb77ff;--pink:#ff44aa;
+  --cdim:#00e5ff22;
+}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#020810;color:#b8d8f0;font-family:'Courier New',Courier,monospace}
-#app{display:flex;flex-direction:column;width:100%;height:100%}
+body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
+     width:100%;height:990px;overflow:hidden;display:flex;flex-direction:column}
 
 /* HEADER */
-#hdr{height:50px;flex-shrink:0;background:#000d1a;border-bottom:1px solid #00e5ff22;
-  display:flex;align-items:center;padding:0 14px;gap:16px;overflow:hidden}
-.brand{color:#00e5ff;font-size:.9rem;font-weight:bold;letter-spacing:2px;white-space:nowrap}
-.sub{font-size:.42rem;color:#ff8c00;white-space:nowrap}
-.kpis{margin-left:auto;display:flex;gap:20px;flex-shrink:0}
-.kpi{text-align:center;min-width:50px}
-.kv{font-size:.95rem;font-weight:bold;line-height:1.1}
-.kl{font-size:.38rem;color:#3a5570;letter-spacing:1px;margin-top:1px}
-.hbtns{display:flex;gap:5px;flex-shrink:0}
-.btn{padding:4px 10px;border-radius:3px;border:1px solid;cursor:pointer;
-  font-family:inherit;font-size:.5rem;letter-spacing:1px;background:transparent}
-.br{border-color:#ff2244;color:#ff2244}.bg{border-color:#00ff88;color:#00ff88}
-.by{border-color:#ffd700;color:#ffd700}
-.btn:hover{opacity:.7}
+#hdr{height:56px;flex-shrink:0;background:linear-gradient(90deg,#000a18,#020810 50%,#000a18);
+  border-bottom:1px solid var(--cdim);display:flex;align-items:center;
+  padding:0 14px;gap:0;position:relative;z-index:2000}
+#hdr::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:scan 5s ease-in-out infinite}
+@keyframes scan{0%,100%{opacity:.3}50%{opacity:1}}
+.h-brand{display:flex;align-items:center;gap:10px;min-width:300px}
+.h-icon{font-size:1.8rem;filter:drop-shadow(0 0 10px var(--cyan))}
+.h-title{font-family:'Orbitron',monospace;font-size:.95rem;font-weight:800;
+  color:var(--cyan);letter-spacing:2px;text-shadow:0 0 20px #00e5ff66}
+.h-sub{font-family:'Share Tech Mono',monospace;font-size:0.52rem;color:var(--orange);
+  letter-spacing:2px;margin-top:2px}
+.h-div{width:1px;height:30px;background:var(--cdim);margin:0 10px}
+.h-kpis{display:flex;gap:18px;flex:1;justify-content:center}
+.kpi{text-align:center}
+.kpi-v{font-family:'Orbitron',monospace;font-weight:700;font-size:1.1rem;line-height:1}
+.kpi-l{font-family:'Share Tech Mono',monospace;font-size:0.44rem;color:#4a6880;
+  letter-spacing:1px;margin-top:3px;text-transform:uppercase}
+.h-btns{display:flex;gap:6px;align-items:center;min-width:340px;justify-content:flex-end}
+.btn{font-family:'Share Tech Mono',monospace;font-size:0.57rem;letter-spacing:1.5px;
+  padding:5px 11px;border:1px solid;border-radius:3px;cursor:pointer;
+  transition:all .2s;background:transparent;text-transform:uppercase;white-space:nowrap}
+.btn-c{border-color:var(--cyan);color:var(--cyan)}
+.btn-c:hover,.btn-c.on{background:var(--cyan);color:#000;box-shadow:0 0 16px #00e5ff88}
+.btn-r{border-color:var(--red);color:var(--red)}
+.btn-r:hover{background:var(--red);color:#fff;box-shadow:0 0 16px #ff224488}
+.btn-g{border-color:var(--green);color:var(--green)}
+.btn-g:hover,.btn-g.on{background:var(--green);color:#000;box-shadow:0 0 16px #00ff8888}
+.live{font-family:'Share Tech Mono',monospace;font-size:0.55rem;letter-spacing:2px;
+  padding:3px 8px;background:#ff224418;border:1px solid var(--red);color:var(--red);
+  border-radius:2px;animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* MAIN */
-#main{flex:1;min-height:0;display:flex;overflow:hidden}
+/* BODY */
+#body{flex:1;min-height:0;display:flex;overflow:hidden}
 
-/* LEFT */
-#lp{width:220px;flex-shrink:0;background:#06101e;border-right:1px solid #0a1928;
-  overflow-y:auto;padding:8px;font-size:.5rem}
-.sh{color:#00e5ff;letter-spacing:2px;font-size:.47rem;padding:5px 0 3px;
-  border-bottom:1px solid #0d2040;margin-bottom:7px;margin-top:8px}
-.sh:first-child{margin-top:0}
-.cr{margin-bottom:8px}
-.cl{display:flex;justify-content:space-between;margin-bottom:2px;color:#4a6880}
-.cv{color:#00e5ff;font-weight:bold}
-input[type=range]{width:100%;height:3px;accent-color:#00e5ff;display:block}
-select{width:100%;background:#020810;border:1px solid #0d2040;color:#00e5ff;
-  font-family:inherit;font-size:.48rem;padding:3px;border-radius:2px;outline:none;margin-top:2px}
-.inf{line-height:1.9;color:#3a5570}
-.inf span{color:#00e5ff}
-.lr{display:flex;align-items:center;gap:6px;margin-bottom:2px;color:#3a5570;font-size:.46rem}
-.lb{height:3px;width:20px;border-radius:1px;flex-shrink:0}
+/* LEFT PANEL */
+#lp{width:286px;flex-shrink:0;background:var(--bg2);
+  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--cdim)}
+.tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
+  font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
+  color:#4a6880;border-bottom:2px solid transparent;transition:.2s;text-transform:uppercase}
+.tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tab:hover:not(.on){color:#7090a0}
+.tpane{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
+  scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
+  flex-direction:column;gap:8px}
+.tpane.on{display:flex}
+.sec{background:var(--bg3);border:1px solid #0d2040;border-radius:4px;padding:10px}
+.stitle{font-family:'Orbitron',monospace;font-size:0.55rem;font-weight:600;
+  color:var(--cyan);letter-spacing:2px;text-transform:uppercase;
+  border-bottom:1px solid var(--cdim);padding-bottom:5px;margin-bottom:8px}
+.ctrl{margin-bottom:10px}.ctrl:last-child{margin-bottom:0}
+.clbl{font-family:'Share Tech Mono',monospace;font-size:0.58rem;color:#4a6880;
+  letter-spacing:1px;display:flex;justify-content:space-between;margin-bottom:4px}
+.clbl span{color:var(--cyan);font-weight:bold}
+input[type=range]{width:100%;-webkit-appearance:none;height:3px;
+  background:#0d2040;border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;
+  background:var(--cyan);border-radius:50%;cursor:pointer;box-shadow:0 0 7px #00e5ff88}
+select{width:100%;background:var(--bg);border:1px solid #0d2040;
+  color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:0.58rem;
+  padding:5px 6px;border-radius:3px;outline:none;cursor:pointer}
+.ji{display:grid;grid-template-columns:10px 1fr auto auto;align-items:center;gap:6px;
+  padding:5px 6px;border-radius:3px;border:1px solid transparent;cursor:pointer;
+  transition:.2s;margin-bottom:3px;background:var(--bg)}
+.ji:hover{border-color:var(--cdim)}
+.ji.evp{border-color:var(--red);background:#150308;animation:jp .8s infinite alternate}
+@keyframes jp{from{box-shadow:none}to{box-shadow:0 0 8px #ff224433}}
+.jdot{width:9px;height:9px;border-radius:50%;transition:all .3s}
+.jname{font-family:'Share Tech Mono',monospace;font-size:0.58rem;line-height:1.3}
+.jname small{display:block;color:#3a5570;font-size:0.45rem}
+.jpct{font-family:'Orbitron',monospace;font-size:0.68rem;font-weight:700;text-align:right}
+.jtmr{font-family:'Share Tech Mono',monospace;font-size:0.45rem;color:#3a5570}
+.sc-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.sc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sc-txt{font-family:'Share Tech Mono',monospace;font-size:0.55rem;color:#5a7590;line-height:1.4}
+.dt{width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:0.55rem}
+.dt td{padding:3px 4px;border-bottom:1px solid #0d2040}
+.dt tr:last-child td{border-bottom:none}
+.dt td:first-child{color:#4a6880}
+.dt td:last-child{text-align:right;font-weight:bold}
 
 /* MAP */
-#mw{flex:1;position:relative;overflow:hidden;background:#020810}
-#mc{position:absolute;top:0;left:0;display:block}
-.pill{position:absolute;z-index:5;background:rgba(2,8,16,.9);border:1px solid;
-  border-radius:3px;font-size:.48rem;padding:4px 10px}
-#ptop{top:8px;left:50%;transform:translateX(-50%);border-color:#ff8c0044;
-  color:#ff8c00;display:flex;gap:14px;white-space:nowrap}
-#ptop b{color:#00e5ff}
-#pleg{bottom:36px;left:8px;border-color:#00e5ff18;padding:6px 10px}
+#mw{flex:1;position:relative;overflow:hidden}
+#map{width:100%;height:100%}
+#fc{position:absolute;top:0;left:0;pointer-events:none;z-index:400}
+.evpo{position:absolute;inset:0;pointer-events:none;z-index:450;
+  background:transparent;transition:.4s}
+.evpo.on{background:radial-gradient(ellipse at center,rgba(255,34,68,.07) 0%,transparent 65%)}
+.mpill{position:absolute;z-index:600;background:rgba(2,8,16,.92);
+  border:1px solid;border-radius:4px;font-family:'Share Tech Mono',monospace;
+  font-size:0.58rem;backdrop-filter:blur(4px)}
+#mtop{top:10px;left:50%;transform:translateX(-50%);border-color:#ff8c0088;
+  padding:6px 16px;display:flex;gap:18px;color:var(--orange);white-space:nowrap}
+#mtop b{color:var(--cyan)}
+#mleg{bottom:12px;left:12px;border-color:var(--cdim);padding:10px 12px;min-width:160px}
+#mscl{bottom:12px;right:12px;border-color:var(--cdim);padding:10px 12px}
+.lt{font-family:'Orbitron',monospace;font-size:0.5rem;color:var(--cyan);
+  letter-spacing:2px;margin-bottom:6px}
+.lr{display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#5a7090}
+.lb{height:3px;width:28px;border-radius:2px}
+.mr{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.md{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mt{font-family:'Share Tech Mono',monospace;font-size:0.53rem;color:#5a7590}
 
-/* RIGHT */
-#rp{width:300px;flex-shrink:0;background:#06101e;border-left:1px solid #0a1928;
-  display:flex;flex-direction:column;overflow:hidden}
-.tabs{display:flex;border-bottom:1px solid #0d2040;flex-shrink:0}
-.tab{flex:1;padding:6px 0;text-align:center;cursor:pointer;font-size:.42rem;
-  color:#3a5570;border-bottom:2px solid transparent;letter-spacing:1px}
-.tab.on{color:#00e5ff;border-bottom-color:#00e5ff}
-.tp{display:none;flex:1;overflow-y:auto;padding:7px}
-.tp.on{display:block}
+/* RIGHT PANEL */
+#rp{width:330px;flex-shrink:0;background:var(--bg2);
+  border-left:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.atab-content{display:none;flex:1;min-height:0;overflow-y:auto;padding:10px;
+  scrollbar-width:thin;scrollbar-color:var(--cdim) transparent;
+  flex-direction:column;gap:8px}
+.atab-content.on{display:flex}
+.gc{background:var(--bg3);border:1px solid #0d2040;border-radius:4px;padding:8px}
+.gh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
+.gtl{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:var(--cyan);
+  letter-spacing:1.5px;text-transform:uppercase;line-height:1.5}
+.gr{text-align:right}
+.gv{font-family:'Orbitron',monospace;font-size:1.25rem;font-weight:700;line-height:1}
+.gu{font-family:'Share Tech Mono',monospace;font-size:0.44rem;color:#4a6880;
+  display:block;margin-top:2px}
+.gd{font-family:'Share Tech Mono',monospace;font-size:0.5rem;display:inline-block;margin-top:2px}
+.up{color:var(--green)}.dn{color:var(--red)}
+canvas.gcanv{display:block;width:100%!important;height:62px!important}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.scard{background:var(--bg);border:1px solid #0d2040;border-radius:3px;
+  padding:8px 6px;text-align:center;border-left:3px solid}
+.sv{font-family:'Orbitron',monospace;font-size:1.0rem;font-weight:700;
+  line-height:1;margin-bottom:3px}
+.sl{font-family:'Share Tech Mono',monospace;font-size:0.44rem;
+  color:#4a6880;letter-spacing:1px;text-transform:uppercase}
+.ss{font-family:'Share Tech Mono',monospace;font-size:0.44rem;color:#2a4060;margin-top:2px}
+.ab-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ab{padding:8px 6px;border-radius:3px;border:1px solid;text-align:center}
+.abn{font-family:'Orbitron',monospace;font-size:0.43rem;letter-spacing:1px;
+  margin-bottom:4px;text-transform:uppercase}
+.abv{font-family:'Orbitron',monospace;font-size:1.05rem;font-weight:700;line-height:1}
+.abs{font-family:'Share Tech Mono',monospace;font-size:0.44rem;color:#3a5570;margin-top:3px}
+/* ── REAL-TIME SIGNAL CARDS ── big, visible from far ── */
+.sc-card{background:#030d1a;border:1px solid #0d2040;border-radius:6px;
+  padding:8px 10px;border-left:5px solid;margin-bottom:6px;position:relative;overflow:hidden}
+.sc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.3}
+.sc-name{font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:700;
+  color:#a0c0d0;margin-bottom:4px;letter-spacing:1px;text-transform:uppercase}
+.sc-state{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:900;
+  line-height:1;letter-spacing:2px}
+.sc-sub{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:#3a5570;margin-bottom:2px}
+.sc-tmr{font-family:'Orbitron',monospace;font-size:2.2rem;font-weight:900;
+  line-height:1;text-align:center;letter-spacing:3px;text-shadow:0 0 20px currentColor}
+.sc-bar{height:6px;background:#0d2040;border-radius:3px;margin-top:6px;overflow:hidden}
+.sc-fill{height:100%;border-radius:3px;transition:width .3s linear}
+.sc-stat-big{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;line-height:1}
+.sc-stat-label{font-family:'Share Tech Mono',monospace;font-size:0.5rem;color:#4a6880;
+  text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.sc-stat-cell{text-align:center;padding:5px 4px;background:#040f1e;border-radius:4px;
+  border:1px solid #0d2040}
+.sc-evp{animation:scp .4s infinite alternate}
+@keyframes scp{from{box-shadow:none;border-left-color:#ff2244}to{box-shadow:0 0 18px #ff224488;border-left-color:#ff6688}}
+.lp-box{background:var(--bg);border:1px solid #0d2040;border-radius:3px;
+  padding:9px;font-family:'Share Tech Mono',monospace;font-size:0.57rem;
+  color:#3a5570;line-height:2}
+.hi{color:var(--cyan)}.hig{color:var(--green)}.hiy{color:var(--yellow)}
+.hio{color:var(--orange)}.hir{color:var(--red)}.hip{color:var(--purple)}
+#statusbar{height:27px;flex-shrink:0;background:var(--bg2);
+  border-top:1px solid var(--cdim);display:flex;align-items:center;
+  padding:0 12px;gap:0;font-family:'Share Tech Mono',monospace;font-size:0.54rem;overflow:hidden}
+.sb{display:flex;align-items:center;gap:4px;color:#4a6880;padding:0 10px;
+  border-right:1px solid #0d2040;white-space:nowrap}
+.sb:last-child{border-right:none;margin-left:auto}
+.sbv{color:var(--cyan);font-weight:bold}
+.sbv.r{color:var(--red)}.sbv.g{color:var(--green)}.sbv.y{color:var(--yellow)}.sbv.p{color:var(--purple)}
+.leaflet-tile-pane{filter:brightness(.28) saturate(.2) hue-rotate(195deg)!important}
+.leaflet-container{background:var(--bg)}
+.leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+/* LWR shock wave canvas */
+#lwrcanv{display:block;width:100%!important;height:90px!important}
+/* LP table */
+.lptbl{width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:0.52rem}
+.lptbl th{color:var(--cyan);padding:3px 4px;border-bottom:1px solid var(--cdim);font-weight:normal;text-align:right}
+.lptbl th:first-child{text-align:left}
+.lptbl td{padding:2px 4px;border-bottom:1px solid #0a1828;text-align:right}
+.lptbl td:first-child{text-align:left;color:#5a7590}
+.lptbl tr:last-child td{border-bottom:none}
+.badge{display:inline-block;font-family:'Share Tech Mono',monospace;font-size:0.44rem;
+  padding:1px 5px;border-radius:2px;font-weight:bold}
+.badge-ok{background:#00ff8822;color:var(--green);border:1px solid #00ff8844}
+.badge-warn{background:#ffd70022;color:var(--yellow);border:1px solid #ffd70044}
+.badge-crit{background:#ff224422;color:var(--red);border:1px solid #ff224444}
 
-/* GRAPH CARDS */
-.gc{background:#0b1a2e;border:1px solid #0d2040;border-radius:3px;padding:6px;margin-bottom:5px}
-.gh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px}
-.gl{font-size:.44rem;color:#00e5ff;letter-spacing:1px}
-.gval{font-size:1rem;font-weight:bold;text-align:right;line-height:1.1}
-.gu{font-size:.38rem;color:#3a5570;display:block}
-.gc canvas{display:block;width:100%!important;height:52px!important}
+/* ── COLLAPSIBLE SECTIONS ──────────────────────────────────────────────────── */
+details.csec{background:var(--bg3);border:1px solid #0d2040;border-radius:4px;margin-bottom:6px;overflow:hidden}
+details.csec[open]{border-color:#1a3050}
+details.csec summary{
+  font-family:'Orbitron',monospace;font-size:0.52rem;font-weight:600;
+  color:var(--cyan);letter-spacing:1.5px;text-transform:uppercase;
+  padding:8px 10px;cursor:pointer;list-style:none;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid transparent;user-select:none;
+  transition:background .15s}
+details.csec summary::-webkit-details-marker{display:none}
+details.csec[open] summary{border-bottom-color:var(--cdim);background:#091420}
+details.csec summary::after{
+  content:'▼';font-size:0.4rem;color:#3a5570;transition:transform .2s}
+details.csec[open] summary::after{transform:rotate(180deg);color:var(--cyan)}
+details.csec summary:hover{background:#0a1828}
+.csec-body{padding:10px}
+.csec-badge{font-family:'Share Tech Mono',monospace;font-size:0.42rem;
+  padding:1px 6px;border-radius:2px;border:1px solid;margin-left:6px}
+.csec-badge.live{background:#00ff8811;color:var(--green);border-color:#00ff8844;
+  animation:blink 1.4s infinite}
+.csec-badge.warn{background:#ffd70011;color:var(--yellow);border-color:#ffd70044}
+.csec-badge.crit{background:#ff224411;color:var(--red);border-color:#ff224444}
 
-/* LP TABLE */
-table{width:100%;border-collapse:collapse;font-size:.44rem}
-th{color:#00e5ff;padding:2px 3px;border-bottom:1px solid #0d2040;text-align:right;font-weight:normal}
-th:first-child{text-align:left}
-td{padding:2px 3px;border-bottom:1px solid #080f1c;text-align:right}
-td:first-child{text-align:left;color:#4a6880;font-size:.42rem}
+/* ── INTERSECTION SIGNAL BOX ───────────────────────────────────────────────── */
+.sig-box{display:grid;grid-template-columns:1fr 44px 1fr;grid-template-rows:1fr 44px 1fr;
+  gap:4px;padding:8px;background:var(--bg);border:1px solid #0d2040;border-radius:4px;margin-bottom:6px}
+.sig-arm{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.sig-arm.horiz{flex-direction:row}
+.sig-center{background:#0a1828;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-family:'Orbitron',monospace;font-size:0.48rem;
+  color:var(--cyan);text-align:center;line-height:1.3}
+.sig-light{width:8px;height:8px;border-radius:50%;border:1px solid #1a3050;flex-shrink:0}
+.sig-light.on-g{background:var(--green);box-shadow:0 0 6px var(--green)}
+.sig-light.on-y{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+.sig-light.on-r{background:var(--red);box-shadow:0 0 6px var(--red)}
+.sig-light.off{background:#0d2040}
+.sig-arm-lbl{font-family:'Share Tech Mono',monospace;font-size:0.42rem;color:#3a5570;
+  letter-spacing:0.5px;text-align:center}
+.sig-timer{font-family:'Orbitron',monospace;font-size:0.65rem;font-weight:700;
+  color:var(--cyan);text-align:center}
 
-/* SIGNAL CARDS */
-.sc{background:#0b1a2e;border:1px solid #0d2040;border-left:3px solid;
-  border-radius:3px;padding:6px;margin-bottom:5px}
-.sn{font-size:.5rem;font-weight:bold;color:#a0c0d0;margin-bottom:2px}
-.sw{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
-.ss-state{font-size:1rem;font-weight:bold}
-.ss-timer{font-size:1.5rem;font-weight:bold;letter-spacing:2px}
-.sb2{height:4px;background:#0d2040;border-radius:2px;margin:3px 0;overflow:hidden}
-.sf{height:100%;border-radius:2px}
-.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:3px}
-.sc2{text-align:center;background:#040f1e;border:1px solid #0d2040;border-radius:2px;padding:2px}
-.sv2{font-size:.8rem;font-weight:bold;line-height:1.1}
-.sl{font-size:.36rem;color:#3a5570;margin-top:1px}
-
-/* STATUS BAR */
-#sb{height:22px;flex-shrink:0;background:#06101e;border-top:1px solid #0d2040;
-  display:flex;align-items:center;padding:0 8px;gap:0;font-size:.44rem;overflow:hidden}
-.sbi{color:#3a5570;padding:0 7px;border-right:1px solid #0d2040;white-space:nowrap}
-.sbi b{color:#00e5ff}
-.sbi:last-child{border:none;margin-left:auto;font-size:.38rem}
-
-/* TOOLTIP */
-#tip{position:fixed;z-index:9999;background:rgba(2,8,16,.97);border:1px solid #00e5ff44;
-  border-radius:4px;padding:8px 12px;pointer-events:none;display:none;font-size:10px;
-  line-height:1.7;max-width:210px;color:#b8d8f0;box-shadow:0 4px 20px #000c}
+/* ── LANE-DIAGRAM MINI ─────────────────────────────────────────────────────── */
+.mini-road{position:relative;height:28px;background:#0a1828;border-radius:2px;
+  overflow:hidden;margin-top:4px;border:1px solid #0d2040}
+.lane-stripe{position:absolute;top:50%;transform:translateY(-50%);
+  width:100%;height:1px;border-top:1px dashed #1a3050;opacity:.5}
+.lane-flow{position:absolute;top:0;left:0;height:50%;width:100%;
+  background:linear-gradient(90deg,transparent,#00e5ff18,transparent)}
+.lane-flow.rev{top:50%;background:linear-gradient(270deg,transparent,#ff224418,transparent)}
 </style>
 </head>
 <body>
-<div id="tip"></div>
-<script>var __BD=BACKEND_JSON_PLACEHOLDER;</script>
-<div id="app">
 
+<script id="__backend_data" type="application/json">""" + BACKEND_JSON + """</script>
 <div id="hdr">
-  <div><div class="brand">🚦 URBAN FLOW &amp; LIFE-LINES</div>
-    <div class="sub">BANGALORE GRID · LP+CTM+LWR+RL · NMIT ISE · NISHCHAL &amp; RISHUL</div></div>
-  <div class="kpis">
-    <div class="kpi"><div class="kv" id="kv0" style="color:#00e5ff">--</div><div class="kl">VEHICLES</div></div>
-    <div class="kpi"><div class="kv" id="kv1" style="color:#ff2244">--</div><div class="kl">AVG DELAY</div></div>
-    <div class="kpi"><div class="kv" id="kv2" style="color:#ff8c00">--</div><div class="kl">EVP ACTIVE</div></div>
-    <div class="kpi"><div class="kv" id="kv3" style="color:#00ff88">--</div><div class="kl">EFFICIENCY</div></div>
-    <div class="kpi"><div class="kv" id="kv4" style="color:#ffd700">--</div><div class="kl">KM/H AVG</div></div>
+  <div class="h-brand">
+    <div class="h-icon">&#x1F6A6;</div>
+    <div>
+      <div class="h-title">URBAN FLOW &amp; LIFE-LINES</div>
+      <div class="h-sub">&#9658; BANGALORE GRID &#8212; LP+CTM+LWR+RL+ML &#9668; NMIT ISE &mdash; <span style="color:#00ff88">&#9733; NOVEL: Q-LEARNING vs HiGHS-LP ON BBMP 2022 O-D</span></div>
+    </div>
   </div>
-  <div class="hbtns">
-    <button class="btn br" id="btnlive">● LIVE</button>
-    <button class="btn bg" id="btnalgo" onclick="cycleAlgo()">GW+LP+EVP</button>
-    <button class="btn by" onclick="massEVP()">⚡ MASS EVP</button>
-    <button class="btn by" id="btnpause" onclick="togglePause()">⏸ PAUSE</button>
+  <div class="h-div"></div>
+  <div class="h-kpis">
+    <div class="kpi"><div class="kpi-v" id="kv0" style="color:var(--cyan)">&#8212;</div><div class="kpi-l">Live Vehicles</div></div>
+    <div class="kpi"><div class="kpi-v" id="kv1" style="color:var(--red)">&#8212;</div><div class="kpi-l">Webster Delay</div></div>
+    <div class="kpi"><div class="kpi-v" id="kv2" style="color:var(--orange)">&#8212;</div><div class="kpi-l">EVP Active</div></div>
+    <div class="kpi"><div class="kpi-v" id="kv3" style="color:var(--green)">&#8212;</div><div class="kpi-l">Grid Efficiency</div></div>
+    <div class="kpi"><div class="kpi-v" id="kv4" style="color:var(--yellow)">&#8212;</div><div class="kpi-l">Avg Speed km/h</div></div>
+    <div class="kpi"><div class="kpi-v" id="kv5" style="color:var(--purple)">&#8212;</div><div class="kpi-l">LP Objective</div></div>
+  </div>
+  <div class="h-div"></div>
+  <div class="h-btns">
+    <div class="live">&#x25CF; LIVE</div>
+    <button class="btn btn-g on" id="btn-algo" onclick="cycleAlgo()">&#x26A1; GW+LP+EVP</button>
+    <button class="btn btn-r" onclick="massEVP()">&#x1F6A8; MASS EVP</button>
+    <button class="btn btn-c" id="btn-pause" onclick="togglePause()">&#x23F8; PAUSE</button>
   </div>
 </div>
 
-<div id="main">
+<div id="body">
+  <!-- LEFT -->
   <div id="lp">
-    <div class="sh">SIMULATION CONTROLS</div>
-    <div class="cr"><div class="cl">Traffic Density <span class="cv" id="ldl">Peak</span></div>
-      <input type="range" min="1" max="5" value="5" oninput="setDens(+this.value)"></div>
-    <div class="cr"><div class="cl">Emergency Vehicles <span class="cv" id="lem">50=5K veh</span></div>
-      <input type="range" min="0" max="100" value="50" oninput="setEmerg(+this.value)"></div>
-    <div class="cr"><div class="cl">Free-Flow Speed <span class="cv" id="lwv">25 km/h</span></div>
-      <input type="range" min="5" max="60" value="25" oninput="S.wave=+this.value;g('lwv').textContent=this.value+' km/h'"></div>
-    <div class="cr"><div class="cl">Signal Cycle <span class="cv" id="lcy">90s</span></div>
-      <input type="range" min="30" max="180" value="90" oninput="S.cycle=+this.value;g('lcy').textContent=this.value+'s'"></div>
-    <div class="sh">ALGORITHM</div>
-    <div class="cr"><select id="selalgo" onchange="setAlgo(this.value)">
-      <option value="optimal">GW + LP + EVP (Proposed)</option>
-      <option value="lp">LP Only</option>
-      <option value="webster">Webster Adaptive</option>
-      <option value="fixed">Fixed Timer</option>
-      <option value="evp">EVP Priority</option>
-      <option value="rl">RL Q-Learning</option>
-    </select></div>
-    <div class="cr"><div class="cl">Speed</div>
-      <select onchange="S.spd=+this.value">
-        <option value="0.5">0.5×</option><option value="1" selected>1× Real-time</option>
-        <option value="2">2× Fast</option><option value="5">5× Ultra</option>
-      </select></div>
-    <div class="sh">LP SOLVER STATUS</div>
-    <div class="inf">Status: <span id="lps" style="color:#00ff88">OPTIMAL</span><br>
-      Obj val: <span id="lpo">--</span><br>
-      Avg delay: <span id="lpd" style="color:#ff2244">--</span>s/veh<br>
-      Avg x: <span id="lpx" style="color:#ff8c00">--</span></div>
-    <div class="sh">MAP LEGEND</div>
-    <div class="lr"><div class="lb" style="background:#00ff88"></div>Free-flow &lt;40%</div>
-    <div class="lr"><div class="lb" style="background:#ffd700"></div>Moderate 40-65%</div>
-    <div class="lr"><div class="lb" style="background:#ff8c00"></div>Congested 65-85%</div>
-    <div class="lr"><div class="lb" style="background:#ff2244"></div>Gridlock &gt;85%</div>
-    <div class="lr"><div class="lb" style="background:#bb77ff"></div>LWR Shock Wave</div>
-    <div class="lr"><div class="lb" style="background:#ff44aa"></div>EVP Corridor</div>
+    <div class="tabs">
+      <div class="tab on" onclick="lTab(0)">CONTROLS</div>
+      <div class="tab" onclick="lTab(1)">JUNCTIONS</div>
+      <div class="tab" onclick="lTab(2)">DATA</div>
+    </div>
+
+    <div class="tpane on" id="lt0">
+
+      <details class="csec" open>
+        <summary>&#9881; Simulation Controls <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body">
+          <div class="ctrl">
+            <div class="clbl">Traffic Density <span id="ldns">Peak</span></div>
+            <input type="range" min="1" max="5" value="4" oninput="setDens(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Emergency Vehicles <span id="lems">50 = 5,000 veh</span></div>
+            <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Free-Flow Speed <span id="lwav">25 km/h</span></div>
+            <input type="range" min="10" max="60" value="25" step="5" oninput="setWave(this.value)">
+          </div>
+          <div class="ctrl">
+            <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
+            <input type="range" min="30" max="180" value="90" step="10" oninput="setCycle(this.value)">
+          </div>
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x26A1; Algorithm &amp; Speed</summary>
+        <div class="csec-body">
+          <div class="ctrl">
+            <div class="clbl">Simulation Speed</div>
+            <select onchange="setSS(this.value)">
+              <option value="0.5">0.5x Slow</option>
+              <option value="1" selected>1x Real-time</option>
+              <option value="2">2x Fast</option>
+              <option value="4">4x Ultra</option>
+            </select>
+          </div>
+          <div class="ctrl" style="margin-top:8px">
+            <div class="clbl">Control Algorithm</div>
+            <select id="algo-sel" onchange="setAlgoSel(this.value)">
+              <option value="optimal">GW + LP + EVP (Proposed)</option>
+              <option value="fixed">Fixed Timer (Baseline)</option>
+              <option value="lp">LP Only</option>
+              <option value="evp">EVP Only</option>
+              <option value="webster">Webster Adaptive</option>
+              <option value="rl">&#9733; RL Q-Learning (Novel)</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4D0; LP Solver Status</summary>
+        <div class="csec-body">
+          <div class="lp-box" style="font-size:.53rem;line-height:1.7">
+            <span class="hi">Solver:</span> scipy HiGHS LP<br>
+            <span class="hi">Variables:</span> 12 green times g_i<br>
+            <span class="hi">Constraints:</span> &#x2211;g_i &#x2264; C&#x2212;L<br>
+            <span class="hi">Objective:</span> Minimise &#x2211; w_i&#x22C5;d_i<br>
+            <span class="hi">OD Matrix:</span> 12&#xD7;12 BBMP/KRDCL<br>
+            <span class="hi">CTM:</span> Daganzo (1994), 5 cells<br>
+            <span class="hi">Robertson:</span> &#x3B2;=0.8, TRANSYT<br>
+            <span class="hi">Status:</span> <span class="hig" id="lp-status">OPTIMAL</span><br>
+            <span class="hi">Obj Value:</span> <span class="hiy" id="lp-obj">--</span><br>
+            <span class="hi">Avg Delay:</span> <span class="hir" id="lp-wd">--</span> s<br>
+            <span class="hi">Avg x (v/c):</span> <span class="hio" id="lp-xavg">--</span>
+          </div>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F50D; Map Legend</summary>
+        <div class="csec-body">
+          <div class="sc-row"><div class="sc-dot" style="background:var(--cyan)"></div>
+            <div class="sc-txt">1 cyan dot = <b style="color:var(--cyan)">5,000</b> regular vehicles</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>
+            <div class="sc-txt">1 red dot = <b style="color:var(--red)">100</b> emergency vehicles</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--yellow)"></div>
+            <div class="sc-txt">Yellow = LWR shock wave front</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--orange)"></div>
+            <div class="sc-txt">Orange = stopped at red signal</div></div>
+          <div class="sc-row"><div class="sc-dot" style="background:var(--pink);box-shadow:0 0 5px var(--pink)"></div>
+            <div class="sc-txt">Pink dashed = active EVP corridor</div></div>
+          <div style="margin-top:8px;border-top:1px solid #0d2040;padding-top:8px">
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--green);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Free-flow road &lt;40% cong.</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--yellow);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Moderate 40–65% congestion</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--orange);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Congested 65–85%</div></div>
+            <div class="sc-row" style="align-items:center">
+              <div style="width:22px;height:3px;background:var(--red);border-radius:2px;flex-shrink:0"></div>
+              <div class="sc-txt">Gridlock &gt;85% congestion</div></div>
+          </div>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="tpane" id="lt1">
+
+      <details class="csec" open>
+        <summary>&#x1F534; High Congestion (&gt;65%) <span class="csec-badge crit">CRITICAL</span></summary>
+        <div class="csec-body" id="jlist-crit"></div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x1F7E1; Moderate (45-65%) <span class="csec-badge warn">MOD</span></summary>
+        <div class="csec-body" id="jlist-mod"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F7E2; Free-flow (&lt;45%) <span class="csec-badge live">FREE</span></summary>
+        <div class="csec-body" id="jlist-free"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4CD; Network Stats</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Total junctions</td><td style="color:var(--cyan)">12</td></tr>
+            <tr><td>Critical (&gt;65%)</td><td style="color:var(--red)">3</td></tr>
+            <tr><td>Moderate (45-65%)</td><td style="color:var(--orange)">5</td></tr>
+            <tr><td>Free-flow (&lt;45%)</td><td style="color:var(--green)">4</td></tr>
+            <tr><td>OD demand total</td><td style="color:var(--cyan)">1.2M PCU/hr</td></tr>
+          </table>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="tpane" id="lt2">
+
+      <details class="csec" open>
+        <summary>&#x1F4CB; BBMP / KRDCL Data</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Silk Board</td><td style="color:var(--red)">71%</td></tr>
+            <tr><td>Electronic City</td><td style="color:var(--red)">67%</td></tr>
+            <tr><td>Hebbal</td><td style="color:var(--red)">64%</td></tr>
+            <tr><td>Marathahalli</td><td style="color:var(--orange)">58%</td></tr>
+            <tr><td>KR Puram</td><td style="color:var(--orange)">54%</td></tr>
+            <tr><td>ORR Average</td><td style="color:var(--orange)">62%</td></tr>
+            <tr><td>Peak Hours</td><td style="color:var(--yellow)">8-10AM, 6-9PM</td></tr>
+            <tr><td>Avg Speed (Peak)</td><td style="color:var(--red)">17.8 km/h</td></tr>
+            <tr><td>Avg Speed (Off)</td><td style="color:var(--green)">32.4 km/h</td></tr>
+            <tr><td>Daily Vehicles</td><td style="color:var(--cyan)">1.2M</td></tr>
+            <tr><td>Registered Veh.</td><td style="color:var(--cyan)">10.5M</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F697; Traffic Flow Params</summary>
+        <div class="csec-body">
+          <table class="dt">
+            <tr><td>Sat. Flow</td><td style="color:var(--cyan)">1600-1800 PCU/hr/ln</td></tr>
+            <tr><td>Free-Flow Speed</td><td style="color:var(--green)">60 km/h</td></tr>
+            <tr><td>Jam Density k_j</td><td style="color:var(--red)">120 veh/km/ln</td></tr>
+            <tr><td>Capacity q_max</td><td style="color:var(--cyan)">1800 veh/hr</td></tr>
+            <tr><td>LWR Wave max</td><td style="color:var(--purple)">-60 km/h</td></tr>
+            <tr><td>Webster L</td><td style="color:var(--orange)">7s/cycle</td></tr>
+            <tr><td>Robertson beta</td><td style="color:var(--cyan)">0.8</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4DA; Academic Sources</summary>
+        <div class="csec-body">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.53rem;color:#3a5570;line-height:1.9">
+            BBMP Traffic Engineering Cell 2022<br>
+            KRDCL ORR Traffic Study 2019<br>
+            BDA Master Plan 2031 OD Survey<br>
+            Webster (1958) &mdash; Signal Timing<br>
+            Lighthill &amp; Whitham (1955) &mdash; LWR<br>
+            Daganzo (1994) &mdash; CTM, Trans. Res-B<br>
+            Robertson (1969) &mdash; Platoon Dispersion<br>
+            Hunt et al. (1982) &mdash; SCOOT, TRRL<br>
+            Ehrgott (2005) &mdash; Multi-Obj LP<br>
+            HCM 6th Ed. &sect;18 &mdash; Perf. Index<br>
+            EPA MOVES3 &mdash; Fuel/CO&sup2; Emissions
+          </div>
+        </div>
+      </details>
+
+    </div>
   </div>
 
+  <!-- MAP -->
   <div id="mw">
-    <canvas id="mc"></canvas>
-    <div class="pill" id="ptop">
-      <span>SIM:<b id="stm">00:00:00</b></span>
-      <span>ALGO:<b id="alg">GW+LP+EVP</b></span>
-      <span>VEH:<b id="vtot">--</b></span>
+    <div id="map"></div>
+    <canvas id="fc"></canvas>
+    <div class="evpo" id="evpo"></div>
+    <div class="mpill" id="mtop">
+      <span>SIM: <b id="stm">00:00:00</b></span>
+      <span>ALGO: <b id="algod">GW+LP+EVP</b></span>
+      <span>WAVE: <b id="wavd">25 km/h</b></span>
+      <span>VEHICLES: <b id="vtot">--</b></span>
+      <span>LWR: <b id="lwrd" style="color:var(--purple)">--</b></span>
     </div>
-    <div class="pill" id="pleg">
-      <div class="lr"><div class="lb" style="background:#00ccff"></div>Normal vehicle (×5000)</div>
-      <div class="lr"><div class="lb" style="background:#ff2244;border-radius:50%"></div>Emergency (×100)</div>
+    <div class="mpill" id="mleg">
+      <div class="lt">ROAD DENSITY</div>
+      <div class="lr"><div class="lb" style="background:var(--green)"></div>Free-flow &lt;40%</div>
+      <div class="lr"><div class="lb" style="background:var(--yellow)"></div>Moderate 40-65%</div>
+      <div class="lr"><div class="lb" style="background:var(--orange)"></div>Congested 65-85%</div>
+      <div class="lr"><div class="lb" style="background:var(--red)"></div>Gridlock &gt;85%</div>
+      <div class="lr"><div class="lb" style="background:var(--pink)"></div>EVP Corridor</div>
+    </div>
+    <div class="mpill" id="mscl">
+      <div class="lt">PARTICLE SCALE</div>
+      <div class="mr"><div class="md" style="background:var(--cyan)"></div><div class="mt">1 dot = 5,000 vehicles</div></div>
+      <div class="mr"><div class="md" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div><div class="mt">1 dot = 100 emergency</div></div>
+      <div class="mr"><div class="md" style="background:var(--yellow)"></div><div class="mt">Shock wave front</div></div>
     </div>
   </div>
 
+  <!-- RIGHT ANALYTICS -->
   <div id="rp">
     <div class="tabs">
-      <div class="tab on" onclick="tab(0)">GRAPHS</div>
-      <div class="tab" onclick="tab(1)">LP TABLE</div>
-      <div class="tab" onclick="tab(2)">SIGNALS</div>
-      <div class="tab" onclick="tab(3)">LWR</div>
+      <div class="tab on" onclick="rTab(0)" style="font-size:.48rem">GRAPHS</div>
+      <div class="tab" onclick="rTab(1)" style="font-size:.48rem">LP</div>
+      <div class="tab" onclick="rTab(2)" style="font-size:.48rem">SIGNALS</div>
+      <div class="tab" onclick="rTab(3)" style="font-size:.48rem">LWR</div>
+      <div class="tab" onclick="rTab(4)" style="font-size:.46rem;color:#bb77ff">&#x1F916;AI/ML</div>
+      <div class="tab" onclick="rTab(5)" style="font-size:.46rem;color:#00ff88">&#x2713;VALID</div>
+      <div class="tab" onclick="rTab(6)" style="font-size:.46rem;color:#ffd700;animation:blink 2s infinite">&#x2728;CLAUDE</div>
     </div>
-    <div class="tp on" id="t0">
-      <div class="gc"><div class="gh"><div class="gl">NETWORK THROUGHPUT</div><div><div class="gval" id="gv0" style="color:#00ff88">--</div><span class="gu">VPHPL</span></div></div><canvas id="gc0"></canvas></div>
-      <div class="gc"><div class="gh"><div class="gl">WEBSTER AVG DELAY</div><div><div class="gval" id="gv1" style="color:#ff2244">--</div><span class="gu">sec/veh</span></div></div><canvas id="gc1"></canvas></div>
-      <div class="gc"><div class="gh"><div class="gl">AVG v/c RATIO</div><div><div class="gval" id="gv2" style="color:#ff8c00">--</div><span class="gu">x=q/c</span></div></div><canvas id="gc2"></canvas></div>
-      <div class="gc"><div class="gh"><div class="gl">SIGNAL EFFICIENCY g/C</div><div><div class="gval" id="gv3" style="color:#00e5ff">--</div><span class="gu">percent</span></div></div><canvas id="gc3"></canvas></div>
-      <div class="gc"><div class="gh"><div class="gl">MAX LWR SHOCK SPEED</div><div><div class="gval" id="gv4" style="color:#bb77ff">--</div><span class="gu">km/h</span></div></div><canvas id="gc4"></canvas></div>
-    </div>
-    <div class="tp" id="t1">
-      <div style="font-size:.42rem;color:#3a5570;margin-bottom:5px">scipy HiGHS · C=<span id="lptC">90</span>s · <span id="lptS" style="color:#00ff88">OPTIMAL</span></div>
-      <table><thead><tr><th>Junction</th><th>g(s)</th><th>x</th><th>d(s)</th><th>LOS</th></tr></thead><tbody id="lptb"></tbody></table>
-    </div>
-    <div class="tp" id="t2"><div id="sigpanel"></div></div>
-    <div class="tp" id="t3">
-      <div style="font-size:.46rem;color:#3a5570;line-height:2;margin-bottom:8px">
-        Shocks: <span id="lws" style="color:#ffd700">--</span><br>
-        Max |w|: <span id="lwm" style="color:#ff2244">--</span> km/h<br>
-        Avg density: <span id="lwa" style="color:#ff8c00">--</span> veh/km<br>
-        Network LOS: <span id="lwl">--</span></div>
-      <canvas id="lwrc" style="display:block;width:100%;height:110px"></canvas>
-    </div>
-  </div>
-</div>
 
-<div id="sb">
-  <div class="sbi">TIME <b id="sbt">00:00:00</b></div>
-  <div class="sbi">ALGO <b id="sba">GW+LP+EVP</b></div>
-  <div class="sbi">LP <b id="sbl" style="color:#00ff88">OPTIMAL</b></div>
-  <div class="sbi">d_avg <b id="sbd" style="color:#ff2244">--</b>s</div>
-  <div class="sbi">x_avg <b id="sbx" style="color:#ffd700">--</b></div>
-  <div class="sbi">© NMIT ISE — NISHCHAL NB25ISE160 · RISHUL NB25ISE186</div>
+    <div class="atab-content on" id="rt0">
+
+      <details class="csec" open>
+        <summary>&#x1F4CA; Live Performance Charts <span class="csec-badge live">LIVE</span></summary>
+        <div class="csec-body" style="padding:6px">
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Network Throughput<br>veh/hr/lane (VPHPL)</div>
+            <div class="gr"><div class="gv" id="gv0" style="color:var(--green)">--</div>
+              <span class="gu">VPHPL</span><div class="gd" id="gd0"></div></div>
+          </div><canvas class="gcanv" id="gc0"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Webster Avg Delay d</div>
+            <div class="gr"><div class="gv" id="gv1" style="color:var(--red)">--</div>
+              <span class="gu">sec/veh</span><div class="gd" id="gd1"></div></div>
+          </div><canvas class="gcanv" id="gc1"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">AVG v/c Ratio x</div>
+            <div class="gr"><div class="gv" id="gv2" style="color:var(--orange)">--</div>
+              <span class="gu">x = q/c</span><div class="gd" id="gd2"></div></div>
+          </div><canvas class="gcanv" id="gc2"></canvas></div>
+
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x26A1; Signal &amp; Wave Metrics</summary>
+        <div class="csec-body" style="padding:6px">
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Signal Efficiency g/C</div>
+            <div class="gr"><div class="gv" id="gv3" style="color:var(--cyan)">--</div>
+              <span class="gu">percent</span><div class="gd" id="gd3"></div></div>
+          </div><canvas class="gcanv" id="gc3"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">Max LWR Shock Speed</div>
+            <div class="gr"><div class="gv" id="gv4" style="color:var(--purple)">--</div>
+              <span class="gu">km/h</span><div class="gd" id="gd4"></div></div>
+          </div><canvas class="gcanv" id="gc4"></canvas></div>
+
+          <div class="gc"><div class="gh">
+            <div class="gtl">LP Objective Value</div>
+            <div class="gr"><div class="gv" id="gv5" style="color:var(--yellow)">--</div>
+              <span class="gu">score</span><div class="gd" id="gd5"></div></div>
+          </div><canvas class="gcanv" id="gc5"></canvas></div>
+
+        </div>
+      </details>
+
+    </div>
+    </div>
+
+    <div class="atab-content" id="rt1">
+
+      <details class="csec" open>
+        <summary>&#x2211; LP Optimal Green Times</summary>
+        <div class="csec-body" style="padding:4px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;margin-bottom:6px;padding:0 4px">
+            scipy HiGHS | C=<span id="lpt-C">90</span>s | <span id="lpt-status" class="hig">OPTIMAL</span>
+          </div>
+          <div id="lp-table-wrap" style="overflow-x:auto">
+            <table class="lptbl" id="lp-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left">Junction</th>
+                  <th>g(s)</th>
+                  <th>&#x03BB;</th>
+                  <th>x</th>
+                  <th>d(s)</th>
+                  <th>LOS</th>
+                  <th>Q</th>
+                  <th>C*</th>
+                </tr>
+              </thead>
+              <tbody id="lp-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F4CB; Webster Formula Detail</summary>
+        <div class="csec-body">
+          <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+            <span class="hi">d = d&#x2081;&#x22C5;PF + d&#x2082; + d&#x2083;</span> <span style="color:#3a5570">(HCM 6th §19)</span><br>
+            <span class="hi">d&#x2081;=C(1-&#x03BB;)&#xB2;/[2(1-&#x03BB;x)]</span> [uniform]<br>
+            <span class="hi">d&#x2082;=900T[(x-1)+&#x221A;((x-1)&#xB2;+8kIx/cT)]</span><br>
+            <span class="hi">PF=(1-P)/(1-&#x03BB;)</span>, P=0.33 (Arr.Type 3)<br>
+            <span style="color:#2a4060">k=0.5 pre-timed | I=1.0 isolated | T=0.25hr</span><br><br>
+            C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br>
+            &#x03BB;_avg: <span class="hig" id="w-lam">--</span> &nbsp; x_avg: <span class="hiy" id="w-x">--</span><br>
+            d&#x2081;_avg: <span class="hio" id="w-d1">--</span>s &nbsp; d&#x2082;_avg: <span class="hio" id="w-d2">--</span>s<br>
+            d_avg: <span class="hir" id="w-d">--</span> s/veh &nbsp; Max d: <span class="hir" id="w-dmax">--</span>s
+          </div>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="atab-content" id="rt2">
+
+      <details class="csec" open>
+        <summary>&#x1F6A6; Real-Time Signal States <span class="csec-badge live">LIVE · 1s</span></summary>
+        <div class="csec-body" style="padding:6px">
+          <!-- Big real-time countdown clocks per junction -->
+          <div id="sigpanel-rt" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        </div>
+      </details>
+
+      <details class="csec" open>
+        <summary>&#x23F1; Timing &amp; Phase Detail</summary>
+        <div class="csec-body" style="padding:4px" id="sigpanel-timing"></div>
+      </details>
+
+      <details class="csec">
+        <summary>&#x1F504; Full Signal Panel</summary>
+        <div class="csec-body" style="padding:4px">
+          <div id="sigpanel"></div>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="atab-content" id="rt3">
+      <div class="sec">
+        <div class="stitle">&#x1F300; LWR + CTM Hybrid Model</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">LWR PDE:</span> &#x2202;k/&#x2202;t + &#x2202;q/&#x2202;x = 0<br>
+          <span class="hi">Greenshields FD:</span> v = v_f(1&#x2212;k/k_j)<br>
+          <span class="hi">Shock speed:</span> w = (q_A&#x2212;q_B)/(k_A&#x2212;k_B)<br>
+          <span class="hi">CTM Sending:</span> &#x394;(x) = min(q_c, v_f&#x22C5;k)<br>
+          <span class="hi">CTM Receiving:</span> &#x3A3;(x) = min(q_c, w&#x22C5;(k_j&#x2212;k))<br>
+          <span class="hi">CTM Flow:</span> q = min(&#x394;_i, &#x3A3;_{i+1})<br><br>
+          v_f = 60 km/h | k_j = 120 veh/km<br>
+          q_c = 1800 veh/hr/ln | cells = 5/link<br><br>
+          <span class="hi">Active shock fronts:</span> <span class="hiy" id="lwr-shocks">--</span><br>
+          <span class="hi">Max |w|:</span> <span class="hir" id="lwr-maxw">--</span> km/h<br>
+          <span class="hi">Avg density:</span> <span class="hio" id="lwr-avgk">--</span> veh/km<br>
+          <span class="hi">Network LOS:</span> <span id="lwr-los">--</span><br>
+          <span class="hi">CTM bottleneck:</span> <span id="ctm-btn" class="hiy">--</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4C8; Density-Flow Diagram (q-k)</div>
+        <canvas id="lwrcanv"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
+          Greenshields parabola | dots = current junction states
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x26A1; LWR/CTM Edge Table</div>
+        <div id="lwr-table-wrap" style="overflow-y:auto;max-height:200px">
+          <table class="lptbl" id="lwr-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">Link</th>
+                <th>k_A</th>
+                <th>k_B</th>
+                <th>w km/h</th>
+                <th>CTM LOS</th>
+              </tr>
+            </thead>
+            <tbody id="lwr-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4A7; Robertson Platoon Dispersion</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">Model:</span> q_d(t) = F&#x22C5;q_d(t&#x2212;1) + (1&#x2212;F)&#x22C5;q_u(t&#x2212;t_0)<br>
+          <span class="hi">F:</span> 1/(1 + &#x3B2;&#x22C5;t_0),  &#x3B2; = 0.8 (Robertson 1969)<br>
+          <span class="hi">&#x3C6;:</span> Progression factor &#x2248; 1 &#x2212; F<br>
+          <span class="hi">Delay corr.:</span> 1 &#x2212; 0.5&#x22C5;&#x3C6; (range 0.5&#x2013;1.0)<br><br>
+          <span id="platoon-summary" style="color:#4a7090">Loading...</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x26A1; SCOOT Adaptive Cycle</div>
+        <div id="scoot-table-wrap" style="overflow-y:auto;max-height:180px">
+          <table class="lptbl" id="scoot-table">
+            <thead>
+              <tr>
+                <th style="text-align:left">Junction</th>
+                <th>C_opt</th>
+                <th>C_rec</th>
+                <th>Y</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="scoot-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F6E2; Network PI + MC Sensitivity</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">HCM PI = &#x3B1;&#x22C5;&#x2211;d_i&#x22C5;q_i + &#x3B2;&#x22C5;&#x2211;s_i&#x22C5;q_i</span><br>
+          <span class="hi">PI total:</span> <span id="pi-total" class="hir">--</span>
+          &nbsp; <span class="hi">Fuel:</span> <span id="pi-fuel" class="hio">--</span> L/hr
+          &nbsp; <span class="hi">CO&#x2082;:</span> <span id="pi-co2" class="hip">--</span> kg/hr<br>
+          <hr style="border-color:#0d2040;margin:5px 0">
+          <span class="hi">MC Sensitivity (&#x3C3;=15%, n=200):</span><br>
+          <span class="hi">Mean obj:</span> <span id="mc-obj" style="color:var(--cyan)">--</span>
+          &nbsp; <span class="hi">&#x3C3;:</span> <span id="mc-std" class="hiy">--</span><br>
+          <span class="hi">P95 delay:</span> <span id="mc-p95" class="hir">--</span>s/veh
+          &nbsp; <span class="hi">Mean:</span> <span id="mc-avg" class="hio">--</span>s/veh<br>
+          <span class="hi">Most sensitive:</span> <span id="mc-sens" style="color:var(--yellow)">--</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4CA; Algorithm Radar (5-Metric)</div>
+        <canvas id="radar-canv" style="display:block;width:100%!important;height:160px!important;margin-top:4px"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
+          GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
+        </div>
+      </div>
+    </div>
+
+    <!-- rt4: AI/ML -->
+    <div class="atab-content" id="rt4">
+      <div class="sec">
+        <div class="stitle">&#x1F916; RL Q-Learning Controller</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">State:</span> cong_bin{0..4} x phase_bin{0..2}<br>
+          <span class="hi">Actions:</span> reduce(-10s) | hold | extend(+10s)<br>
+          <span class="hi">Reward:</span> -d_i - 0.5q + 0.3throughput<br>
+          <span class="hi">Q-update:</span> Q+=eta[R+gamma*maxQ'-Q]<br>
+          eta=0.18 | gamma=0.92 | eps 1.0->0.05 | 300ep<br>
+          <em style="color:#4a7090">Abdulhai et al. 2003 IEEE T-ITS</em><br><br>
+          RL delay: <span id="rl-d" class="hiy">--</span> s/veh &nbsp; LP: <span id="rl-lp" class="hig">--</span> s/veh<br>
+          Saving: <span id="rl-sav" class="hig" style="font-size:.7rem;font-weight:bold">--</span>%<br>
+          <span style="color:#2a5070;font-size:.47rem">NOVELTY: First Q-learn vs HiGHS-LP benchmark<br>on Bangalore ORR 12-jn O-D matrix (BBMP 2022)</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4CA; RL Convergence (last 20 episodes)</div>
+        <div id="rl-bars" style="padding:2px 0"></div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F916; RL vs LP Green Times</div>
+        <div style="overflow-y:auto;max-height:150px">
+          <table class="lptbl" id="rl-tbl">
+            <thead><tr>
+              <th style="text-align:left">Junction</th>
+              <th>g_RL</th><th>g_LP</th><th>d_RL</th>
+            </tr></thead>
+            <tbody id="rl-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4C9; ML Demand Forecast</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">Model:</span> Fourier(k=3) + ExpSmooth(a=0.30)<br>
+          <span class="hi">Data:</span> BBMP 2022 24hr ORR profile | OLS fit<br>
+          <span class="hi">Formula:</span> y=sum[A_k*sin+B_k*cos] + ES<br>
+          <em style="color:#4a7090">Holt 1957; Harvey 1990 Struct.TS</em><br><br>
+          RMSE: <span id="ml-rmse" class="hig">--</span> &nbsp; MAPE: <span id="ml-mape" class="hiy">--</span>%<br>
+          Peak windows: <span id="ml-peaks" class="hir">--</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4C8; 24hr Forecast (normalised)</div>
+        <div id="ml-chart-wrap" style="position:relative;height:72px;background:#030d1a;border-radius:3px;overflow:hidden;margin-top:4px">
+          <svg id="ml-svg" width="100%" height="100%" viewBox="0 0 300 72" preserveAspectRatio="none" style="position:absolute;top:0;left:0"></svg>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:4px">
+          <span style="font-family:monospace;font-size:.38rem;color:#00e5ff">&#9644; Observed</span>
+          <span style="font-family:monospace;font-size:.38rem;color:#00ff88">&#9644; Fitted</span>
+          <span style="font-family:monospace;font-size:.38rem;color:#ff8c00">&#9644; Forecast</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F517; CTM-LP Coupled (Novel)</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">Method:</span> CTM bottleneck -> LP constraint<br>
+          <span class="hi">Trigger:</span> utilisation > 0.85<br>
+          <span class="hi">Constraint:</span> g_i+g_j >= 2*g_min+10s<br>
+          <em style="color:#4a7090">Daganzo 1999; Lo 1999 CTM-LP</em><br><br>
+          Coupled constraints: <span id="ctm-lp-n" class="hiy">--</span><br>
+          Avg delay: <span id="ctm-lp-d" class="hig">--</span> s/veh
+        </div>
+      </div>
+    </div>
+
+    <!-- rt5: Validation -->
+    <div class="atab-content" id="rt5">
+      <div class="sec">
+        <div class="stitle">&#x2713; Model Validation</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
+          <span class="hi">Ref:</span> BBMP TEC 2022 &amp; KRDCL ORR 2022<br>
+          <span class="hi">Metric:</span> LP-optimal vs field-measured delay<br>
+          <span style="color:#2a5070;font-size:.47rem">LP delays lower = optimisation benefit.<br>Spearman rho validates congestion ranking.</span><br><br>
+          Spearman rho: <span id="val-rho" class="hig" style="font-size:.8rem;font-weight:bold">--</span><br>
+          Avg saving: <span id="val-sav" class="hig">--</span>% &nbsp; RMSE: <span id="val-rmse" class="hiy">--</span>s<br>
+          <span style="color:#3a5570;font-size:.46rem" id="val-note"></span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4CB; Junction Validation Table</div>
+        <div style="overflow-y:auto;max-height:180px">
+          <table class="lptbl">
+            <thead><tr>
+              <th style="text-align:left">Junction</th>
+              <th>Field(s)</th><th>LP(s)</th><th>Saving</th>
+            </tr></thead>
+            <tbody id="val-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4CA; Field vs LP-Optimal</div>
+        <div id="val-chart-wrap" style="position:relative;height:110px;background:#030d1a;border-radius:3px;overflow:hidden;margin-top:4px">
+          <svg id="val-svg" width="100%" height="100%" viewBox="0 0 260 110" preserveAspectRatio="none" style="position:absolute;top:0;left:0"></svg>
+          <div id="val-dots" style="position:absolute;inset:0"></div>
+        </div>
+        <div style="font-family:monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
+          &#x25CF; Each dot = one junction | Lower = better LP saving
+        </div>
+      </div>
+      <div class="sec">
+        <div class="stitle">&#x1F4D6; Novelty &amp; References</div>
+        <div class="lp-box" style="font-size:.49rem;line-height:1.7">
+          <span class="hi" style="color:#bb77ff">NOVELTY CLAIM:</span> First CTM-LP+RL hybrid<br>
+          benchmarked vs HiGHS LP on real Bangalore<br>
+          ORR 12-jn O-D matrix (BBMP/KRDCL 2022).<br>
+          Fourier+ES demand forecast with BBMP profile.<br><br>
+          Webster 1958 | LW&W 1955 | Daganzo 1994<br>
+          Robertson 1969 | Hunt 1982 SCOOT | HCM 6th<br>
+          Ehrgott 2005 Multi-Obj | Abdulhai 2003 RL<br>
+          Sutton&Barto 2018 | Holt 1957 | EPA MOVES3
+        </div>
+      </div>
+    </div>
+
+    <!-- rt6: Claude AI Advisor -->
+    <div class="atab-content" id="rt6">
+      <div class="sec">
+        <div class="stitle">&#x2728; Claude AI Traffic Advisor</div>
+        <div class="lp-box" style="font-size:.52rem;line-height:1.7">
+          <span class="hi">Model:</span> claude-sonnet-4-20250514<br>
+          <span class="hi">Input:</span> Live junction LOS, delay, v/c, CO&#x2082;<br>
+          <span class="hi">Output:</span> Natural-language network advisory<br>
+          <span style="color:#2a5070;font-size:.47rem">Real Anthropic API call — reads current<br>simulation state and generates expert analysis</span>
+        </div>
+        <button onclick="runClaudeAnalysis()" id="claude-btn"
+          style="margin-top:8px;width:100%;padding:7px;background:transparent;
+          border:1px solid #ffd700;color:#ffd700;font-family:'Share Tech Mono',monospace;
+          font-size:.6rem;letter-spacing:2px;border-radius:3px;cursor:pointer;
+          text-transform:uppercase;transition:all .2s"
+          onmouseover="this.style.background='#ffd70022'"
+          onmouseout="this.style.background='transparent'">
+          &#x2728; Generate Traffic Advisory
+        </button>
+        <div style="margin-top:6px">
+          <select id="analysis-type" style="width:100%;background:var(--bg);border:1px solid #0d2040;
+            color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:.55rem;
+            padding:5px;border-radius:3px;outline:none">
+            <option value="advisory">Network Status Advisory</option>
+            <option value="incidents">Incident &amp; Bottleneck Analysis</option>
+            <option value="optimize">Optimization Recommendations</option>
+            <option value="emissions">Emissions &amp; Sustainability Report</option>
+            <option value="compare">Algorithm Comparison (RL vs LP)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec" id="claude-status-sec" style="display:none">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="claude-spinner" style="width:10px;height:10px;border:2px solid #ffd70033;
+            border-top-color:#ffd700;border-radius:50%;animation:spin .8s linear infinite"></div>
+          <span id="claude-status" style="font-family:'Share Tech Mono',monospace;
+            font-size:.53rem;color:#ffd700">Calling Claude API...</span>
+        </div>
+      </div>
+
+      <div class="sec" id="claude-output-sec" style="display:none">
+        <div class="stitle" id="claude-output-title">&#x1F4AC; Advisory</div>
+        <div id="claude-output" style="font-family:'Rajdhani',sans-serif;font-size:.62rem;
+          line-height:1.7;color:#a0c8e0;padding:4px 0;white-space:pre-wrap"></div>
+        <div id="claude-meta" style="margin-top:6px;font-family:'Share Tech Mono',monospace;
+          font-size:.42rem;color:#3a5570;border-top:1px solid #0d2040;padding-top:5px"></div>
+      </div>
+
+      <div class="sec" id="claude-history-sec" style="display:none">
+        <div class="stitle">&#x1F4CB; Analysis History</div>
+        <div id="claude-history" style="font-family:'Share Tech Mono',monospace;
+          font-size:.45rem;color:#3a5570;max-height:120px;overflow-y:auto"></div>
+      </div>
+    </div>
+
 </div>
+<div id="statusbar">
+  <div class="sb">&#x1F551; <span id="sbt" class="sbv">00:00:00</span></div>
+  <div class="sb">ALGO <span id="sba" class="sbv">GW+LP+EVP</span></div>
+  <div class="sb">LP <span id="sbl" class="sbv g">OPTIMAL</span></div>
+  <div class="sb">d_avg <span id="sbw" class="sbv r">--</span>s</div>
+  <div class="sb">x_avg <span id="sbx" class="sbv y">--</span></div>
+  <div class="sb">LWR|w| <span id="sbwv" class="sbv p">--</span>km/h</div>
+  <div class="sb">CO&#x2082; <span id="sb-co2" class="sbv" style="color:var(--green)">--</span>kg/hr</div>
+  <div class="sb">PI <span id="sb-pi" class="sbv r">--</span></div>
+  <div class="sb">EVP <span id="sbe" class="sbv r">--</span></div>
+  <div class="sb">RL&#x2206;d <span id="sb-rl" class="sbv" style="color:#bb77ff">--</span></div>
+  <div class="sb">&#xA9; NMIT ISE &#8212; NISHCHAL NB25ISE160 &#xB7; RISHUL NB25ISE186</div>
 </div>
 
 <script>
-// ─── DATA ────────────────────────────────────────────────────────────────────
-var B=__BD;
-var JN=B.junctions;
-var ED=[[0,7],[0,8],[0,4],[0,6],[1,9],[1,11],[1,3],[2,3],[2,5],[2,6],[2,7],
-        [3,5],[3,11],[4,8],[4,10],[6,7],[6,2],[6,11],[7,10],[7,8],
-        [8,10],[9,11],[9,1],[10,8],[11,6]];
+(function() {
+'use strict';
 
-var DKEYS=['vlow','low','med','high','peak'];
-var DNAMES=['Very Low','Low','Medium','High','Peak'];
-var DMUL=[0.2,0.4,0.7,1.0,1.4];
-var ALGOS={optimal:'GW+LP+EVP',lp:'LP ONLY',webster:'WEBSTER',fixed:'FIXED',evp:'EVP ONLY',rl:'RL Q-LEARN'};
-var ALIST=['optimal','lp','webster','fixed','evp','rl'];
-var aidx=0;
+// ── BACKEND DATA INJECTED BY PYTHON ──────────────────────────────────────────
+var BACKEND = JSON.parse(document.getElementById('__backend_data').textContent);
 
-var S={algo:'optimal',paused:false,spd:1,dens:5,emerg:50,wave:25,cycle:90,
-       t:0,frame:0,booted:0};
-
-var CUR=B.dens_precomp['peak'];
-function refreshCUR(){CUR=B.dens_precomp[DKEYS[S.dens-1]];}
-
-// ─── CANVAS ──────────────────────────────────────────────────────────────────
-var mc=document.getElementById('mc');
-var ctx=mc.getContext('2d');
-
-function resize(){
-  var mw=document.getElementById('mw');
-  mc.width=mw.clientWidth||600;
-  mc.height=mw.clientHeight||500;
-}
-
-// ─── MAP PROJECTION ──────────────────────────────────────────────────────────
-var MB={latMin:12.82,latMax:13.12,lngMin:77.55,lngMax:77.78};
-function ll2p(lat,lng){
-  return{
-    x:(lng-MB.lngMin)/(MB.lngMax-MB.lngMin)*mc.width,
-    y:(1-(lat-MB.latMin)/(MB.latMax-MB.latMin))*mc.height
-  };
-}
-
-// ─── EDGE PATHS ──────────────────────────────────────────────────────────────
-// Midpoints for curved roads through Bangalore geography
-var MPTS=[
-  null,null,null,null,null,null,null,null,null,null,null,null,null,
-  null,null,null,null,null,null,null,null,null,null,null,null
+// ── DATA ──────────────────────────────────────────────────────────────────────
+var JN = BACKEND.junctions;
+var ED = [
+  [0,7],[0,8],[0,4],[0,6],
+  [1,9],[1,11],[1,3],
+  [2,3],[2,5],[2,6],[2,7],
+  [3,5],[3,11],
+  [4,8],[4,10],
+  [6,7],[6,2],[6,11],
+  [7,10],[7,8],
+  [8,10],
+  [9,11],[9,1],
+  [10,8],[11,6]
 ];
 
-function ePath(ri){
-  var e=ED[ri],a=JN[e[0]],b=JN[e[1]];
-  return [[a.lat,a.lng],[b.lat,b.lng]];
+// ── ROAD WAYPOINTS (curved intermediates for each edge) ─────────────────
+// Each entry: array of [lat,lng] waypoints BETWEEN the two junction endpoints
+// Designed to follow approximate real road curvature in Bangalore
+// Sources: OSM road network geometry approximation
+var ROAD_WPT = [
+  // [0]Silk Board→[7]Koramangala  (Hosur Rd / BH Road curve)
+  [[12.9220,77.6235],[12.9285,77.6238]],
+  // [0]Silk Board→[8]JP Nagar  (Outer Ring Rd south)
+  [[12.9140,77.6140],[12.9100,77.5980]],
+  // [0]Silk Board→[4]Electronic City  (Hosur Rd south)
+  [[12.9000,77.6350],[12.8750,77.6490]],
+  // [0]Silk Board→[6]Indiranagar  (Inner Ring Rd)
+  [[12.9300,77.6280],[12.9520,77.6340]],
+  // [1]Hebbal→[9]Yelahanka  (NH 44 north)
+  [[13.0580,77.5980],[13.0780,77.5970]],
+  // [1]Hebbal→[11]Nagawara  (Outer Ring Rd east)
+  [[13.0420,77.6040],[13.0440,77.6100]],
+  // [1]Hebbal→[3]KR Puram  (ORR east)
+  [[13.0250,77.6350],[13.0180,77.6600]],
+  // [2]Marathahalli→[3]KR Puram  (ORR north)
+  [[12.9650,77.7000],[12.9870,77.7020]],
+  // [2]Marathahalli→[5]Whitefield  (Airport Rd east)
+  [[12.9620,77.7200],[12.9660,77.7350]],
+  // [2]Marathahalli→[6]Indiranagar  (Airport Rd west)
+  [[12.9700,77.6800],[12.9760,77.6610]],
+  // [2]Marathahalli→[7]Koramangala  (Sarjapur Rd)
+  [[12.9550,77.6900],[12.9470,77.6600]],
+  // [3]KR Puram→[5]Whitefield  (Old Madras Rd)
+  [[13.0050,77.7200],[12.9890,77.7370]],
+  // [3]KR Puram→[11]Nagawara  (ORR north)
+  [[13.0200,77.6700],[13.0380,77.6430]],
+  // [4]Electronic City→[8]JP Nagar  (Bannerghatta Rd north)
+  [[12.8650,77.6600],[12.8830,77.6000]],
+  // [4]Electronic City→[10]Bannerghatta Rd  (Hosur Rd / BG Rd junction)
+  [[12.8650,77.6500],[12.8800,77.6200]],
+  // [6]Indiranagar→[7]Koramangala  (100ft Rd south)
+  [[12.9740,77.6370],[12.9580,77.6310]],
+  // [6]Indiranagar→[2]Marathahalli  (Airport Rd east from Indi)
+  [[12.9760,77.6550],[12.9680,77.6780]],
+  // [6]Indiranagar→[11]Nagawara  (ORR north from Indi)
+  [[12.9900,77.6350],[13.0180,77.6270]],
+  // [7]Koramangala→[10]Bannerghatta Rd  (Sarjapur / BG cross)
+  [[12.9200,77.6170],[12.9080,77.6050]],
+  // [7]Koramangala→[8]JP Nagar  (BTM / JP cross)
+  [[12.9250,77.6090],[12.9180,77.5960]],
+  // [8]JP Nagar→[10]Bannerghatta Rd  (BG Rd junction)
+  [[12.8990,77.5900],[12.8950,77.5935]],
+  // [9]Yelahanka→[11]Nagawara  (ORR south from Yelahanka)
+  [[13.0850,77.6050],[13.0650,77.6130]],
+  // [9]Yelahanka→[1]Hebbal  (NH44 south to Hebbal)
+  [[13.0800,77.5970],[13.0600,77.5970]],
+  // [10]Bannerghatta Rd→[8]JP Nagar  (reverse BG Rd)
+  [[12.8960,77.5940],[12.8990,77.5900]],
+  // [11]Nagawara→[6]Indiranagar  (ORR south from Nagawara)
+  [[13.0370,77.6250],[13.0100,77.6200]]
+];
+
+// Build full multi-point path for each edge (junction A → waypoints → junction B)
+function getEdgePath(ei) {
+  var e = ED[ei];
+  var ja = JN[e[0]], jb = JN[e[1]];
+  var wpts = ROAD_WPT[ei] || [];
+  var path = [[ja.lat, ja.lng]];
+  for (var i = 0; i < wpts.length; i++) path.push(wpts[i]);
+  path.push([jb.lat, jb.lng]);
+  return path;
 }
 
-function pLen(path){
-  var L=0;
-  for(var i=1;i<path.length;i++){
-    var dy=path[i][0]-path[i-1][0],dx=path[i][1]-path[i-1][1];
-    L+=Math.sqrt(dy*dy+dx*dx);
+// Get total path length (in lat-lng "units") for normalised progress
+function pathLen(path) {
+  var L = 0;
+  for (var i = 1; i < path.length; i++) {
+    var dlat = path[i][0]-path[i-1][0], dlng = path[i][1]-path[i-1][1];
+    L += Math.sqrt(dlat*dlat+dlng*dlng);
   }
-  return L||1e-9;
+  return L;
 }
 
-function sampleP(path,t){
-  t=Math.max(0,Math.min(1,t));
-  var L=pLen(path),tgt=t*L,acc=0;
-  for(var i=1;i<path.length;i++){
-    var dy=path[i][0]-path[i-1][0],dx=path[i][1]-path[i-1][1];
-    var seg=Math.sqrt(dy*dy+dx*dx);
-    if(acc+seg>=tgt||i===path.length-1){
-      var f=seg>0?(tgt-acc)/seg:0;
-      return{lat:path[i-1][0]+dy*f,lng:path[i-1][1]+dx*f};
+// Sample a point along path at normalised progress t ∈ [0,1]
+// laneOff: perpendicular pixel offset for lane separation
+function samplePath(path, t) {
+  var L = pathLen(path);
+  var target = t * L;
+  var acc = 0;
+  for (var i = 1; i < path.length; i++) {
+    var dlat = path[i][0]-path[i-1][0], dlng = path[i][1]-path[i-1][1];
+    var seg = Math.sqrt(dlat*dlat+dlng*dlng);
+    if (acc + seg >= target || i === path.length-1) {
+      var frac = seg>0 ? (target-acc)/seg : 0;
+      return {
+        lat: path[i-1][0] + dlat*frac,
+        lng: path[i-1][1] + dlng*frac,
+        dlat: dlat, dlng: dlng  // direction for lane offset
+      };
     }
-    acc+=seg;
+    acc += seg;
   }
-  return{lat:path[path.length-1][0],lng:path[path.length-1][1]};
+  return {lat: path[path.length-1][0], lng: path[path.length-1][1], dlat:0, dlng:0};
 }
 
-// ─── SIGNALS ─────────────────────────────────────────────────────────────────
-var SIG=JN.map(function(_,i){
-  return{phase:(i/JN.length)*90,cycle:90,state:'red',evp:false,gDur:45};
+// ── STATE ─────────────────────────────────────────────────────────────────────
+var S = {
+  algo:'optimal', paused:false, speed:1,
+  emergDots:50, wave:25, cycle:90, dens:4,
+  simTime:0, frame:0, evpTotal:0, booted:0
+};
+
+var DNAMES = ['Very Low','Low','Medium','High','Peak'];
+var DKEYS  = ['vlow','low','med','high','peak'];
+var DMUL   = [0.2, 0.4, 0.7, 1.0, 1.4];
+var ANAMES = {optimal:'GW+LP+EVP', fixed:'FIXED TIMER', lp:'LP ONLY', evp:'EVP ONLY', webster:'WEBSTER ADPT', rl:'RL Q-LEARN'};
+var ALIST  = ['optimal','fixed','lp','evp','webster','rl'];
+var aidx   = 0;
+
+// Current LP/LWR data (from backend, density-indexed)
+var CUR = BACKEND.dens_precomp['high'];  // default = density 4
+
+function getDensKey(d) { return DKEYS[d-1] || 'high'; }
+function refreshCUR() { CUR = BACKEND.dens_precomp[getDensKey(S.dens)]; }
+
+// Graph buffers
+var GL = 120;
+var GD = {g0:[],g1:[],g2:[],g3:[],g4:[],g5:[]};
+for (var k in GD) { for (var i=0;i<GL;i++) GD[k].push(0); }
+
+// ── SIGNALS ───────────────────────────────────────────────────────────────────
+var SIG = JN.map(function(j,i) {
+  return {id:i, phase:Math.random()*90, cycle:90,
+          state:'red', evp:false, gDur:45, eff:0.5, wait:Math.floor(j.cong*50)};
 });
 
-// ─── PARTICLES ───────────────────────────────────────────────────────────────
-var particles=[];
+// ── PARTICLES ─────────────────────────────────────────────────────────────────
+var particles = [];
+var MAX_N = 650;
 
-function mkP(isE){
-  var ei=Math.floor(Math.random()*ED.length);
-  var path=ePath(ei);
-  return{isE:isE,ei:ei,path:path,prog:Math.random(),
-    dir:Math.random()<.5?1:-1,
-    spd:(0.00003+Math.random()*0.00035)*(isE?3:1),
-    ph:Math.random()*Math.PI*2,trail:[]};
+// ── SPEED CONSTANTS (calibrated to Bangalore real-world data) ────────────────
+// Source: BBMP Traffic Engineering Cell 2022 — Avg peak speed: 17.8 km/h
+//         Off-peak: 32.4 km/h | Free-flow corridor: ~45 km/h
+// 1 deg lat/lng ≈ 111 km at Bangalore lat (~13°)
+// progress/frame = kmh / (111 * 3600) / pathLen_deg / FPS
+var KMH_TO_DEG_PER_S = 1.0 / (111.0 * 3600.0);  // 1 km/h in degrees/second
+var FPS = 60.0;                                    // target frame rate
+
+// Bangalore peak-hour realistic speed ranges (PCU-weighted from KRDCL 2019):
+// ORR corridor (Silk Board, KR Puram, Marathahalli): 12-18 km/h peak
+// Inner ring / arterials: 18-28 km/h moderate
+// Sub-arterials (JP Nagar, Yelahanka): 25-38 km/h
+// Emergency vehicles (preemption): 35-50 km/h on cleared corridor
+var SPEED_TIERS = {
+  // [minKmh, maxKmh] free-flow for each junction's typical approach speed
+  // Based on: saturation flow, number of lanes, and junction geometry
+  orr_critical:  [10, 18],   // Silk Board, KR Puram, Marathahalli — notorious bottlenecks
+  orr_moderate:  [18, 28],   // Hebbal, Electronic City, Koramangala
+  inner_ring:    [22, 32],   // Indiranagar, Whitefield, Bannerghatta
+  sub_arterial:  [28, 40],   // JP Nagar, Yelahanka, Nagawara
+  emergency:     [38, 52],   // EVP with signal preemption
+};
+
+function edgeSpeedFactor(ei) {
+  // Returns the conversion: (1 km/h) = X progress-units/frame for this edge
+  var path = getEdgePath(ei);
+  var lenDeg = pathLen(path);                      // raw lat/lng degree length
+  if (lenDeg < 1e-9) return 0.00001;
+  return KMH_TO_DEG_PER_S / FPS / lenDeg;         // multiply by km/h to get prog/frame
 }
 
-function spawnP(){
+function Particle(isE) {
+  this.isE = isE;
+  this.ei = Math.floor(Math.random()*ED.length);
+  this.prog = Math.random();
+  this.dir = Math.random()>.5?1:-1;
+  this.laneIdx = Math.floor(Math.random()*3);
+  this.ph = Math.random()*Math.PI*2;
+  this.state = 'moving';
+  this.wt = 0;
+  this.trail = [];
+  // Assign realistic Bangalore speed based on the junction context
+  // Regular vehicles: speed varies by which junctions the edge connects
+  // (ORR critical bottlenecks much slower than sub-arterials)
+  var e = ED[this.ei];
+  var jA = JN[e[0]], jB = JN[e[1]];
+  var avgCong = (jA.cong + jB.cong) / 2;
+  if (isE) {
+    // Emergency: 38-52 km/h on preempted corridor
+    this.targetKmh = SPEED_TIERS.emergency[0] + Math.random() * (SPEED_TIERS.emergency[1] - SPEED_TIERS.emergency[0]);
+  } else if (avgCong >= 0.65) {
+    // ORR critical corridors: 10-18 km/h (Silk Board, KR Puram etc.)
+    this.targetKmh = SPEED_TIERS.orr_critical[0] + Math.random() * (SPEED_TIERS.orr_critical[1] - SPEED_TIERS.orr_critical[0]);
+  } else if (avgCong >= 0.50) {
+    // Moderate ORR / arterials: 18-28 km/h
+    this.targetKmh = SPEED_TIERS.orr_moderate[0] + Math.random() * (SPEED_TIERS.orr_moderate[1] - SPEED_TIERS.orr_moderate[0]);
+  } else if (avgCong >= 0.40) {
+    // Inner ring roads: 22-32 km/h
+    this.targetKmh = SPEED_TIERS.inner_ring[0] + Math.random() * (SPEED_TIERS.inner_ring[1] - SPEED_TIERS.inner_ring[0]);
+  } else {
+    // Sub-arterials, low-cong: 28-40 km/h
+    this.targetKmh = SPEED_TIERS.sub_arterial[0] + Math.random() * (SPEED_TIERS.sub_arterial[1] - SPEED_TIERS.sub_arterial[0]);
+  }
+  this._refreshSpeed();
+  this.spd = this.bspd;
+  this.tspd = this.bspd;
+  this.destJ = this._pickDest(this.dir===1?ED[this.ei][0]:ED[this.ei][1]);
+}
+
+Particle.prototype._refreshSpeed = function() {
+  // Recompute bspd whenever edge changes, so speed stays correct in real km/h
+  this.bspd = this.targetKmh * edgeSpeedFactor(this.ei);
+};
+
+Particle.prototype._pickDest = function(srcJ) {
+  var row = BACKEND.od_matrix[srcJ] || [];
+  var total = 0;
+  for(var i=0;i<row.length;i++) total+=row[i];
+  if(total===0) return Math.floor(Math.random()*JN.length);
+  var r = Math.random()*total, acc=0;
+  for(var i=0;i<row.length;i++){acc+=row[i]; if(r<=acc) return i;}
+  return 0;
+};
+
+Particle.prototype.pos = function() {
+  var path = getEdgePath(this.ei);
+  var t = this.dir===1 ? this.prog : 1-this.prog;
+  var pt = samplePath(path, t);
+  // Perpendicular lane offset: rotate direction vector 90 degrees
+  var dlen = Math.sqrt(pt.dlat*pt.dlat + pt.dlng*pt.dlng);
+  if (dlen < 1e-9) return {lat:pt.lat, lng:pt.lng};
+  // Normal vector (perpendicular, pointing left of travel direction)
+  var nx = -pt.dlng / dlen, ny = pt.dlat / dlen;
+  // Lane sign: dir=1 → right half of road (negative normal offset)
+  //            dir=-1 → left half of road (positive normal offset)
+  var sign = this.dir===1 ? -1 : 1;
+  // Lane offsets: 0=inner lane, 1=mid, 2=outer — ~0.00008 deg ≈ 8m per lane
+  var LANE_W = 0.000072;
+  var laneOff = sign * (0.5 + this.laneIdx) * LANE_W;
+  return {
+    lat: pt.lat + nx * laneOff,
+    lng: pt.lng + ny * laneOff
+  };
+};
+
+Particle.prototype.update = function(dt) {
+  try {
+    var e = ED[this.ei];
+    var endId = this.dir===1 ? e[1] : e[0];
+    var sig = SIG[endId];
+    var junc = JN[endId];
+    var distEnd = this.dir===1 ? 1-this.prog : this.prog;
+    var mul = DMUL[S.dens-1];
+    var af = S.algo==='fixed' ? 1.25 : 1.0;
+    var warm = Math.min(S.booted/500,1);
+    var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
+    var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
+    var stop = (!this.isE && distEnd<.22 && sig.state==='red' && !sig.evp);
+
+    // Speed scale: S.wave represents free-flow speed in km/h (default 40)
+    // Vehicles scale their speed relative to this green-wave speed setting
+    var waveScale = S.wave / 40.0;
+
+    if(stop){
+      this.tspd=0; this.state='stopped'; this.wt+=_sigDtSec;
+    } else if(cong>.85&&!this.isE){
+      // Gridlock: near-zero movement, Bangalore-style total jam
+      this.tspd=this.bspd*0.04*waveScale; this.state='stopped';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.05);
+    } else if(cong>.65&&!this.isE){
+      // Heavy congestion: ORR/Silk Board characteristic crawl (4-8 km/h effective)
+      var f=Math.max(0.06, 1-(cong-.65)*3.5);
+      this.tspd=this.bspd*f*waveScale; this.state='slow';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.02);
+    } else if(cong>.45&&!this.isE){
+      // Moderate: 40-60% speed reduction (typical Bangalore inner ring)
+      var f2=Math.max(0.35, 1-(cong-.45)*2.0);
+      this.tspd=this.bspd*f2*waveScale; this.state='slow';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.08);
+    } else {
+      this.tspd=this.bspd*waveScale; this.state='moving';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.3);
+    }
+    // Emergency vehicles ignore signals and congestion — run at full target speed
+    if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
+    // Smooth acceleration/deceleration
+    this.spd+=(this.tspd-this.spd)*.10;
+    this.prog+=this.spd*this.dir*S.speed;
+    if(this.isE){
+      var p=this.pos();
+      this.trail.unshift({lat:p.lat,lng:p.lng});
+      if(this.trail.length>10) this.trail.pop();
+    }
+    if(this.prog>=1 || this.prog<=0){
+      this.prog=this.prog>=1?0:1;
+      var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
+      var conn=[];
+      for(var i=0;i<ED.length;i++){
+        if(i!==this.ei&&(ED[i][0]===ej||ED[i][1]===ej)) conn.push(i);
+      }
+      if(conn.length>0){
+        var best=conn[0], bestW=0;
+        for(var ci=0;ci<conn.length;ci++){
+          var cj=ED[conn[ci]][0]===ej?ED[conn[ci]][1]:ED[conn[ci]][0];
+          var od=BACKEND.od_matrix[ej][cj]||1;
+          if(od>bestW||Math.random()<.3){bestW=od;best=conn[ci];}
+        }
+        this.ei=best; this.dir=ED[best][0]===ej?1:-1;
+        this.prog=this.dir===1?0:1;
+        this._refreshSpeed();  // recalculate bspd for new edge length
+        if(ej===this.destJ) this.destJ=this._pickDest(ej);
+      } else {
+        this.dir*=-1;
+      }
+    }
+  } catch(err){}
+};
+
+Particle.prototype.col = function() {
+  if(this.isE) return '#ff2244';
+  if(this.state==='stopped') return '#ff5500';
+  if(this.state==='slow') return '#ffcc00';
+  return '#00ccff';
+};
+
+function spawnParticles() {
   particles=[];
-  var n=Math.min(Math.floor(400*DMUL[S.dens-1]),600);
-  for(var i=0;i<n;i++) particles.push(mkP(false));
-  for(var i=0;i<S.emerg;i++) particles.push(mkP(true));
+  var mul=DMUL[S.dens-1];
+  var n=Math.floor(MAX_N*mul);
+  for(var i=0;i<n;i++) particles.push(new Particle(false));
+  for(var i=0;i<S.emergDots;i++) particles.push(new Particle(true));
 }
 
-function updateP(dt){
+// ── MAP ───────────────────────────────────────────────────────────────────────
+var map=L.map('map',{center:[12.97,77.62],zoom:12,
+  zoomControl:false,attributionControl:false,preferCanvas:true});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
+setTimeout(function(){map.invalidateSize();map.setView([12.97,77.62],12);},300);
+setTimeout(function(){map.invalidateSize();},800);
+
+var roadLines=[];
+function drawRoads() {
+  for(var i=0;i<roadLines.length;i++) try{roadLines[i].remove();}catch(e){}
+  roadLines=[];
+  var warm=Math.min(S.booted/500,1);
+  var lwr=CUR.lwr;
+  for(var ri=0;ri<ED.length;ri++){
+    var e=ED[ri];
+    var ja=JN[e[0]], jb=JN[e[1]];
+    var mul=DMUL[S.dens-1];
+    var af=S.algo==='fixed'?1.2:1.0;
+    var ar=S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:0;
+    var cong=Math.min((ja.cong+jb.cong)/2*mul*af*(1-ar),1);
+    var wv=lwr[ri]?Math.abs(lwr[ri].w_km_h):0;
+    var col=cong>.85?'#ff2244':cong>.65?'#ff8c00':cong>.4?'#ffd700':'#00ff88';
+    var w=4+cong*7;
+    // Full curved road path via waypoints
+    var path=getEdgePath(ri);
+    var latLngs=path.map(function(p){return[p[0],p[1]];});
+    var hasEvp=false;
+    for(var pi=0;pi<particles.length;pi++){
+      if(particles[pi].isE&&particles[pi].ei===ri){hasEvp=true;break;}
+    }
+    // Road glow shadow (wider, very faint)
+    try{
+      roadLines.push(L.polyline(latLngs,
+        {color:col+'33',weight:w+8,opacity:.3,lineJoin:'round',lineCap:'round'}).addTo(map));
+    }catch(ex){}
+    // Road base (solid, congestion coloured)
+    try{
+      roadLines.push(L.polyline(latLngs,
+        {color:col+'aa',weight:w,opacity:.9,lineJoin:'round',lineCap:'round'}).addTo(map));
+    }catch(ex){}
+    // Road centre divider line (dashed white)
+    try{
+      roadLines.push(L.polyline(latLngs,
+        {color:'#ffffff1a',weight:1,opacity:.6,dashArray:'5 9'}).addTo(map));
+    }catch(ex){}
+    // EVP corridor overlay
+    if(hasEvp){
+      try{
+        roadLines.push(L.polyline(latLngs,
+          {color:'#ff224444',weight:w+12,opacity:.45}).addTo(map));
+        roadLines.push(L.polyline(latLngs,
+          {color:'#ff44aa',weight:2,opacity:.9,dashArray:'10 6'}).addTo(map));
+      }catch(ex){}
+    }
+    // LWR shock wave overlay
+    if(wv>15){
+      try{
+        var alpha=Math.min(wv/60,.6);
+        roadLines.push(L.polyline(latLngs,
+          {color:'rgba(187,119,255,'+alpha.toFixed(2)+')',weight:2.5,opacity:.85,dashArray:'4 8'}).addTo(map));
+      }catch(ex){}
+    }
+  }
+}
+
+var jmkrs=JN.map(function(j,i){
+  var lanes = j.lanes || 3;
+  var r = 6 + lanes*1.5;
+  var m=L.circleMarker([j.lat,j.lng],
+    {radius:r,color:'#ffffff',weight:2,fillColor:'#ff2244',fillOpacity:.92}).addTo(map);
+  var tc=j.cong>.65?'#ff2244':j.cong>.45?'#ff8c00':'#00ff88';
+  var lp=CUR.lp;
+  m.bindTooltip(
+    '<div style="font-family:monospace;font-size:11px;line-height:1.6;min-width:180px">'+
+    '<b style="color:#ffd700;font-size:12px">'+j.name+'</b><br>'+
+    'Congestion: <b style="color:'+tc+'">'+Math.round(j.cong*100)+'%</b><br>'+
+    'Lanes: <b>'+lanes+' per direction</b><br>'+
+    'O-D demand: <b>'+Math.round(BACKEND.od_totals[i]).toLocaleString()+' PCU/hr</b><br>'+
+    'Daily: <b>'+(j.daily/1000).toFixed(0)+'K veh/day</b><br>'+
+    'LP green: <b>'+(lp.g?lp.g[i].toFixed(0):45)+'s / '+(lp.C||90)+'s cycle</b><br>'+
+    'Webster d: <b>'+(lp.delay?lp.delay[i].toFixed(1):'-')+'s/veh</b><br>'+
+    'v/c ratio: <b>'+(lp.x?lp.x[i].toFixed(3):'-')+'</b>'+
+    '</div>',
+    {direction:'top',className:'jn-tip'}
+  );
+  return m;
+});
+
+// ── CANVAS OVERLAY ────────────────────────────────────────────────────────────
+var fc=document.getElementById('fc');
+var cx=fc.getContext('2d');
+function resizeFC(){var mw=document.getElementById('mw');fc.width=mw.offsetWidth;fc.height=mw.offsetHeight;}
+resizeFC();
+window.addEventListener('resize',resizeFC);
+function ll2px(lat,lng){try{var p=map.latLngToContainerPoint([lat,lng]);return {x:p.x,y:p.y};}catch(e){return{x:-100,y:-100};}}
+
+function renderParticles(){
+  cx.clearRect(0,0,fc.width,fc.height);
+
+  // Draw 4-arm signal indicators at each junction
+  for(var ji=0;ji<JN.length;ji++){
+    var j=JN[ji]; var sig=SIG[ji];
+    var jpt=ll2px(j.lat,j.lng);
+    var col=sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    var R=8+(j.lanes||3)*1.5;
+    // 4 signal arms (N/S/E/W)
+    var arms=[{dx:0,dy:-(R+6)},{dx:0,dy:R+6},{dx:R+6,dy:0},{dx:-(R+6),dy:0}];
+    for(var ai=0;ai<arms.length;ai++){
+      var arm=arms[ai];
+      cx.save();
+      cx.fillStyle=col+'cc';
+      cx.shadowBlur=7; cx.shadowColor=col;
+      cx.fillRect(jpt.x+arm.dx-3,jpt.y+arm.dy-3,6,6);
+      cx.shadowBlur=0; cx.restore();
+    }
+    // Junction glow ring
+    cx.save(); cx.beginPath();
+    cx.arc(jpt.x,jpt.y,R+3,0,Math.PI*2);
+    cx.fillStyle=col+'12'; cx.fill(); cx.restore();
+    // Phase progress arc
+    var pct=sig.phase/sig.cycle;
+    cx.save(); cx.beginPath();
+    cx.arc(jpt.x,jpt.y,R,-Math.PI/2,-Math.PI/2+pct*2*Math.PI);
+    cx.strokeStyle=col+'77'; cx.lineWidth=2.5; cx.stroke(); cx.restore();
+  }
+
+  // Draw regular vehicles as directional mini-cars
   for(var i=0;i<particles.length;i++){
     var p=particles[i];
-    var jIdx=p.dir===1?ED[p.ei][1]:ED[p.ei][0];
-    var sig=SIG[jIdx];
-    var near=p.dir===1?p.prog>.82:p.prog<.18;
-    var stopped=!p.isE&&sig.state==='red'&&near;
-    if(!stopped){
-      p.prog+=p.dir*p.spd*dt*S.spd*(p.isE?2:1);
+    if(p.isE) continue;
+    try{
+      var pos=p.pos();
+      var pt=ll2px(pos.lat,pos.lng);
+      var path=getEdgePath(p.ei);
+      var t2=(p.dir===1?p.prog:1-p.prog);
+      var ptA=samplePath(path,Math.max(0,t2-0.015));
+      var ptB=samplePath(path,Math.min(1,t2+0.015));
+      // Screen direction (map lat decreases going down screen)
+      var pA=ll2px(ptA.lat,ptA.lng);
+      var pB=ll2px(ptB.lat,ptB.lng);
+      var ang=Math.atan2(pB.y-pA.y,pB.x-pA.x);
+      if(p.dir===-1) ang+=Math.PI;
+      var vcol=p.col();
+      cx.save();
+      cx.translate(pt.x,pt.y);
+      cx.rotate(ang);
+      cx.fillStyle=vcol+'cc';
+      cx.fillRect(-3.5,-1.8,7,3.6);
+      cx.fillStyle='#ffffff44';
+      cx.fillRect(0.5,-1.2,2.5,2.4);
+      cx.restore();
+    }catch(e){}
+  }
+
+  // LWR shock wave midpoint pulses
+  var lwr=CUR.lwr;
+  for(var ri=0;ri<ED.length&&ri<lwr.length;ri++){
+    var wv=lwr[ri].w_km_h;
+    if(Math.abs(wv)>10){
+      var path3=getEdgePath(ri);
+      var midpt=samplePath(path3,0.5);
+      var pt2=ll2px(midpt.lat,midpt.lng);
+      var pulse=.5+.5*Math.sin(S.frame*.15+ri);
+      var a=Math.min(Math.abs(wv)/60,.8)*pulse;
+      cx.fillStyle='rgba(187,119,255,'+a.toFixed(2)+')';
+      cx.beginPath();cx.arc(pt2.x,pt2.y,5,0,Math.PI*2);cx.fill();
     }
-    if(p.prog>1||p.prog<0){
-      p.ei=Math.floor(Math.random()*ED.length);
-      p.path=ePath(p.ei);
-      p.prog=p.dir===1?0.01:0.99;
-    }
-    if(p.isE){
-      var pos=sampleP(p.path,p.prog);
-      p.trail.push([pos.lat,pos.lng]);
-      if(p.trail.length>10) p.trail.shift();
-    }
+  }
+
+  // Emergency vehicles on top with trails
+  for(var i=0;i<particles.length;i++){
+    var p=particles[i];
+    if(!p.isE) continue;
+    try{
+      for(var t=1;t<p.trail.length;t++){
+        var t1=ll2px(p.trail[t-1].lat,p.trail[t-1].lng);
+        var t3=ll2px(p.trail[t].lat,p.trail[t].lng);
+        cx.strokeStyle='rgba(255,34,68,'+(((1-t/p.trail.length)*.6).toFixed(2))+')';
+        cx.lineWidth=Math.max(.5,4-t*.35);
+        cx.beginPath();cx.moveTo(t1.x,t1.y);cx.lineTo(t3.x,t3.y);cx.stroke();
+      }
+      var pos2=p.pos(); var pt4=ll2px(pos2.lat,pos2.lng);
+      var pulse2=.55+.45*Math.sin(S.frame*.25+p.ph);
+      cx.shadowBlur=18*pulse2;cx.shadowColor='#ff2244';cx.fillStyle='#ff2244';
+      cx.beginPath();cx.arc(pt4.x,pt4.y,8,0,Math.PI*2);cx.fill();
+      cx.shadowBlur=0;cx.strokeStyle='#ffffff';cx.lineWidth=2;
+      cx.beginPath();
+      cx.moveTo(pt4.x-6,pt4.y);cx.lineTo(pt4.x+6,pt4.y);
+      cx.moveTo(pt4.x,pt4.y-6);cx.lineTo(pt4.x,pt4.y+6);
+      cx.stroke();
+    }catch(e){}
+  }
+  cx.shadowBlur=0;
+}
+
+var lwrChart=null;
+setTimeout(function(){
+  var el=document.getElementById('lwrcanv');
+  if(!el) return;
+  var vf=60, kj=120;
+  var kArr=[], qArr=[];
+  for(var k=0;k<=kj;k+=2){kArr.push(k);qArr.push(vf*k*(1-k/kj));}
+  var jDots=JN.map(function(j,i){
+    var k=j.cong*DMUL[S.dens-1]*kj;
+    return {x:k, y:vf*k*(1-k/kj)};
+  });
+  try{
+    lwrChart=new Chart(el,{
+      type:'scatter',
+      data:{
+        datasets:[
+          {label:'q-k curve',data:kArr.map(function(k,i){return{x:k,y:qArr[i]};}),
+           type:'line',borderColor:'#00e5ff55',borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+          {label:'Junctions',data:jDots,
+           backgroundColor:'#ff224488',pointRadius:5,pointHoverRadius:7}
+        ]
+      },
+      options:{
+        animation:false,responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{enabled:false}},
+        scales:{
+          x:{display:true,title:{display:true,text:'Density k (veh/km)',color:'#3a5570',font:{size:8}},
+             ticks:{color:'#3a5570',font:{size:8}},grid:{color:'#0d2040'},min:0,max:kj},
+          y:{display:true,title:{display:true,text:'Flow q (veh/hr)',color:'#3a5570',font:{size:8}},
+             ticks:{color:'#3a5570',font:{size:8}},grid:{color:'#0d2040'},min:0,max:1900}
+        }
+      }
+    });
+  }catch(e){}
+},400);
+
+function updateLWRChart(){
+  if(!lwrChart) return;
+  try{
+    var vf=60,kj=120;
+    var jDots=JN.map(function(j){
+      var k=Math.min(j.cong*DMUL[S.dens-1]*kj,kj*.99);
+      return{x:k,y:vf*k*(1-k/kj)};
+    });
+    lwrChart.data.datasets[1].data=jDots;
+    lwrChart.update('none');
+  }catch(e){}
+}
+
+// ── PERFORMANCE CHARTS ────────────────────────────────────────────────────────
+var GCFG=[
+  {id:'gc0',col:'#00ff88',max:2200},
+  {id:'gc1',col:'#ff2244',max:200},
+  {id:'gc2',col:'#ff8c00',max:1.0},
+  {id:'gc3',col:'#00e5ff',max:100},
+  {id:'gc4',col:'#bb77ff',max:80},
+  {id:'gc5',col:'#ffd700',max:2000}
+];
+var GKEYS=['g0','g1','g2','g3','g4','g5'];
+var charts={};
+setTimeout(function(){
+  for(var i=0;i<GCFG.length;i++){
+    (function(cfg,key){
+      var el=document.getElementById(cfg.id);
+      if(!el) return;
+      try{
+        charts[key]=new Chart(el,{
+          type:'line',
+          data:{labels:new Array(GL).fill(''),
+            datasets:[{data:GD[key].slice(),borderColor:cfg.col,borderWidth:1.5,
+              pointRadius:0,fill:true,backgroundColor:cfg.col+'18',tension:.4}]},
+          options:{animation:false,responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{enabled:false}},
+            scales:{x:{display:false},y:{display:false,min:0,max:cfg.max}}}
+        });
+      }catch(e){}
+    })(GCFG[i],GKEYS[i]);
+  }
+},350);
+
+function pushGraph(key,val){
+  GD[key].push(val);GD[key].shift();
+  if(charts[key]){
+    try{charts[key].data.datasets[0].data=GD[key].slice();charts[key].update('none');}catch(e){}
   }
 }
 
-// ─── SIGNALS UPDATE ──────────────────────────────────────────────────────────
-var _lw=0;
-function updateSig(){
-  var now=performance.now();
-  if(!_lw)_lw=now;
-  var dt=Math.min((now-_lw)/1000,0.1)*S.spd;
-  _lw=now;
-  S.t+=dt;
-  var lp=CUR.lp,warm=Math.min(S.booted/500,1);
+// ── SIGNAL UPDATE ─────────────────────────────────────────────────────────────
+function updateSignals(dt){
+  S.booted=Math.min(S.booted+dt,500);
+  var warm=S.booted/500;
+  var lp=CUR.lp;
+
   for(var i=0;i<SIG.length;i++){
     var sig=SIG[i];
-    sig.phase=((sig.phase+dt)%S.cycle+S.cycle)%S.cycle;
-    sig.cycle=S.cycle;
-    // EVP
-    var evp=false;
-    for(var j=0;j<particles.length;j++){
-      var p=particles[j];if(!p.isE)continue;
-      var tj=p.dir===1?ED[p.ei][1]:ED[p.ei][0];
+    // Wall-clock accurate: advance phase by real elapsed sim-seconds per frame
+    // _sigDtSec is computed from performance.now() delta → exact second countdown
+    sig.phase += _sigDtSec;
+    // Hard clamp: phase MUST stay in [0, cycle) — catches any edge case drift
+    sig.phase = ((sig.phase % sig.cycle) + sig.cycle) % sig.cycle;
+
+    var nearEvp=false;
+    for(var pi=0;pi<particles.length;pi++){
+      var p=particles[pi];
+      if(!p.isE) continue;
+      var ej=p.dir===1?ED[p.ei][1]:ED[p.ei][0];
       var d2=p.dir===1?1-p.prog:p.prog;
-      if(tj===i&&d2<.28){evp=true;break;}
+      if(ej===i&&d2<.3){nearEvp=true;break;}
     }
-    sig.evp=evp&&S.algo!=='fixed';
-    if(sig.evp){sig.state='green';sig.gDur=S.cycle*.93;continue;}
+    var wasEvp=sig.evp;
+    sig.evp=nearEvp&&S.algo!=='fixed';
+    if(sig.evp&&!wasEvp){
+      S.evpTotal++;
+      var ov=document.getElementById('evpo');
+      if(ov){ov.classList.add('on');setTimeout(function(){var o=document.getElementById('evpo');if(o)o.classList.remove('on');},600);}
+    }
+    if(sig.evp){sig.state='green';sig.eff=1;sig.gDur=S.cycle*.95;continue;}
+
+    // LP-optimal green time (from Python scipy solver)
     var gDur=S.cycle*.5;
     if((S.algo==='optimal'||S.algo==='lp')&&lp&&lp.g){
-      gDur=Math.max(10,Math.min(lp.g[i]*(S.cycle/90)*(0.5+warm*.5),S.cycle*.75));
-    }else if(S.algo==='rl'&&B.rl&&B.rl.g_rl){
-      gDur=Math.max(10,Math.min(B.rl.g_rl[i]*(S.cycle/90)*(0.5+warm*.5),S.cycle*.75));
-    }else if(S.algo==='webster'&&lp&&lp.lambda){
+      // LP-optimal green time scaled to current cycle
+      var lpG = lp.g[i] * (S.cycle / 90);
+      gDur = Math.max(10, Math.min(lpG * (0.5 + warm * 0.5), S.cycle * 0.75));
+      // NOTE: green-wave phase sync removed — it caused unbounded phase drift
+      // (nudge accumulation across multiple edges per junction per frame)
+    } else if(S.algo==='rl'&&BACKEND.rl&&BACKEND.rl.g_rl){
+      var rlG=BACKEND.rl.g_rl[i]*(S.cycle/90);
+      gDur=Math.max(10,Math.min(rlG*(0.5+warm*0.5),S.cycle*0.75));
+    } else if(S.algo==='webster'&&lp&&lp.lambda){
+      // Webster-derived green time directly from λ_i
       gDur=Math.max(10,lp.lambda[i]*S.cycle*(0.5+warm*.5));
+    } else if(S.algo==='evp'){
+      gDur=S.cycle*.5;
     }
-    sig.gDur=gDur;
+    // fixed timer: gDur stays at cycle*.5
+
+    sig.gDur=gDur; sig.cycle=S.cycle;
     var yDur=S.cycle*.07;
-    sig.state=sig.phase<gDur?'green':sig.phase<gDur+yDur?'yellow':'red';
+    if(sig.phase<gDur) sig.state='green';
+    else if(sig.phase<gDur+yDur) sig.state='yellow';
+    else sig.state='red';
+    sig.eff=(gDur/S.cycle)*warm;
+    sig.wait=sig.state==='red'?Math.floor(JN[i].cong*45*DMUL[S.dens-1]):Math.floor(JN[i].cong*10);
   }
 }
 
-// ─── DRAW ─────────────────────────────────────────────────────────────────────
-function draw(){
-  if(mc.width<10||mc.height<10) return;
-  ctx.clearRect(0,0,mc.width,mc.height);
-
-  // Grid
-  ctx.save();ctx.strokeStyle='#00e5ff07';ctx.lineWidth=1;ctx.setLineDash([]);
-  for(var x=0;x<mc.width;x+=55){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,mc.height);ctx.stroke();}
-  for(var y=0;y<mc.height;y+=55){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(mc.width,y);ctx.stroke();}
-  ctx.restore();
-
-  // Roads
-  var warm=Math.min(S.booted/500,1),lwr=CUR.lwr,mul=DMUL[S.dens-1];
-  var af=S.algo==='fixed'?1.2:1,ar=S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:0;
-  for(var ri=0;ri<ED.length;ri++){
-    var e=ED[ri],ja=JN[e[0]],jb=JN[e[1]];
-    var cong=Math.min((ja.cong+jb.cong)/2*mul*af*(1-ar),1);
-    var col=cong>.85?'#ff2244':cong>.65?'#ff8c00':cong>.4?'#ffd700':'#00ff88';
-    var w=Math.max(3,4+cong*8);
-    var path=ePath(ri);
-    var evpHit=false;
-    for(var pi=0;pi<particles.length;pi++){if(particles[pi].isE&&particles[pi].ei===ri){evpHit=true;break;}}
-    dPath(path,w+10,col+'20');
-    dPath(path,w,col+'bb');
-    dPath(path,1,'#ffffff12',[4,8]);
-    if(evpHit){dPath(path,w+16,'#ff224425');dPath(path,2,'#ff44aacc',[7,4]);}
-    if(lwr&&lwr[ri]){
-      var wv=Math.abs(lwr[ri].w_km_h);
-      if(wv>12) dPath(path,2,'rgba(187,119,255,'+Math.min(wv/55,.55).toFixed(2)+')',[4,6]);
-    }
-  }
-
-  // Junctions
-  for(var ji=0;ji<JN.length;ji++){
-    var j=JN[ji],sig=SIG[ji],pt=ll2p(j.lat,j.lng);
-    var jc=sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
-    var jr=8+(j.lanes||3)*1.5;
-    // Outer glow
-    ctx.save();ctx.beginPath();ctx.arc(pt.x,pt.y,jr+9,0,Math.PI*2);
-    ctx.fillStyle=jc+'15';ctx.fill();ctx.restore();
-    // Main circle
-    ctx.save();ctx.beginPath();ctx.arc(pt.x,pt.y,jr,0,Math.PI*2);
-    ctx.fillStyle=jc+'cc';ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
-    // Phase progress arc
-    ctx.save();ctx.beginPath();
-    ctx.arc(pt.x,pt.y,jr+3,-Math.PI/2,-Math.PI/2+(sig.phase/sig.cycle)*Math.PI*2);
-    ctx.strokeStyle=jc+'77';ctx.lineWidth=3;ctx.stroke();ctx.restore();
-    // Signal arms N/S/E/W
-    var arms=[[0,-(jr+7)],[0,jr+7],[jr+7,0],[-(jr+7),0]];
-    for(var ai=0;ai<4;ai++){
-      ctx.save();ctx.shadowBlur=8;ctx.shadowColor=jc;
-      ctx.fillStyle=jc+'cc';
-      ctx.fillRect(pt.x+arms[ai][0]-3,pt.y+arms[ai][1]-3,6,6);
-      ctx.shadowBlur=0;ctx.restore();
-    }
-    // Name label
-    ctx.save();ctx.font='bold 8px monospace';ctx.fillStyle='rgba(255,255,255,.7)';
-    ctx.textAlign='center';ctx.fillText(j.name.split(' ')[0],pt.x,pt.y+jr+12);ctx.restore();
-  }
-
-  // Normal vehicles
-  for(var i=0;i<particles.length;i++){
-    var p=particles[i];if(p.isE)continue;
-    try{
-      var pos=sampleP(p.path,p.prog),pt=ll2p(pos.lat,pos.lng);
-      var t2=Math.max(0,Math.min(1,p.prog+(p.dir===1?.008:-.008)));
-      var pos2=sampleP(p.path,t2),pt2=ll2p(pos2.lat,pos2.lng);
-      var ang=Math.atan2(pt2.y-pt.y,pt2.x-pt.x);
-      var sig=SIG[p.dir===1?ED[p.ei][1]:ED[p.ei][0]];
-      var stopped=sig.state==='red'&&(p.dir===1?p.prog>.82:p.prog<.18);
-      ctx.save();ctx.translate(pt.x,pt.y);ctx.rotate(ang);
-      ctx.fillStyle=stopped?'#ff224488':'#00ccffcc';
-      ctx.fillRect(-3.5,-1.8,7,3.6);
-      ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(.5,-1.2,2.5,2.4);
-      ctx.restore();
-    }catch(ex){}
-  }
-
-  // Emergency vehicles
-  for(var i=0;i<particles.length;i++){
-    var p=particles[i];if(!p.isE)continue;
-    try{
-      // Trail
-      for(var t=1;t<p.trail.length;t++){
-        var t1=ll2p(p.trail[t-1][0],p.trail[t-1][1]);
-        var t2=ll2p(p.trail[t][0],p.trail[t][1]);
-        ctx.strokeStyle='rgba(255,34,68,'+((t/p.trail.length)*.45).toFixed(2)+')';
-        ctx.lineWidth=3-t*.2;ctx.setLineDash([]);
-        ctx.beginPath();ctx.moveTo(t1.x,t1.y);ctx.lineTo(t2.x,t2.y);ctx.stroke();
-      }
-      var pos=sampleP(p.path,p.prog),pt=ll2p(pos.lat,pos.lng);
-      var pulse=.6+.4*Math.sin(S.frame*.2+p.ph);
-      ctx.save();ctx.shadowBlur=14*pulse;ctx.shadowColor='#ff2244';
-      ctx.beginPath();ctx.arc(pt.x,pt.y,6,0,Math.PI*2);
-      ctx.fillStyle='#ff2244';ctx.fill();ctx.shadowBlur=0;
-      ctx.strokeStyle='#fff';ctx.lineWidth=1.5;
-      ctx.beginPath();ctx.moveTo(pt.x-4,pt.y);ctx.lineTo(pt.x+4,pt.y);
-      ctx.moveTo(pt.x,pt.y-4);ctx.lineTo(pt.x,pt.y+4);ctx.stroke();
-      ctx.restore();
-    }catch(ex){}
-  }
-
-  // LWR shock pulses
-  if(lwr){
-    for(var ri=0;ri<ED.length&&ri<lwr.length;ri++){
-      var wv=Math.abs(lwr[ri].w_km_h);
-      if(wv>10){
-        var mid=sampleP(ePath(ri),.5),mpt=ll2p(mid.lat,mid.lng);
-        var pulse=.5+.5*Math.sin(S.frame*.1+ri*.7);
-        ctx.save();ctx.beginPath();ctx.arc(mpt.x,mpt.y,5,0,Math.PI*2);
-        ctx.fillStyle='rgba(187,119,255,'+Math.min((wv/55)*pulse,.65).toFixed(2)+')';
-        ctx.fill();ctx.restore();
-      }
-    }
-  }
-}
-
-function dPath(path,lw,col,dash){
-  ctx.save();ctx.beginPath();ctx.lineWidth=lw;ctx.strokeStyle=col;
-  ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash(dash||[]);
-  var p0=ll2p(path[0][0],path[0][1]);ctx.moveTo(p0.x,p0.y);
-  for(var i=1;i<path.length;i++){var p=ll2p(path[i][0],path[i][1]);ctx.lineTo(p.x,p.y);}
-  ctx.stroke();ctx.restore();
-}
-
-// ─── SPARKLINES ──────────────────────────────────────────────────────────────
-var GL=80;
-var GD={g0:[],g1:[],g2:[],g3:[],g4:[]};
-for(var k in GD){for(var i=0;i<GL;i++)GD[k].push(0);}
-var GCFG=[
-  {id:'gc0',key:'g0',col:'#00ff88',max:2200},
-  {id:'gc1',key:'g1',col:'#ff2244',max:200},
-  {id:'gc2',key:'g2',col:'#ff8c00',max:1.0},
-  {id:'gc3',key:'g3',col:'#00e5ff',max:100},
-  {id:'gc4',key:'g4',col:'#bb77ff',max:80}
-];
-
-function spark(id,data,col,maxV){
-  var el=document.getElementById(id);if(!el)return;
-  var w=el.clientWidth||270,h=52;
-  if(el.width!==w||el.height!==h){el.width=w;el.height=h;}
-  var c=el.getContext('2d'),n=data.length,step=w/n;
-  c.clearRect(0,0,w,h);
-  if(n<2)return;
-  c.beginPath();c.moveTo(0,h);
-  for(var i=0;i<n;i++){
-    var y=h-(Math.min(Math.max(data[i],0),maxV)/maxV)*(h-5)-2;
-    if(i===0)c.lineTo(0,y);else c.lineTo(i*step,y);
-  }
-  c.lineTo(w,h);c.closePath();c.fillStyle=col+'1a';c.fill();
-  c.beginPath();
-  for(var i=0;i<n;i++){
-    var y=h-(Math.min(Math.max(data[i],0),maxV)/maxV)*(h-5)-2;
-    if(i===0)c.moveTo(0,y);else c.lineTo(i*step,y);
-  }
-  c.strokeStyle=col+'cc';c.lineWidth=1.5;c.setLineDash([]);c.stroke();
-}
-
-function pushSpark(key,val){
-  GD[key].push(val);GD[key].shift();
-  for(var i=0;i<GCFG.length;i++){
-    if(GCFG[i].key===key){spark(GCFG[i].id,GD[key],GCFG[i].col,GCFG[i].max);break;}
-  }
-}
-
-// ─── LWR CHART ───────────────────────────────────────────────────────────────
-function drawLWR(){
-  var el=document.getElementById('lwrc');if(!el)return;
-  var w=el.clientWidth||270,h=110,pad=12;
-  if(el.width!==w||el.height!==h){el.width=w;el.height=h;}
-  var c=el.getContext('2d'),vf=60,kj=120;
-  c.clearRect(0,0,w,h);
-  var sx=(w-2*pad)/kj,sy=(h-2*pad)/1800;
-  c.strokeStyle='#0d2040';c.lineWidth=1;c.setLineDash([]);
-  for(var k=0;k<=kj;k+=30){var x2=pad+k*sx;c.beginPath();c.moveTo(x2,pad);c.lineTo(x2,h-pad);c.stroke();}
-  for(var q=0;q<=1800;q+=600){var y2=h-pad-q*sy;c.beginPath();c.moveTo(pad,y2);c.lineTo(w-pad,y2);c.stroke();}
-  c.beginPath();c.strokeStyle='#00e5ff44';c.lineWidth=1.5;
-  for(var k=0;k<=kj;k+=2){var q=vf*k*(1-k/kj);if(k===0)c.moveTo(pad,h-pad-q*sy);else c.lineTo(pad+k*sx,h-pad-q*sy);}
-  c.stroke();
-  var mul=DMUL[S.dens-1];
+function updateJMkrs(){
   for(var i=0;i<JN.length;i++){
-    var k2=Math.min(JN[i].cong*mul*kj,kj*.99),q2=vf*k2*(1-k2/kj);
-    var col=JN[i].cong>.65?'#ff2244':JN[i].cong>.45?'#ff8c00':'#00ff88';
-    c.beginPath();c.arc(pad+k2*sx,h-pad-q2*sy,4,0,Math.PI*2);c.fillStyle=col+'cc';c.fill();
+    var s=SIG[i];
+    var c=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
+    try{jmkrs[i].setStyle({fillColor:c,color:s.evp?'#ff4466':'#ffffff'});}catch(e){}
   }
-  c.fillStyle='#3a5570';c.font='7px monospace';
-  c.fillText('k (density)→',w-70,h-1);c.fillText('q↑',2,pad+4);
 }
 
-// ─── METRICS ─────────────────────────────────────────────────────────────────
-function updateMetrics(){
-  var warm=Math.min(S.booted/500,1),lp=CUR.lp,lwr=CUR.lwr,mul=DMUL[S.dens-1];
-  var norm=0,stop2=0;
-  for(var i=0;i<particles.length;i++){
-    if(particles[i].isE)continue;
-    norm++;
-    var sig=SIG[particles[i].dir===1?ED[particles[i].ei][1]:ED[particles[i].ei][0]];
-    if(sig.state==='red'&&(particles[i].dir===1?particles[i].prog>.82:particles[i].prog<.18))stop2++;
+// ── DOM HELPERS ───────────────────────────────────────────────────────────────
+var prevM={};
+function g(id){return document.getElementById(id);}
+function sv(id,v){var el=g(id);if(el)el.textContent=v;}
+function setDelta(key,dId,val,goodUp){
+  var prev=prevM[key]||0;var d=val-prev;
+  if(Math.abs(d)>.5){
+    var good=goodUp?d>0:d<0;
+    var el=g(dId);if(!el)return;
+    el.textContent=(d>0?'▲':'▼')+Math.abs(d).toFixed(1);
+    el.className='gd '+(good?'up':'dn');
   }
-  var sf=norm>0?stop2/norm:0;
-  var bD=0,bLam=0,bX=0,bObj=0;
-  if(lp&&lp.delay){
-    for(var i=0;i<lp.delay.length;i++){bD+=lp.delay[i];bLam+=lp.lambda[i];bX+=lp.x[i];}
-    bD/=lp.delay.length;bLam/=lp.lambda.length;bX/=lp.x.length;bObj=lp.obj_val||0;
-  }else{bD=80;bLam=.45;bX=.75;}
-  var am=S.algo==='fixed'?1.35:S.algo==='lp'?(1-warm*.2):S.algo==='optimal'?(1-warm*.35):S.algo==='webster'?(1-warm*.15):1;
-  var co=lp&&lp.C_opt?lp.C_opt:90;
-  var cm=1+Math.abs(S.cycle-co)/co*.6;
-  var avgD=Math.min(bD*am*cm*(1+sf*.8),300);
-  var avgX=Math.min(bX*mul*am*cm*.7,.999);
-  var avgE=Math.min((bLam+(S.algo==='optimal'?warm*.12:S.algo==='lp'?warm*.08:0))*100,95);
-  var mf=norm>0?(norm-stop2)/norm:.5;
-  var thr=Math.round((800+mf*1200)*(S.algo==='fixed'?.72:S.algo==='optimal'?(.85+warm*.15):(.8+warm*.1))/Math.max(mul,.3));
-  var dF=(mul-.2)/(1.4-.2);
-  var avgSpd=Math.max(4,(32.4-dF*(32.4-17.8))*(1-sf*.5)*(1+(S.algo==='optimal'?warm*.18:0)));
-  var maxShock=0,nSh=0;
-  if(lwr){for(var i=0;i<lwr.length;i++){var w2=Math.abs(lwr[i].w_km_h);if(w2>maxShock)maxShock=w2;if(w2>5)nSh++;}}
-  maxShock*=Math.min(mul,1.4);
-  var evpAct=0;for(var i=0;i<SIG.length;i++)if(SIG[i].evp)evpAct++;
-
-  sv('kv0',(particles.length*5000).toLocaleString());
-  sv('kv1',avgD.toFixed(1)+'s');sv('kv2',evpAct);
-  sv('kv3',avgE.toFixed(0)+'%');sv('kv4',avgSpd.toFixed(1));
-  sv('gv0',thr);sv('gv1',avgD.toFixed(1));sv('gv2',avgX.toFixed(3));
-  sv('gv3',avgE.toFixed(0));sv('gv4',maxShock.toFixed(1));
-
-  pushSpark('g0',Math.min(thr,2200));pushSpark('g1',Math.min(avgD,200));
-  pushSpark('g2',Math.min(avgX,1));pushSpark('g3',avgE);pushSpark('g4',Math.min(maxShock,80));
-
-  sv('lps',lp&&lp.lp_ok?'OPTIMAL':'FEASIBLE');
-  sv('lpo',(bObj*am*mul).toFixed(0));sv('lpd',avgD.toFixed(1));sv('lpx',avgX.toFixed(3));
-
-  var ts=fmtT(S.t);
-  sv('stm',ts);sv('sbt',ts);sv('sba',ALGOS[S.algo]);sv('sbd',avgD.toFixed(1));sv('sbx',avgX.toFixed(3));
-  sv('alg',ALGOS[S.algo]);sv('vtot',(particles.length*5000).toLocaleString());
-
-  sv('lws',nSh);sv('lwm',maxShock.toFixed(1));
-  var avgK=lwr?lwr.reduce(function(a,r){return a+(r.k_A+r.k_B)/2;},0)/Math.max(lwr.length,1):0;
-  sv('lwa',avgK.toFixed(1));
-  sv('lwl',avgK<20?'A - Free':avgK<40?'B - Stable':avgK<60?'C':avgK<80?'D':'E/F');
+  prevM[key]=val;
 }
 
-function fmtT(t){
-  var h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=Math.floor(t%60);
-  return(h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
-}
-
-// ─── LP TABLE ────────────────────────────────────────────────────────────────
-function renderLP(){
-  var lp=CUR.lp;if(!lp||!lp.g)return;
-  sv('lptC',lp.C||90);sv('lptS',lp.lp_ok?'OPTIMAL':'FEASIBLE');
-  var LC={A:'#00ff88',B:'#00dd66',C:'#ffd700',D:'#ff8c00',E:'#ff2244',F:'#dd0022'};
+// ── LP TABLE RENDER ───────────────────────────────────────────────────────────
+function renderLPTable(){
+  var lp=CUR.lp;
+  if(!lp||!lp.g) return;
+  var tb=g('lp-tbody');
+  if(!tb) return;
+  var losColors={'A':'var(--green)','B':'var(--green)','C':'var(--yellow)','D':'var(--orange)','E':'var(--red)','F':'var(--red)'};
   var html='';
   for(var i=0;i<JN.length;i++){
-    var xc=lp.x[i]>.9?'#ff2244':lp.x[i]>.7?'#ff8c00':'#00ff88';
-    var dc=lp.delay[i]>80?'#ff2244':lp.delay[i]>55?'#ff8c00':lp.delay[i]>35?'#ffd700':'#00ff88';
-    var los=lp.los?lp.los[i]:'?';
-    html+='<tr><td>'+JN[i].name.replace(' Junction','').substring(0,12)+'</td>'+
-      '<td style="color:#00e5ff">'+lp.g[i].toFixed(0)+'</td>'+
-      '<td style="color:'+xc+'">'+lp.x[i].toFixed(2)+'</td>'+
-      '<td style="color:'+dc+'">'+lp.delay[i].toFixed(0)+'</td>'+
-      '<td style="color:'+(LC[los]||'#ffd700')+'">'+los+'</td></tr>';
+    var gi=lp.g[i].toFixed(0);
+    var li=(lp.lambda[i]*100).toFixed(0)+'%';
+    var xi=lp.x[i].toFixed(3);
+    var di=lp.delay[i].toFixed(1);
+    var qi=Math.round(lp.q_pcu[i]).toLocaleString();
+    var xcolor=lp.x[i]>.9?'var(--red)':lp.x[i]>.7?'var(--orange)':'var(--green)';
+    var dcolor=lp.delay[i]>80?'var(--red)':lp.delay[i]>55?'var(--orange)':lp.delay[i]>35?'var(--yellow)':'var(--green)';
+    var los=lp.los?lp.los[i]:'–';
+    var loscol=losColors[los]||'var(--yellow)';
+    var qlen=lp.q_len?lp.q_len[i]:'–';
+    var copt=lp.C_opt_per?lp.C_opt_per[i]:'–';
+    html+='<tr><td>'+JN[i].name+'</td>'+
+      '<td style="color:var(--cyan)">'+gi+'</td>'+
+      '<td>'+li+'</td>'+
+      '<td style="color:'+xcolor+'">'+xi+'</td>'+
+      '<td style="color:'+dcolor+'">'+di+'</td>'+
+      '<td style="color:'+loscol+'">'+los+'</td>'+
+      '<td style="color:var(--yellow)">'+qlen+'</td>'+
+      '<td style="color:#4a6880">'+copt+'</td></tr>';
   }
-  document.getElementById('lptb').innerHTML=html;
+  tb.innerHTML=html;
+  sv('lpt-C',lp.C||90);
+  sv('lpt-status',lp.lp_ok?'OPTIMAL':'FEASIBLE');
 }
 
-// ─── SIGNAL PANEL ────────────────────────────────────────────────────────────
-function renderSig(){
-  var el=document.getElementById('sigpanel');if(!el)return;
-  var lp=CUR.lp,html='';
-  for(var i=0;i<SIG.length;i++){
-    var s=SIG[i],j=JN[i];
-    var col=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
-    var lbl=s.evp?'EVP!':s.state.toUpperCase();
-    var rem=s.state==='green'?Math.max(0,s.gDur-s.phase):
-             s.state==='yellow'?Math.max(0,s.gDur+s.cycle*.07-s.phase):
-             Math.max(0,s.cycle-s.phase);
-    var pct=Math.round(s.phase/s.cycle*100);
-    var x=lp&&lp.x?lp.x[i].toFixed(2):'--';
-    var d=lp&&lp.delay?lp.delay[i].toFixed(0):'-';
-    var los=lp&&lp.los?lp.los[i]:'?';
-    html+='<div class="sc" style="border-left-color:'+col+'">'+
-      '<div class="sn">'+j.name+'</div>'+
-      '<div class="sw"><div class="ss-state" style="color:'+col+'">'+lbl+'</div>'+
-        '<div class="ss-timer" style="color:'+col+'">'+rem.toFixed(0)+'s</div></div>'+
-      '<div class="sb2"><div class="sf" style="width:'+pct+'%;background:'+col+'"></div></div>'+
-      '<div class="sg">'+
-        '<div class="sc2"><div class="sv2" style="color:'+
-          (parseFloat(x)>.9?'#ff2244':parseFloat(x)>.7?'#ff8c00':'#00ff88')+'">'+x+'</div><div class="sl">v/c</div></div>'+
-        '<div class="sc2"><div class="sv2" style="color:'+
-          (parseInt(d)>80?'#ff2244':parseInt(d)>55?'#ff8c00':'#00ff88')+'">'+d+'s</div><div class="sl">delay</div></div>'+
-        '<div class="sc2"><div class="sv2" style="color:#00e5ff">'+s.gDur.toFixed(0)+'s</div><div class="sl">green</div></div>'+
-        '<div class="sc2"><div class="sv2" style="color:#ffd700">'+los+'</div><div class="sl">LOS</div></div>'+
-      '</div></div>';
+// ── LWR TABLE RENDER ─────────────────────────────────────────────────────────
+function renderLWRTable(){
+  var lwr=CUR.lwr;
+  var ctm=CUR.ctm;
+  if(!lwr) return;
+  var tb=g('lwr-tbody');
+  if(!tb) return;
+  var html='';
+  var nShocks=0, maxW=0, sumK=0;
+  var losColors={'A':'var(--green)','B':'var(--green)','C':'var(--yellow)','D':'var(--orange)','E':'var(--red)','F':'var(--red)'};
+  for(var i=0;i<lwr.length;i++){
+    var r=lwr[i];
+    var e=r.edge;
+    var linkName=JN[e[0]].name.substring(0,5)+'→'+JN[e[1]].name.substring(0,5);
+    var wabs=Math.abs(r.w_km_h);
+    if(wabs>5) nShocks++;
+    if(wabs>maxW) maxW=wabs;
+    sumK+=(r.k_A+r.k_B)/2;
+    var wcol=wabs>30?'var(--red)':wabs>15?'var(--orange)':'var(--green)';
+    var los=ctm&&ctm[i]?ctm[i].los:'?';
+    var loscol=losColors[los]||'var(--yellow)';
+    html+='<tr><td>'+linkName+'</td>'+
+      '<td>'+r.k_A+'</td>'+
+      '<td>'+r.k_B+'</td>'+
+      '<td style="color:'+wcol+'">'+r.w_km_h+'</td>'+
+      '<td style="color:'+loscol+'">LOS '+los+'</td></tr>';
   }
-  el.innerHTML=html;
-}
-
-// ─── TOOLTIP ─────────────────────────────────────────────────────────────────
-var tipEl=document.getElementById('tip');
-mc.addEventListener('mousemove',function(ev){
-  var r=mc.getBoundingClientRect(),mx=ev.clientX-r.left,my=ev.clientY-r.top,hit=-1;
-  for(var i=0;i<JN.length;i++){
-    var p=ll2p(JN[i].lat,JN[i].lng),dx=mx-p.x,dy=my-p.y;
-    if(dx*dx+dy*dy<625){hit=i;break;}
+  tb.innerHTML=html;
+  var avgK=sumK/lwr.length;
+  sv('lwr-shocks',nShocks);
+  sv('lwr-maxw',maxW.toFixed(1));
+  sv('lwr-avgk',avgK.toFixed(1));
+  var los=avgK<20?'A (Free)':avgK<40?'B (Stable)':avgK<60?'C (Stable)':avgK<80?'D (Near)':'E/F (Unstable)';
+  var losel=g('lwr-los');
+  if(losel){
+    losel.textContent=los;
+    losel.style.color=avgK<40?'var(--green)':avgK<70?'var(--yellow)':'var(--red)';
   }
-  if(hit<0){tipEl.style.display='none';mc.style.cursor='default';return;}
-  var j=JN[hit],lp=CUR.lp,tc=j.cong>.65?'#ff2244':j.cong>.45?'#ff8c00':'#00ff88';
-  tipEl.innerHTML='<b style="color:#ffd700;font-size:12px">'+j.name+'</b><br>'+
-    'Congestion: <b style="color:'+tc+'">'+Math.round(j.cong*100)+'%</b><br>'+
-    'Lanes: <b>'+(j.lanes||3)+' per dir</b><br>'+
-    'O-D demand: <b>'+Math.round(B.od_totals[hit]).toLocaleString()+' PCU/hr</b><br>'+
-    'LP green: <b>'+(lp.g?lp.g[hit].toFixed(0):45)+'s / '+(lp.C||90)+'s</b><br>'+
-    'Webster delay: <b>'+(lp.delay?lp.delay[hit].toFixed(1):'-')+'s/veh</b><br>'+
-    'v/c ratio: <b>'+(lp.x?lp.x[hit].toFixed(3):'-')+'</b>';
-  tipEl.style.display='block';
-  tipEl.style.left=Math.min(ev.clientX+14,window.innerWidth-220)+'px';
-  tipEl.style.top=Math.max(ev.clientY-100,8)+'px';
-  mc.style.cursor='pointer';
-});
-mc.addEventListener('mouseleave',function(){tipEl.style.display='none';});
-
-// ─── CONTROLS ────────────────────────────────────────────────────────────────
-function sv(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
-function g(id){return document.getElementById(id);}
-function setDens(v){S.dens=+v;refreshCUR();spawnP();sv('ldl',DNAMES[S.dens-1]);}
-function setEmerg(v){S.emerg=+v;spawnP();sv('lem',v+'='+(v*100).toLocaleString()+' veh');}
-function setAlgo(v){S.algo=v;sv('btnalgo',ALGOS[v]||v);}
-function cycleAlgo(){aidx=(aidx+1)%ALIST.length;S.algo=ALIST[aidx];g('selalgo').value=S.algo;sv('btnalgo',ALGOS[S.algo]);}
-function massEVP(){for(var i=0;i<particles.length;i++)if(!particles[i].isE&&Math.random()<.25)particles[i]=mkP(true);}
-function togglePause(){S.paused=!S.paused;sv('btnpause',S.paused?'▶ RESUME':'⏸ PAUSE');}
-function tab(n){
-  var ts=document.querySelectorAll('.tab'),bs=document.querySelectorAll('.tp');
-  for(var i=0;i<ts.length;i++){ts[i].className='tab'+(i===n?' on':'');}
-  for(var i=0;i<bs.length;i++){bs[i].className='tp'+(i===n?' on':'');}
-  if(n===3)setTimeout(drawLWR,50);
+  sv('lwr-maxw',maxW.toFixed(1));
 }
 
-// ─── MAIN LOOP ───────────────────────────────────────────────────────────────
-var lastTS=0;
-function loop(ts){
-  if(!lastTS)lastTS=ts;
-  var dt=Math.min((ts-lastTS)/1000,0.05);
-  lastTS=ts;
-
-  if(!S.paused){
-    S.frame++;
-    S.booted=Math.min(S.booted+dt*60,500);
-    updateSig();
-    updateP(dt*60);
-    draw();
-    if(S.frame%2===0) updateMetrics();
-    if(S.frame%60===0){renderLP();renderSig();}
-    if(S.frame%90===0) drawLWR();
+// ── METRICS ───────────────────────────────────────────────────────────────────
+function updateMetrics(){
+  var warm=Math.min(S.booted/500,1);
+  var norm=[],emerg=[];
+  for(var i=0;i<particles.length;i++){
+    if(particles[i].isE) emerg.push(particles[i]); else norm.push(particles[i]);
   }
-  requestAnimationFrame(loop);
-}
+  var moving=0,slow=0,stopped=0;
+  for(var i=0;i<norm.length;i++){
+    if(norm[i].state==='moving') moving++;\n    else if(norm[i].state==='slow') slow++;\n    else stopped++;\n  }
+  var total=particles.length;
+  var lp=CUR.lp;
+  var lwr=CUR.lwr;
+  var mul=DMUL[S.dens-1];
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-// Use ResizeObserver for reliable sizing
-var mwEl=document.getElementById('mw');
-function doInit(){
-  resize();
-  refreshCUR();
-  spawnP();
-  renderLP();
-  renderSig();
-  drawLWR();
-  requestAnimationFrame(loop);
-}
-
-if(typeof ResizeObserver!=='undefined'){
-  var ro=new ResizeObserver(function(entries){
-    resize();
-    if(mc.width>10&&mc.height>10&&!loop._started){
-      loop._started=true;doInit();
+  // ── Dynamic metric computation (responds to all sliders) ──────────────────
+  // Base Webster delay from LP (density-specific precomputed values)
+  var baseDelay=0, avgLam=0, avgX=0, maxDelay=0, baseLpObj=0;
+  if(lp&&lp.delay){
+    for(var i=0;i<lp.delay.length;i++){
+      baseDelay+=lp.delay[i];
+      avgLam+=lp.lambda[i];
+      avgX+=lp.x[i];
+      if(lp.delay[i]>maxDelay) maxDelay=lp.delay[i];
     }
-  });
-  ro.observe(mwEl);
-  // Fallback if ResizeObserver fires but dimensions are 0
-  setTimeout(function(){
-    if(!loop._started){loop._started=true;doInit();}
-  },300);
-}else{
-  window.addEventListener('resize',resize);
-  setTimeout(function(){doInit();},150);
+    baseDelay/=lp.delay.length;
+    avgLam/=lp.lambda.length;
+    avgX/=lp.x.length;
+    baseLpObj=lp.obj_val||0;
+  } else {
+    baseDelay=80; avgLam=0.45; avgX=0.75; baseLpObj=0;
+  }
+
+  // Algorithm modifier: optimal LP reduces delay vs fixed-timer baseline
+  var algoDelayMul = S.algo==='fixed'   ? 1.35 :
+                     S.algo==='lp'      ? (1 - warm*0.20) :
+                     S.algo==='optimal' ? (1 - warm*0.35) :
+                     S.algo==='webster' ? (1 - warm*0.15) :
+                     1.0; // evp
+
+  // Cycle time modifier: Webster optimal C reduces delay; too long or too short increases it
+  var C_opt = lp&&lp.C_opt ? lp.C_opt : 90;
+  var cycleDelta = Math.abs(S.cycle - C_opt) / C_opt;
+  var cycleDelayMul = 1 + cycleDelta * 0.6;  // up to +60% if far from optimal
+
+  // Particle state modifier: fraction stopped/slow increases perceived delay
+  var stopFrac = norm.length>0 ? (stopped + slow*0.5)/norm.length : 0;
+  var particleDelayMul = 1 + stopFrac * 0.8;
+
+  var avgDelay = Math.min(baseDelay * algoDelayMul * cycleDelayMul * particleDelayMul, 300);
+
+  // v/c ratio: scales with density and degrades with poor algorithm
+  var vcBase = avgX;
+  var avgVC = Math.min(vcBase * mul * algoDelayMul * cycleDelayMul * 0.7, 0.999);
+
+  // Signal efficiency g/C: LP-optimised algorithms improve green utilisation
+  var baseEff = avgLam;
+  var algoEffBonus = S.algo==='optimal' ? warm*0.12 :
+                     S.algo==='lp'      ? warm*0.08 :
+                     S.algo==='webster' ? warm*0.05 : 0;
+  var avgEff = Math.min((baseEff + algoEffBonus) * 100, 95);
+
+  // Network throughput: moving vehicles × scale factor, drops under congestion
+  var movingFrac = norm.length>0 ? moving/norm.length : 0.5;
+  var baseThr = 800 + movingFrac * 1200;  // 800-2000 veh/hr/lane range
+  var algoThrMul = S.algo==='fixed'?0.72 : S.algo==='optimal'?(0.85+warm*0.15) : (0.80+warm*0.10);
+  var thr = Math.round(baseThr * algoThrMul / Math.max(mul, 0.3));
+
+  // Average network speed: calibrated to BBMP data
+  // Peak (density 4-5): ~17.8 km/h | Off-peak: ~32.4 km/h
+  // Base speeds reflect actual Bangalore measurements (BBMP 2022)
+  var peakBaseSpeed = 17.8;   // km/h peak hour (BBMP Traffic Engineering 2022)
+  var offpeakSpeed  = 32.4;   // km/h off-peak
+  // Interpolate based on density and algorithm improvement
+  var densityFrac = (mul - 0.2) / (1.4 - 0.2);  // 0→1 as density goes from vlow→peak
+  var baseSpeedForDens = offpeakSpeed - densityFrac * (offpeakSpeed - peakBaseSpeed);
+  var congSpeedMul2 = 1 - stopFrac * 0.5;
+  var algoSpeedBonus = S.algo==='optimal' ? warm*0.18 : S.algo==='lp' ? warm*0.10 : 0;
+  var avgSpd = Math.max(4, baseSpeedForDens * Math.max(congSpeedMul2, 0.15) * (1 + algoSpeedBonus));
+
+  // LP objective: scales with delay, density, and algorithm efficiency
+  var lpObj = baseLpObj * algoDelayMul * mul;
+
+  // LWR shock metrics (from density-precomputed data)
+  var maxShock=0,nShocks=0;
+  if(lwr){
+    for(var i=0;i<lwr.length;i++){
+      var wabs=Math.abs(lwr[i].w_km_h);
+      if(wabs>maxShock) maxShock=wabs;
+      if(wabs>5) nShocks++;
+    }
+    // Scale shock speed by density - higher density = stronger shocks
+    maxShock = maxShock * Math.min(mul, 1.4);
+  }
+
+  var evpAct=0;
+  for(var i=0;i<SIG.length;i++) if(SIG[i].evp) evpAct++;
+
+  pushGraph('g0', Math.min(thr, 2200));
+  pushGraph('g1', Math.min(avgDelay, 200));
+  pushGraph('g2', Math.min(avgVC, 1.0));
+  pushGraph('g3', avgEff);
+  pushGraph('g4', Math.min(maxShock, 80));
+  pushGraph('g5', Math.min(lpObj/50, 2000));
+
+  sv('kv0',(total*5000).toLocaleString());
+  sv('kv1',avgDelay.toFixed(1)+'s');
+  sv('kv2',evpAct);
+  sv('kv3',avgEff.toFixed(0)+'%');
+  sv('kv4',avgSpd.toFixed(1));
+  sv('kv5',lpObj.toFixed(0));
+
+  sv('gv0',thr); setDelta('thr','gd0',thr,true);
+  sv('gv1',avgDelay.toFixed(1)); setDelta('del','gd1',avgDelay,false);
+  sv('gv2',avgVC.toFixed(3)); setDelta('xvr','gd2',avgVC,false);
+  sv('gv3',avgEff.toFixed(0)); setDelta('eff','gd3',avgEff,true);
+  sv('gv4',maxShock.toFixed(1)); setDelta('lwr','gd4',maxShock,false);
+  sv('gv5',lpObj.toFixed(0)); setDelta('obj','gd5',lpObj,true);
+
+  // LP status panel
+  sv('lp-status',lp&&lp.lp_ok?'OPTIMAL':'FEASIBLE');
+  sv('lp-obj',lpObj.toFixed(1));
+  sv('lp-wd',avgDelay.toFixed(1));
+  sv('lp-xavg',avgVC.toFixed(3));
+  sv('w-C',S.cycle);
+  sv('w-lam',avgLam.toFixed(3));
+  sv('w-x',avgVC.toFixed(3));
+  sv('w-d',avgDelay.toFixed(1));
+  sv('w-dmax',(maxDelay*algoDelayMul*cycleDelayMul).toFixed(1));
+  // d1 and d2 components from LP
+  var avgD1=0,avgD2=0,nD=0;
+  if(lp&&lp.delay_d1&&lp.delay_d2){
+    for(var _j=0;_j<lp.delay_d1.length;_j++){avgD1+=lp.delay_d1[_j];avgD2+=lp.delay_d2[_j];nD++;}
+    if(nD>0){avgD1/=nD;avgD2/=nD;}
+  }
+  sv('w-d1',avgD1>0?(avgD1*algoDelayMul).toFixed(1):'--');
+  sv('w-d2',avgD2>0?(avgD2*algoDelayMul).toFixed(1):'--');
+
+  // LWR display
+  sv('lwr-maxw',maxShock.toFixed(1));
+  sv('lwr-shocks',nShocks);
+  var avgK2=JN.reduce(function(a,j){return a+j.cong*mul*120;},0)/JN.length;
+  sv('lwr-avgk',avgK2.toFixed(1));
+  sv('lwrd',maxShock.toFixed(0)+' km/h');
+
+  // Status bar
+  var ts=pad(Math.floor(S.simTime/3600)%24)+':'+pad(Math.floor(S.simTime/60)%60)+':'+pad(Math.floor(S.simTime)%60);
+  sv('stm',ts); sv('sbt',ts);
+  sv('algod',ANAMES[S.algo]); sv('sba',ANAMES[S.algo]);
+  sv('vtot',(total*5000).toLocaleString());
+  sv('sbl',lp&&lp.lp_ok?'OPTIMAL':'FEAS');
+  sv('sbw',avgDelay.toFixed(1));
+  sv('sbx',avgVC.toFixed(3));
+  sv('sbwv',maxShock.toFixed(0));
+  sv('sbod','1.2M');
+  sv('sbe',evpAct);
+  // RL improvement in statusbar
+  if(BACKEND.rl&&BACKEND.rl.avg_delay_rl&&CUR.lp&&CUR.lp.delay){
+    var lpMean=CUR.lp.delay.reduce(function(a,b){return a+b;},0)/CUR.lp.delay.length;
+    var rlImp=lpMean>0?((lpMean-BACKEND.rl.avg_delay_rl)/lpMean*100):0;
+    sv('sb-rl',(rlImp>=0?'-':'+')+(Math.abs(rlImp).toFixed(1))+'%');
+  }
+
+  // Junction list is now updated by updateJunctionTimers() every 3 frames for accurate timers
+
+  // Signal panel – Real-time big-stat cards (visible from far) + detailed panels
+  var sp=g('sigpanel');
+  var spRT=g('sigpanel-rt');
+  var spTiming=g('sigpanel-timing');
+  var html='', htmlRT='', htmlTiming='';
+  var losColors={'A':'#00ff88','B':'#00e070','C':'#ffd700','D':'#ff8c00','E':'#ff2244','F':'#ff0033'};
+  var pi=CUR.pi;
+  for(var i=0;i<SIG.length;i++){
+    var s2=SIG[i];
+    var stateColor=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
+    var pct=Math.round(s2.phase/s2.cycle*100);
+    var remain=s2.state==='green' ? Math.max(0,s2.gDur-s2.phase)
+              :s2.state==='yellow'? Math.max(0,s2.gDur+s2.cycle*0.07-s2.phase)
+              : Math.max(0,s2.cycle-s2.phase);
+    var tl2=remain.toFixed(0)+'s '+(s2.state==='green'?'GO':(s2.state==='yellow'?'YLW':'WAIT'));
+    var lam2=lp&&lp.lambda?lp.lambda[i].toFixed(3):'-';
+    var x2num=lp&&lp.x?lp.x[i]:null;
+    var x2=x2num!==null?x2num.toFixed(3):'-';
+    var xColor=x2num!==null?(x2num>.9?'#ff2244':x2num>.7?'#ff8c00':'#00ff88'):'#5a7590';
+    var dRaw=lp&&lp.delay?lp.delay[i]:null;
+    var dScaled=dRaw!==null?Math.min(dRaw*algoDelayMul*cycleDelayMul,300):null;
+    var d2=dScaled!==null?dScaled.toFixed(0):'-';
+    var dColor=dScaled!==null?(dScaled>120?'#ff2244':dScaled>80?'#ff8c00':dScaled>35?'#ffd700':'#00ff88'):'#5a7590';
+    var gLp=lp&&lp.g?lp.g[i].toFixed(0):s2.gDur.toFixed(0);
+    var qRaw=lp&&lp.q_pcu?lp.q_pcu[i]/3600:0;
+    var lamN=lp&&lp.lambda?lp.lambda[i]:0.5;
+    var xN=lp&&lp.x?Math.min(lp.x[i],0.999):0.7;
+    var queueLen=Math.round(qRaw*s2.cycle*(1-lamN)*(1-lamN)/(2*Math.max(1-lamN*xN,0.01)));
+    queueLen=Math.max(0,Math.min(queueLen,99));
+    var scoot=CUR.scoot&&CUR.scoot[i]?CUR.scoot[i]:null;
+    var copt=scoot?scoot.C_opt.toFixed(0):'--';
+    var crec=scoot?scoot.C_rec.toFixed(0):'--';
+    var scootAction=scoot?scoot.action:'HOLD';
+    var scootCol=scootAction==='INCREMENT'?'#ff2244':scootAction==='DECREMENT'?'#00ff88':'#ffd700';
+    var piJ=pi&&pi.per_jct&&pi.per_jct[i]?pi.per_jct[i]:null;
+    var co2J=piJ?piJ.co2_kph.toFixed(1):'--';
+    var jLOS=lp&&lp.los?lp.los[i]:'-';
+    var losCol=losColors[jLOS]||'#ffd700';
+    var odDemand=BACKEND.od_totals[i]?Math.round(BACKEND.od_totals[i]).toLocaleString():'--';
+    var stateLabel=s2.evp?'EVP!':s2.state.toUpperCase();
+    var remainSec=remain.toFixed(0);
+
+    // ── BIG REAL-TIME CARD – 2-col grid, giant countdown ─────────────────
+    htmlRT+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-left-color:'+stateColor+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<div class="sc-name">'+JN[i].name+'</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#3a5570">OD:'+odDemand+'</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+
+        '<div style="text-align:center;padding:4px 0">'+
+          '<div class="sc-state" style="color:'+stateColor+'">'+stateLabel+'</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:0.46rem;color:'+stateColor+';opacity:.65;margin-top:2px">g='+gLp+'s / C='+s2.cycle.toFixed(0)+'s</div>'+
+        '</div>'+
+        '<div style="text-align:center">'+
+          '<div class="sc-tmr" style="color:'+stateColor+'">'+remainSec+'</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#4a6880;margin-top:1px">sec remain</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="sc-bar" style="margin-bottom:8px">'+
+        '<div class="sc-fill" style="width:'+pct+'%;background:'+stateColor+'"></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:'+xColor+'">'+x2+'</div>'+
+          '<div class="sc-stat-label">v/c</div>'+
+        '</div>'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:'+dColor+'">'+d2+'s</div>'+
+          '<div class="sc-stat-label">delay</div>'+
+        '</div>'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:#ff8c00">'+queueLen+'</div>'+
+          '<div class="sc-stat-label">queue</div>'+
+        '</div>'+
+        '<div class="sc-stat-cell">'+
+          '<div class="sc-stat-big" style="color:'+losCol+'">'+jLOS+'</div>'+
+          '<div class="sc-stat-label">LOS</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;margin-top:5px;'+
+        'font-family:Share Tech Mono,monospace;font-size:0.43rem;color:#3a5570">'+
+        '<span>SCOOT:'+crec+'s <span style="color:'+scootCol+'">'+scootAction+'</span></span>'+
+        '<span>CO2:'+co2J+' kg/hr</span>'+
+      '</div>'+
+    '</div>';
+
+    // Timing detail panel
+    htmlTiming+='<div style="display:grid;grid-template-columns:85px 1fr 1fr;gap:3px;'+
+      'align-items:start;padding:5px 6px;border-bottom:1px solid #0d2040;'+
+      'font-family:Share Tech Mono,monospace;font-size:0.48rem">'+
+      '<div style="color:#6a8090;font-size:.5rem">'+JN[i].name.substring(0,9)+'</div>'+
+      '<div>'+
+        '<div><span style="color:#4a6880">g_LP=</span><span style="color:var(--cyan)">'+gLp+'s</span> '+
+             '<span style="color:#4a6880">C*=</span><span style="color:var(--yellow)">'+copt+'s</span></div>'+
+        '<div><span style="color:#4a6880">d=</span><span style="color:'+dColor+'">'+d2+'s</span> '+
+             '<span style="color:#4a6880">Q=</span><span style="color:var(--orange)">'+queueLen+'</span></div>'+
+      '</div>'+
+      '<div>'+
+        '<div><span style="color:#4a6880">x=</span><span style="color:'+xColor+'">'+x2+'</span> '+
+             '<span style="color:#4a6880">LOS=</span><span style="color:'+losCol+'">'+jLOS+'</span></div>'+
+        '<div style="color:'+stateColor+'">'+stateLabel+' '+remainSec+'s</div>'+
+      '</div>'+
+    '</div>';
+
+    // Full detail card (collapsed section)
+    html+='<div class="sc-card'+(s2.evp?' sc-evp':'')+'" style="border-left-color:'+stateColor+'">'+
+      '<div class="sc-name">'+JN[i].name+' <small style="color:#3a5570;font-size:.4rem">OD:'+odDemand+' PCU/hr</small></div>'+
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center;margin:3px 0">'+
+        '<div class="sc-state" style="color:'+stateColor+';font-size:.9rem">'+stateLabel+'</div>'+
+        '<div class="sc-bar"><div class="sc-fill" style="width:'+pct+'%;background:'+stateColor+'"></div></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;font-family:Share Tech Mono,monospace;font-size:0.5rem;margin-bottom:2px">'+
+        '<div><span style="color:#4a6880">g=</span><span style="color:var(--cyan)">'+gLp+'s</span></div>'+
+        '<div><span style="color:#4a6880">lambda=</span><span style="color:var(--cyan)">'+lam2+'</span></div>'+
+        '<div><span style="color:#4a6880">x=</span><span style="color:'+xColor+'">'+x2+'</span></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;font-family:Share Tech Mono,monospace;font-size:0.5rem;margin-bottom:2px">'+
+        '<div><span style="color:#4a6880">d=</span><span style="color:'+dColor+'">'+d2+'s</span></div>'+
+        '<div><span style="color:#4a6880">Q=</span><span style="color:var(--yellow)">'+queueLen+'</span></div>'+
+        '<div><span style="color:#4a6880">LOS=</span><span style="color:'+losCol+'">'+jLOS+'</span></div>'+
+      '</div>'+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#3a5570">'+tl2+' | SCOOT:'+crec+'s ('+scootAction.substring(0,3)+') | CO2:'+co2J+'kg/hr</div>'+
+    '</div>';
+  }
+  if(sp) sp.innerHTML=html;
+  if(spRT) spRT.innerHTML=htmlRT;
+  if(spTiming) spTiming.innerHTML=htmlTiming;
 }
+
+function pad(n){return n<10?'0'+n:String(n);}
+
+// ── FAST JUNCTION TIMER UPDATE (every 3 frames) ───────────────────────────
+// Updates only the countdown labels in jlist-crit/mod/free without full DOM rebuild
+// Also updates the signal panel timing detail
+function updateJunctionTimers(){
+  var lp=CUR.lp;
+  // Re-render junction list timers only (lightweight: text only per item)
+  var jlCrit=g('jlist-crit'),jlMod=g('jlist-mod'),jlFree=g('jlist-free');
+  if(!jlCrit) return;
+  var htmlCrit='',htmlMod='',htmlFree='';
+  for(var i=0;i<JN.length;i++){
+    var j=JN[i]; var s=SIG[i];
+    var col=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
+    var _yDur3=s.cycle*0.07;
+    var tl3;
+    if(s.evp){ tl3='EVP PRI'; }
+    else if(s.state==='green'){ tl3=Math.max(0,s.gDur-s.phase).toFixed(0)+'s \u25ba'; }
+    else if(s.state==='yellow'){ tl3=Math.max(0,s.gDur+_yDur3-s.phase).toFixed(0)+'s YLW'; }
+    else { tl3=Math.max(0,s.cycle-s.phase).toFixed(0)+'s WAIT'; }
+    var cc=j.cong>.65?'var(--red)':j.cong>.45?'var(--orange)':'var(--green)';
+    var xi2=(lp&&lp.x)?lp.x[i].toFixed(2):'--';
+    var lanes=j.lanes||3;
+    var item='<div class="ji'+(s.evp?' evp':'')+'\" style=\"background:'+(s.evp?'#150308':'#020810')+'">'+
+      '<div class="jdot" style="background:'+col+';box-shadow:0 0 5px '+col+'"></div>'+
+      '<div class="jname">'+j.name+
+        '<small>x='+xi2+' | '+(j.daily/1000).toFixed(0)+'K/d | '+lanes+' ln</small></div>'+
+      '<div class="jpct" style="color:'+cc+'">'+Math.round(j.cong*100)+'%</div>'+
+      '<div class="jtmr" style="color:'+col+'">'+tl3+'</div>'+
+      '</div>';
+    if(j.cong>0.65) htmlCrit+=item;
+    else if(j.cong>0.45) htmlMod+=item;
+    else htmlFree+=item;
+  }
+  jlCrit.innerHTML=htmlCrit||'<div style="font-family:monospace;font-size:.5rem;color:#3a5570;padding:4px">None at this density</div>';
+  if(jlMod) jlMod.innerHTML=htmlMod||'';
+  if(jlFree) jlFree.innerHTML=htmlFree||'';
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────────
+function setAlgo(a){
+  S.algo=a; S.booted=0; aidx=ALIST.indexOf(a);
+  sv('algod',ANAMES[a]); sv('sba',ANAMES[a]);
+  var ba=g('btn-algo'); if(ba) ba.textContent='⚡ '+ANAMES[a].split('+')[0];
+  var sel=g('algo-sel'); if(sel) sel.value=a;
+}
+function cycleAlgo(){aidx=(aidx+1)%ALIST.length;setAlgo(ALIST[aidx]);}
+function setAlgoSel(v){setAlgo(v);}
+function togglePause(){S.paused=!S.paused;var b=g('btn-pause');if(b)b.textContent=S.paused?'▶ RESUME':'⏸ PAUSE';}
+function massEVP(){
+  for(var i=0;i<SIG.length;i++) SIG[i].evp=true;
+  S.evpTotal+=SIG.length;
+  var ov=g('evpo');if(ov)ov.classList.add('on');
+  setTimeout(function(){for(var i=0;i<SIG.length;i++)SIG[i].evp=false;var o=g('evpo');if(o)o.classList.remove('on');},6000);
+}
+function setDens(v){
+  S.dens=parseInt(v);
+  var el=g('ldns');if(el)el.textContent=DNAMES[S.dens-1];
+  refreshCUR();
+  spawnParticles();
+  renderLPTable();
+  renderLWRTable();
+  updateLWRChart();
+  updateCTMDisplay();
+  updatePlatoonDisplay();
+  renderPIBox();
+  renderSCOOTTable();
+}
+function setEmerg(v){
+  S.emergDots=parseInt(v);
+  var el=g('lems');if(el)el.textContent=v+' = '+(v*100).toLocaleString()+' veh';
+  particles=particles.filter(function(p){return !p.isE;});
+  for(var i=0;i<S.emergDots;i++) particles.push(new Particle(true));
+}
+function setWave(v){S.wave=parseInt(v);var el=g('lwav');if(el)el.textContent=v+' km/h';sv('wavd',v+' km/h');}
+function setCycle(v){S.cycle=parseInt(v);var el=g('lcyc');if(el)el.textContent=v+'s';sv('w-C',v);}
+function setSS(v){S.speed=parseFloat(v);}
+function lTab(n){
+  var tabs=document.querySelectorAll('#lp .tab');
+  var panes=document.querySelectorAll('#lp .tpane');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
+  for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
+}
+function rTab(n){
+  var tabs=document.querySelectorAll('#rp .tab');
+  var panes=document.querySelectorAll('.atab-content');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
+  for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
+  if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();setTimeout(function(){renderRadarChart();},80);}
+  if(n===4){setTimeout(initAIML,80);}
+  if(n===5){setTimeout(initValid,80);}
+  if(n===6){setTimeout(initClaudeTab,80);}
+}
+
+// ── PARETO TAB INIT ───────────────────────────────────────────────────────────
+var paretoInited = false;
+var radarInited  = false;
+var radarChart   = null;
+var paretoChart2 = null;
+
+function initParetoTab(){
+  if(!paretoInited){
+    paretoInited=true;
+    // Delay slightly so the tab's display:flex has applied and canvas has real dimensions
+    setTimeout(function(){
+      renderParetoChart();
+      renderMCSummary();
+      renderSCOOTTable();
+      renderPIBox();
+      setTimeout(function(){renderRadarChart();},150);
+    },50);
+  } else {
+    // Re-render on every tab visit to handle resize/layout changes
+    if(paretoChart2){try{paretoChart2.resize();}catch(e){}}
+    if(radarChart){try{radarChart.resize();}catch(e){}}
+  }
+}
+
+function renderParetoChart(){
+  var pf = BACKEND.pareto;
+  if(!pf||pf.length===0){ sv('pf-n','No data'); return; }
+  sv('pf-n', pf.length);
+  var minD=pf[0].f1_delay, minE=pf[pf.length-1].f2_emiss;
+  sv('pf-d1', minD.toFixed(1));
+  sv('pf-d2', minE.toFixed(4));
+  var el = g('pareto-canv');
+  if(!el) return;
+  if(paretoChart2){try{paretoChart2.destroy();}catch(e){} paretoChart2=null;}
+  try{
+    var pts = pf.map(function(p){return {x:p.f1_delay, y:p.f2_emiss};});
+    paretoChart2 = new Chart(el,{
+      type:'line',
+      data:{
+        labels: pf.map(function(p){return p.f1_delay.toFixed(0);}),
+        datasets:[{
+          label:'Pareto Front',
+          data: pts.map(function(p){return p.y;}),
+          borderColor:'#00e5ff',
+          backgroundColor:'#00e5ff22',
+          pointBackgroundColor:'#00e5ff',
+          pointRadius:4,
+          borderWidth:2,
+          fill:true,
+          tension:0.3
+        },{
+          label:'Min Delay',
+          data: pts.map(function(p,i){return i===0?p.y:null;}),
+          borderColor:'#00ff88',
+          backgroundColor:'#00ff8866',
+          pointBackgroundColor:'#00ff88',
+          pointRadius:7,
+          borderWidth:0,
+          fill:false
+        }]
+      },
+      options:{
+        animation:false,responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:function(ctx){
+            var i=ctx.dataIndex;
+            return 'Delay:'+pf[i].f1_delay.toFixed(1)+' | CO₂:'+pf[i].f2_emiss.toFixed(4);
+          }}}
+        },
+        scales:{
+          x:{display:true,title:{display:true,text:'f1 Delay (weighted s)',color:'#4a6880',font:{size:8}},
+             ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}},
+          y:{display:true,title:{display:true,text:'f2 CO₂ proxy',color:'#4a6880',font:{size:8}},
+             ticks:{color:'#3a5570',font:{size:7}},grid:{color:'#0d2040'}}
+        }
+      }
+    });
+  }catch(e){console.warn('Pareto chart error:',e);}
+}
+
+function renderMCSummary(){
+  var mc = BACKEND.mc_sensitivity;
+  if(!mc) return;
+  sv('mc-n',   mc.n_samples);
+  sv('mc-sig', (mc.sigma_pct*100).toFixed(0)+'%');
+  sv('mc-obj', mc.mean_obj.toFixed(1));
+  sv('mc-std', '±'+mc.std_obj.toFixed(1));
+  sv('mc-p95', mc.p95_delay.toFixed(1));
+  sv('mc-avg', mc.mean_delay.toFixed(1));
+  sv('mc-sens', mc.sensitive_name+' (σ='+mc.per_jct_std[mc.most_sensitive].toFixed(1)+'s)');
+}
+
+function renderSCOOTTable(){
+  var dk = DKEYS[S.dens-1];
+  var sc = BACKEND.scoot_all[dk];
+  if(!sc||!g('scoot-tbody')) return;
+  var tb=g('scoot-tbody');
+  if(!tb) return;
+  var html='';
+  for(var i=0;i<sc.length;i++){
+    var r=sc[i];
+    var ac=r.action==='INCREMENT'?'var(--red)':r.action==='DECREMENT'?'var(--green)':'var(--yellow)';
+    var xc=r.oversaturated?'var(--red)':'var(--green)';
+    html+='<tr><td>'+r.jn_name+'</td>'+
+      '<td>'+r.C_opt+'</td>'+
+      '<td style="color:'+ac+'">'+r.C_rec+'</td>'+
+      '<td>'+r.Y.toFixed(2)+'</td>'+
+      '<td style="color:'+ac+'">'+r.action.substring(0,3)+'</td></tr>';
+  }
+  tb.innerHTML=html;
+}
+
+function renderPIBox(){
+  var dk = DKEYS[S.dens-1];
+  var piData = BACKEND.dens_precomp[dk].pi;
+  if(!piData) return;
+  sv('pi-total', piData.PI_total ? piData.PI_total.toFixed(0) : '--');
+  sv('pi-fuel',  piData.fuel_lph ? piData.fuel_lph.toFixed(0) : '--');
+  sv('pi-co2',   piData.co2_kph  ? piData.co2_kph.toFixed(0)  : '--');
+  // Also update statusbar
+  sv('sb-co2', piData.co2_kph ? piData.co2_kph.toFixed(0) : '--');
+  sv('sb-pi',  piData.PI_total ? (piData.PI_total/1000).toFixed(1)+'K' : '--');
+}
+
+function renderRadarChart(){
+  var el=g('radar-canv');
+  if(!el) return;
+  if(radarChart){try{radarChart.destroy();}catch(e){} radarChart=null;}
+  radarInited=true;
+  try{
+    var warm=Math.min(S.booted/500,1);
+    var mul=DMUL[S.dens-1];
+    // Scores scale dynamically with current density and algorithm
+    var algoBoost = S.algo==='optimal'?warm : S.algo==='lp'?warm*0.7 : S.algo==='webster'?warm*0.4 : 0;
+    var optVals  = [
+      Math.round(60+algoBoost*28),   // Throughput
+      Math.round(55+algoBoost*27),   // Delay-Eff
+      Math.round(65-mul*8+algoBoost*15),  // v/c Control
+      Math.round(60+algoBoost*20),   // LOS
+      S.algo==='fixed'?20:Math.round(70+algoBoost*25)  // EVP Response
+    ];
+    var fixedVals= [62, 45, 60, 52, 20];
+    radarChart = new Chart(el,{
+      type:'radar',
+      data:{
+        labels:['Throughput','Delay-Eff','v/c Ctrl','LOS','EVP Resp'],
+        datasets:[
+          {label:'Current Algo',data:optVals,
+           borderColor:'#00e5ff',backgroundColor:'#00e5ff22',
+           pointBackgroundColor:'#00e5ff',borderWidth:2,pointRadius:3},
+          {label:'Fixed Timer',data:fixedVals,
+           borderColor:'#ff2244',backgroundColor:'#ff224422',
+           pointBackgroundColor:'#ff2244',borderWidth:2,pointRadius:3}
+        ]
+      },
+      options:{
+        animation:false,responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'bottom',labels:{
+          color:'#4a6880',font:{size:8,family:"'Share Tech Mono',monospace"},boxWidth:10}}},
+        scales:{r:{
+          ticks:{color:'#3a5570',font:{size:7},backdropColor:'transparent'},
+          grid:{color:'#0d2040'},pointLabels:{color:'#7090b0',font:{size:7.5}},
+          min:0,max:100,beginAtZero:true
+        }}
+      }
+    });
+  }catch(e){console.warn('Radar chart error:',e);}
+}
+
+// ── CTM BOTTLENECK DISPLAY ────────────────────────────────────────────────────
+function updateCTMDisplay(){
+  var dk=DKEYS[S.dens-1];
+  var ctm=BACKEND.dens_precomp[dk].ctm;
+  if(!ctm||ctm.length===0) return;
+  // Find worst LOS link
+  var los_rank={'A':0,'B':1,'C':2,'D':3,'E':4,'F':5};
+  var worst=ctm[0]; var wrank=-1;
+  for(var i=0;i<ctm.length;i++){
+    var r=los_rank[ctm[i].los]||0;
+    if(r>wrank){wrank=r;worst=ctm[i];}
+  }
+  var e=worst.edge;
+  sv('ctm-btn', JN[e[0]].name.substring(0,5)+'→'+JN[e[1]].name.substring(0,5)+' LOS:'+worst.los+' (util:'+Math.round(worst.utilisation*100)+'%)');
+}
+
+// ── PLATOON SUMMARY DISPLAY ───────────────────────────────────────────────────
+function updatePlatoonDisplay(){
+  var dk=DKEYS[S.dens-1];
+  var pl=BACKEND.dens_precomp[dk].platoon;
+  if(!pl||pl.length===0) return;
+  var avgF=0, avgPhi=0;
+  for(var i=0;i<pl.length;i++){avgF+=pl[i].F; avgPhi+=pl[i].phi;}
+  avgF/=pl.length; avgPhi/=pl.length;
+  var el=g('platoon-summary');
+  if(el) el.innerHTML=
+    '<span style="color:#00e5ff">Avg F:</span> '+avgF.toFixed(3)+'<br>'+
+    '<span style="color:#00ff88">Avg &#x3C6;:</span> '+avgPhi.toFixed(3)+'<br>'+
+    '<span style="color:#ff8c00">Delay corr.:</span> '+(1-0.5*avgPhi).toFixed(3)+'<br>'+
+    '<span style="color:#4a6880">Links analysed:</span> '+pl.length;
+}
+
+// ── AI/ML PANEL ──────────────────────────────────────────────────────────────
+var _aiDone=false;
+function initAIML(){
+  if(_aiDone) return; _aiDone=true;
+  var rl=BACKEND.rl; var ml=BACKEND.ml; var lp=CUR.lp;
+  var dk=DKEYS[S.dens-1]; var ctmLp=BACKEND.ctm_lp?BACKEND.ctm_lp[dk]:null;
+
+  // RL summary numbers
+  if(rl){
+    sv('rl-d', rl.avg_delay_rl.toFixed(1));
+    var lpMn=lp&&lp.delay?lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length:0;
+    sv('rl-lp', lpMn.toFixed(1));
+    var impv=lpMn>0?((lpMn-rl.avg_delay_rl)/lpMn*100):0;
+    var el=g('rl-sav'); if(el){el.textContent=(impv>=0?'+':'')+impv.toFixed(1); el.style.color=impv>=0?'var(--green)':'var(--red)';}
+
+    // Horizontal bar chart — pure CSS, no canvas, works even from hidden tab
+    var barsEl=g('rl-bars');
+    if(barsEl&&rl.rewards_trace&&rl.rewards_trace.length>0){
+      var rw=rl.rewards_trace;
+      var minR=Math.min.apply(null,rw), maxR=Math.max.apply(null,rw), rng=maxR-minR||1;
+      var bHtml='';
+      for(var ri=0;ri<rw.length;ri++){
+        var pct=Math.max(4,Math.round(((rw[ri]-minR)/rng)*100));
+        var prog=ri/Math.max(rw.length-1,1);
+        // red->purple->green gradient
+        var cr=Math.round(187*(1-prog)), cg=Math.round(255*prog), cb=Math.round(255*(1-prog)+136*prog);
+        var bcol='rgb('+cr+','+cg+','+cb+')';
+        bHtml+='<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">'
+          +'<span style="font-family:monospace;font-size:.37rem;color:#3a5570;width:14px;text-align:right">'+(ri+1)+'</span>'
+          +'<div style="flex:1;background:#0d2040;border-radius:2px;height:7px">'
+            +'<div style="width:'+pct+'%;height:100%;background:'+bcol+';border-radius:2px;box-shadow:0 0 3px '+bcol+'88"></div>'
+          +'</div>'
+          +'<span style="font-family:monospace;font-size:.37rem;color:'+bcol+';width:26px;text-align:right">'+rw[ri].toFixed(0)+'</span>'
+        +'</div>';
+      }
+      barsEl.innerHTML=bHtml;
+    }
+
+    // RL vs LP table
+    var tb=g('rl-tbody'); if(tb){
+      var th='';
+      for(var ii=0;ii<JN.length;ii++){
+        var grl=rl.g_rl?rl.g_rl[ii].toFixed(0):'-';
+        var glp=lp&&lp.g?lp.g[ii].toFixed(0):'-';
+        var drl=rl.delay_rl?rl.delay_rl[ii].toFixed(0):'-';
+        th+='<tr><td style="color:#7090a0">'+JN[ii].name.substring(0,8)+'</td>'
+          +'<td style="color:#bb77ff">'+grl+'s</td>'
+          +'<td style="color:var(--cyan)">'+glp+'s</td>'
+          +'<td style="color:var(--orange)">'+drl+'s</td></tr>';
+      }
+      tb.innerHTML=th;
+    }
+  }
+
+  // ML forecast numbers
+  if(ml){
+    sv('ml-rmse', ml.rmse.toFixed(4));
+    sv('ml-mape', ml.mape_pct.toFixed(2));
+    sv('ml-peaks', ml.peak_windows?ml.peak_windows.join(', '):'--');
+    // ML chart — SVG polyline, works even from hidden tab
+    var svgEl=g('ml-svg');
+    if(svgEl&&ml.y_obs&&ml.y_fore){
+      var obs=ml.y_obs.slice(0,48); var fore=ml.y_fore.slice(0,48);
+      var fit=ml.y_fit?ml.y_fit.slice(0,48):[];
+      var allVals=obs.concat(fore).concat(fit);
+      var minV=Math.min.apply(null,allVals), maxV2=Math.max.apply(null,allVals)||1.2;
+      var W=300, H=72, pad=4;
+      function toX(i,len){return pad+(i/(len-1))*(W-2*pad);}
+      function toY(v){return H-pad-(v-minV)/(maxV2-minV+0.01)*(H-2*pad);}
+      function makePoly(arr,col){
+        var pts=arr.map(function(v,i){return toX(i,arr.length).toFixed(1)+','+toY(v).toFixed(1);}).join(' ');
+        return '<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+      }
+      // Grid line at 0.5
+      var gridY=toY(0.5).toFixed(1);
+      var svgHtml='<line x1="'+pad+'" y1="'+gridY+'" x2="'+(W-pad)+'" y2="'+gridY+'" stroke="#0d2040" stroke-width="1" stroke-dasharray="4 4"/>';
+      if(fit.length) svgHtml+=makePoly(fit,'#00ff88');
+      svgHtml+=makePoly(obs,'#00e5ff');
+      // Forecast starts after obs — draw as separate section
+      svgHtml+='<polyline points="'+fore.map(function(v,i){return toX(i,fore.length).toFixed(1)+','+toY(v).toFixed(1);}).join(' ')+'" fill="none" stroke="#ff8c00" stroke-width="1.5" stroke-dasharray="6 3" stroke-linecap="round"/>';
+      svgEl.innerHTML=svgHtml;
+    }
+  }
+
+  // CTM-LP
+  if(ctmLp){
+    sv('ctm-lp-n', ctmLp.n_coupled_constraints);
+    sv('ctm-lp-d', ctmLp.avg_delay.toFixed(1));
+  }
+}
+
+// ── VALIDATION PANEL ─────────────────────────────────────────────────────────
+var _valDone=false;
+function initValid(){
+  if(_valDone) return; _valDone=true;
+  var val=BACKEND.validation; if(!val) return;
+  var rhoEl=g('val-rho');
+  if(rhoEl){rhoEl.textContent=val.spearman_rho.toFixed(4); rhoEl.style.color=val.spearman_rho>0.7?'var(--green)':val.spearman_rho>0.4?'var(--yellow)':'var(--red)';}
+  sv('val-sav', val.avg_savings_pct.toFixed(1));
+  sv('val-rmse', val.rmse_s.toFixed(1));
+  var noteEl=g('val-note'); if(noteEl&&val.note) noteEl.textContent=val.note;
+
+  // Table
+  var tb=g('val-tbody'); if(tb&&val.details){
+    var th='';
+    val.details.forEach(function(d){
+      var sc=d.savings_pct>60?'var(--green)':d.savings_pct>40?'var(--yellow)':'var(--orange)';
+      th+='<tr><td style="color:#7090a0">'+d.junction.substring(0,10)+'</td>'
+        +'<td style="color:var(--cyan)">'+d.measured+'</td>'
+        +'<td style="color:var(--orange)">'+d.modelled+'</td>'
+        +'<td style="color:'+sc+'">'+d.savings_pct+'%</td></tr>';
+    });
+    tb.innerHTML=th;
+  }
+
+  // SVG scatter — works from hidden tab, no canvas needed
+  var vsvg=g('val-svg');
+  if(vsvg&&val.details){
+    var meas2=val.details.map(function(d){return d.measured;});
+    var lps=val.details.map(function(d){return d.modelled;});
+    var maxF=Math.max.apply(null,meas2)*1.1;
+    var W2=260,H2=110,pad2=14;
+    function fx(v){return pad2+(v/maxF)*(W2-2*pad2);}
+    function fy(v){return H2-pad2-(v/maxF)*(H2-2*pad2);}
+    // y=x diagonal
+    var svgH='<line x1="'+fx(0)+'" y1="'+fy(0)+'" x2="'+fx(maxF)+'" y2="'+fy(maxF)+'" stroke="#00e5ff22" stroke-width="1" stroke-dasharray="5 4"/>';
+    // Axis labels
+    svgH+='<text x="'+pad2+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">0</text>';
+    svgH+='<text x="'+(W2-20)+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'s</text>';
+    svgH+='<text x="2" y="'+(pad2+4)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'</text>';
+    // Dots
+    val.details.forEach(function(d,idx){
+      var cx2=fx(d.measured), cy2=fy(d.modelled);
+      // color by saving: green=big saving, orange=moderate
+      var dotCol=d.savings_pct>70?'#00ff88':d.savings_pct>50?'#ffd700':'#ff8c00';
+      svgH+='<circle cx="'+cx2.toFixed(1)+'" cy="'+cy2.toFixed(1)+'" r="5" fill="'+dotCol+'" fill-opacity="0.85"/>';
+      // Label
+      var lx=cx2>W2-50?cx2-2:cx2+7;
+      svgH+='<text x="'+lx.toFixed(0)+'" y="'+(cy2-3).toFixed(0)+'" fill="'+dotCol+'" font-size="5.5">'+d.junction.substring(0,6)+'</text>';
+    });
+    vsvg.innerHTML=svgH;
+  }
+}
+
+// ── CLAUDE AI ADVISOR ────────────────────────────────────────────────────────
+var _claudeHistory = [];
+var _claudeRunning = false;
+
+function initClaudeTab(){
+  // Nothing to pre-render — user triggers via button
+}
+
+function buildNetworkContext(){
+  // Gather live simulation state for Claude's context
+  var lp = CUR.lp;
+  var pi = CUR.pi;
+  var rl = BACKEND.rl;
+  var dk = DKEYS[S.dens-1];
+  var densName = ['Very Low','Low','Medium','High','Peak'][S.dens-1];
+  var algoName = {optimal:'GW+LP+EVP',fixed:'Fixed Timer',lp:'LP Only',evp:'EVP Only',webster:'Webster Adaptive',rl:'RL Q-Learning'}[S.algo]||S.algo;
+
+  var jnLines = JN.map(function(j,i){
+    var d = lp&&lp.delay ? lp.delay[i].toFixed(1) : '?';
+    var x = lp&&lp.x    ? lp.x[i].toFixed(3)     : '?';
+    var los = lp&&lp.los ? lp.los[i]               : '?';
+    var g  = lp&&lp.g   ? lp.g[i].toFixed(0)+'s'  : '?';
+    var q  = lp&&lp.q_len ? lp.q_len[i]+'veh'     : '?';
+    return '  '+j.name+': LOS='+los+' delay='+d+'s v/c='+x+' green='+g+' queue='+q;
+  }).join('\n');
+
+  var ctmLp = BACKEND.ctm_lp ? BACKEND.ctm_lp[dk] : null;
+  var rlLine = rl ? 'RL Q-Learning avg delay: '+rl.avg_delay_rl+'s/veh (vs LP: '+(lp&&lp.delay?(lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length).toFixed(1):'?')+'s/veh)' : '';
+
+  return [
+    '=== BANGALORE ORR TRAFFIC NETWORK — LIVE STATE ===',
+    'Simulation time: '+document.getElementById('sbt').textContent,
+    'Traffic density: '+densName+' (factor '+(['0.2','0.4','0.7','1.0','1.4'][S.dens-1])+')',
+    'Active algorithm: '+algoName,
+    'Cycle length: '+S.cycle+'s | Emergency vehicles: '+S.emergDots,
+    '',
+    'JUNCTION STATUS (12 junctions on Outer Ring Road):',
+    jnLines,
+    '',
+    'NETWORK PERFORMANCE:',
+    '  Total PI: '+(pi&&pi.PI_total?pi.PI_total:'?'),
+    '  CO2: '+(pi&&pi.co2_kph?pi.co2_kph+'kg/hr':'?'),
+    '  Fuel: '+(pi&&pi.fuel_lph?pi.fuel_lph+'L/hr':'?'),
+    '  CTM-LP coupled constraints: '+(ctmLp?ctmLp.n_coupled_constraints:'?'),
+    rlLine,
+    '',
+    'DATA SOURCES: BBMP Traffic Engineering Cell 2022, KRDCL ORR Study 2019',
+    'MODEL: Webster HCM delay + HiGHS LP + CTM + LWR + Robertson + SCOOT + RL Q-learning',
+  ].join('\n');
+}
+
+function buildPrompt(analysisType, context){
+  var prompts = {
+    advisory: 'You are an expert traffic engineering advisor specialising in Indian urban road networks. Based on the following live simulation data from Bangalore\'s Outer Ring Road network, provide a concise professional traffic advisory (150-200 words). Identify the 3 most congested junctions, explain why, and give one actionable recommendation for each. Use technical traffic engineering terminology (LOS, v/c ratio, Webster delay, PCU). Be specific and data-driven.\n\n',
+    incidents: 'You are an expert traffic operations analyst. Based on the following Bangalore ORR network data, identify all junctions showing LOS D, E, or F and explain the likely root causes (demand exceeding capacity, poor signal timing, platoon dispersion). Quantify the network-wide delay impact in vehicle-hours lost per hour. Give specific incident hotspot locations.\n\n',
+    optimize: 'You are a senior traffic engineer reviewing signal optimisation results. Compare the current algorithm\'s performance against what the LP optimal solution and RL Q-learning controller achieve. Explain in 150 words which junctions would benefit most from adaptive signal control, citing specific delay values and v/c ratios from the data. Recommend the optimal cycle length.\n\n',
+    emissions: 'You are a transport sustainability consultant. Based on the following traffic network data for Bangalore\'s ORR, calculate and explain the CO2 and fuel consumption implications of the current signal strategy. How much CO2 could be saved by switching from fixed timers to LP-optimal control? Express in kg/hr and annual tonnes. Use the MOVES-lite emission model parameters shown.\n\n',
+    compare: 'You are a research engineer presenting to a PhD committee. Compare the three signal control approaches in this simulation: Fixed Timer (baseline), HiGHS LP optimisation (proposed), and RL Q-learning (novel contribution). For each, explain the mathematical basis, performance on the Bangalore ORR network, and practical deployment challenges. Write in academic style (200 words) suitable for a PhD competition presentation.\n\n'
+  };
+  return (prompts[analysisType]||prompts.advisory) + context;
+}
+
+async function runClaudeAnalysis(){
+  if(_claudeRunning) return;
+  _claudeRunning = true;
+
+  var analysisType = g('analysis-type') ? g('analysis-type').value : 'advisory';
+  var titleMap = {
+    advisory:'Network Status Advisory',
+    incidents:'Incident & Bottleneck Analysis',
+    optimize:'Optimization Recommendations',
+    emissions:'Emissions & Sustainability',
+    compare:'Algorithm Comparison (RL vs LP)'
+  };
+
+  // Show spinner
+  var statusSec = g('claude-status-sec');
+  var outputSec = g('claude-output-sec');
+  var historySec = g('claude-history-sec');
+  var btn = g('claude-btn');
+  if(statusSec) statusSec.style.display='block';
+  if(outputSec) outputSec.style.display='none';
+  if(btn){ btn.disabled=true; btn.textContent='Analysing...'; }
+  sv('claude-status','Calling Claude API...');
+
+  var context = buildNetworkContext();
+  var prompt  = buildPrompt(analysisType, context);
+  var t0 = Date.now();
+
+  try {
+    sv('claude-status','Sending network state to Claude...');
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: 'You are an expert traffic engineering AI assistant specialising in urban signal optimisation for Indian cities. You are embedded in a PhD-level traffic simulation system for Bangalore\'s Outer Ring Road. Be precise, cite the numbers given, use traffic engineering terminology, and keep responses concise and technically rigorous.',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if(!response.ok){
+      var errText = await response.text();
+      throw new Error('API error '+response.status+': '+errText.substring(0,120));
+    }
+
+    var data = await response.json();
+    var elapsed = ((Date.now()-t0)/1000).toFixed(1);
+    var text = data.content && data.content[0] && data.content[0].text
+      ? data.content[0].text : '(no response)';
+    var tokens = data.usage ? (data.usage.input_tokens||0)+' in / '+(data.usage.output_tokens||0)+' out' : '';
+
+    // Show output
+    if(statusSec) statusSec.style.display='none';
+    if(outputSec){
+      outputSec.style.display='block';
+      var titleEl = g('claude-output-title');
+      if(titleEl) titleEl.textContent='\u2728 '+titleMap[analysisType];
+      var outEl = g('claude-output');
+      if(outEl){
+        outEl.textContent='';
+        // Typewriter effect
+        var chars=text.split('');
+        var ci=0;
+        function typeNext(){
+          if(ci<chars.length){
+            outEl.textContent+=chars[ci++];
+            setTimeout(typeNext, ci<50?5:8);
+          }
+        }
+        typeNext();
+      }
+      var metaEl = g('claude-meta');
+      if(metaEl) metaEl.textContent='Model: claude-sonnet-4-20250514 | Tokens: '+tokens+' | Time: '+elapsed+'s | Density: '+['Very Low','Low','Medium','High','Peak'][S.dens-1]+' | Algo: '+(({optimal:'GW+LP+EVP',fixed:'Fixed',lp:'LP',evp:'EVP',webster:'Webster',rl:'RL'})[S.algo]||S.algo);
+    }
+
+    // Add to history
+    var ts = document.getElementById('sbt').textContent;
+    _claudeHistory.unshift({type:titleMap[analysisType], time:ts, snippet:text.substring(0,80)+'...'});
+    if(_claudeHistory.length>5) _claudeHistory.pop();
+    if(historySec){
+      historySec.style.display='block';
+      var hEl=g('claude-history'); if(hEl){
+        hEl.innerHTML=_claudeHistory.map(function(h){
+          return '<div style="border-bottom:1px solid #0d2040;padding:3px 0;margin-bottom:3px">'
+            +'<span style="color:var(--yellow)">'+h.type+'</span>'
+            +' <span style="color:#2a4060">@ '+h.time+'</span><br>'
+            +'<span style="color:#3a5570">'+h.snippet+'</span></div>';
+        }).join('');
+      }
+    }
+
+  } catch(err){
+    if(statusSec) statusSec.style.display='none';
+    if(outputSec){
+      outputSec.style.display='block';
+      var outEl2=g('claude-output');
+      if(outEl2) outEl2.textContent='Error: '+err.message;
+      var metaEl2=g('claude-meta');
+      if(metaEl2) metaEl2.textContent='Check network / API access';
+    }
+  }
+
+  _claudeRunning=false;
+  if(btn){ btn.disabled=false; btn.textContent='\u2728 Generate Traffic Advisory'; }
+}
+
+window.runClaudeAnalysis=runClaudeAnalysis;
+
+window.cycleAlgo=cycleAlgo;window.massEVP=massEVP;window.togglePause=togglePause;
+window.setDens=setDens;window.setEmerg=setEmerg;window.setWave=setWave;
+window.setCycle=setCycle;window.setSS=setSS;window.setAlgoSel=setAlgoSel;
+window.lTab=lTab;window.rTab=rTab;
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+// Wall-clock reference for accurate per-second signal phase advance
+// Declared at module scope so updateSignals() can always read a valid value
+var _sigLastWall = 0;  // set properly on first loop tick
+var _sigDtSec    = 0;  // real elapsed sim-seconds this frame (clamped 0..0.1)
+var lastT=0,roadTick=0;
+function loop(ts){
+  try{
+    if(S.paused){
+      _sigLastWall = performance.now();  // reset wall-clock when unpausing
+      requestAnimationFrame(loop);return;
+    }
+    var dt=Math.min((ts-lastT)/1000*60,4);
+    lastT=ts; S.frame++;
+
+    // ── WALL-CLOCK dt for signal phase (MUST be computed BEFORE updateSignals) ──
+    var _nowWall = performance.now();
+    if(_sigLastWall === 0) _sigLastWall = _nowWall;  // first-frame init
+    // Clamp to 100ms max to prevent huge jumps after tab unfocus/pause
+    _sigDtSec = Math.min((_nowWall - _sigLastWall) / 1000.0, 0.1) * S.speed;
+    _sigLastWall = _nowWall;
+    S.simTime += _sigDtSec;
+    updateSignals(dt);
+    for(var i=0;i<particles.length;i++) particles[i].update(dt);
+    renderParticles();
+    if(S.frame%15===0){
+      updateJMkrs();
+      roadTick++;
+      if(roadTick%3===0) drawRoads();
+    }
+    if(S.frame%30===0) updateMetrics();
+    // Junction tab signal timers: update every 3 frames for smooth countdown
+    if(S.frame%3===0) updateJunctionTimers();
+    if(S.frame%5===0){
+      // Real-time signal countdown – update sigpanel-rt every 5 frames (~3/sec)
+      var spRT2=g('sigpanel-rt');
+      if(spRT2&&spRT2.children.length===SIG.length){
+        var lp2=CUR.lp;
+        var algoMul2=S.algo==='fixed'?1.35:S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20):S.algo==='optimal'?(1-Math.min(S.booted/500,1)*0.35):S.algo==='webster'?(1-Math.min(S.booted/500,1)*0.15):1.0;
+        var C_opt2=lp2&&lp2.C_opt?lp2.C_opt:90;
+        var cyd2=1+Math.abs(S.cycle-C_opt2)/C_opt2*0.6;
+        var losC2={'A':'#00ff88','B':'#00e070','C':'#ffd700','D':'#ff8c00','E':'#ff2244','F':'#ff0033'};
+        for(var _i=0;_i<SIG.length;_i++){
+          var _s=SIG[_i];
+          var _card=spRT2.children[_i];
+          if(!_card) continue;
+          var _rem=_s.state==='green' ? Math.max(0,_s.gDur-_s.phase)
+                  :_s.state==='yellow'? Math.max(0,_s.gDur+_s.cycle*0.07-_s.phase)
+                  : Math.max(0,_s.cycle-_s.phase);
+          var _col=_s.evp?'#ff2244':_s.state==='green'?'#00ff88':_s.state==='yellow'?'#ffd700':'#ff2244';
+          var _lbl=_s.evp?'EVP!':_s.state.toUpperCase();
+          var _pct=Math.round(_s.phase/_s.cycle*100);
+          var _x2=lp2&&lp2.x?lp2.x[_i]:0;
+          var _xCol=_x2>.9?'#ff2244':_x2>.7?'#ff8c00':'#00ff88';
+          var _dR=lp2&&lp2.delay?lp2.delay[_i]:null;
+          var _dS=_dR!==null?Math.min(_dR*algoMul2*cyd2,300):null;
+          var _dCol=_dS>120?'#ff2244':_dS>80?'#ff8c00':_dS>35?'#ffd700':'#00ff88';
+          var _los=lp2&&lp2.los?lp2.los[_i]:'-';
+          var _losc=losC2[_los]||'#ffd700';
+          var _gLp=lp2&&lp2.g?lp2.g[_i].toFixed(0):_s.gDur.toFixed(0);
+          var _lamN=lp2&&lp2.lambda?lp2.lambda[_i]:0.5;
+          var _xN=lp2&&lp2.x?Math.min(lp2.x[_i],0.999):0.7;
+          var _qR=lp2&&lp2.q_pcu?lp2.q_pcu[_i]/3600:0;
+          var _qL=Math.max(0,Math.min(Math.round(_qR*_s.cycle*(1-_lamN)*(1-_lamN)/(2*Math.max(1-_lamN*_xN,0.01))),99));
+          _card.style.borderLeftColor=_col;
+          _card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+            '<div class="sc-name">'+JN[_i].name+'</div>'+
+            '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#3a5570">'+_s.cycle.toFixed(0)+'s cycle</div>'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+
+            '<div style="text-align:center;padding:4px 0">'+
+              '<div class="sc-state" style="color:'+_col+'">'+_lbl+'</div>'+
+              '<div style="font-family:Share Tech Mono,monospace;font-size:0.46rem;color:'+_col+';opacity:.65;margin-top:2px">g='+_gLp+'s / C='+_s.cycle.toFixed(0)+'s</div>'+
+            '</div>'+
+            '<div style="text-align:center">'+
+              '<div class="sc-tmr" style="color:'+_col+'">'+_rem.toFixed(0)+'</div>'+
+              '<div style="font-family:Share Tech Mono,monospace;font-size:0.44rem;color:#4a6880;margin-top:1px">sec remain</div>'+
+            '</div>'+
+          '</div>'+
+          '<div class="sc-bar" style="margin-bottom:8px"><div class="sc-fill" style="width:'+_pct+'%;background:'+_col+'"></div></div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:'+_xCol+'">'+_x2.toFixed(3)+'</div><div class="sc-stat-label">v/c</div></div>'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:'+_dCol+'">'+(_dS!==null?_dS.toFixed(0):'--')+'s</div><div class="sc-stat-label">delay</div></div>'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:#ff8c00">'+_qL+'</div><div class="sc-stat-label">queue</div></div>'+
+            '<div class="sc-stat-cell"><div class="sc-stat-big" style="color:'+_losc+'">'+_los+'</div><div class="sc-stat-label">LOS</div></div>'+
+          '</div>';
+        }
+      }
+    }
+    if(S.frame%60===0){renderLPTable();renderLWRTable();updateLWRChart();updateCTMDisplay();updatePlatoonDisplay();}
+    if(S.frame%120===0) renderPIBox();
+  }catch(err){console.warn('Loop:',err);}
+  requestAnimationFrame(loop);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+refreshCUR();
+spawnParticles();
+drawRoads();
+renderLPTable();
+renderLWRTable();
+renderPIBox();
+updateCTMDisplay();
+updatePlatoonDisplay();
+requestAnimationFrame(loop);
+
+})();
 </script>
 </body>
-</html>"""
+</html>
+"""
 
-HTML = HTML_TEMPLATE.replace('BACKEND_JSON_PLACEHOLDER', BACKEND_JSON)
-components.html(HTML, height=995, scrolling=False)
+components.html(HTML, height=990, scrolling=False)
+
