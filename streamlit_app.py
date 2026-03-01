@@ -1783,8 +1783,8 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F4CA; Algorithm Radar (5-Metric)</div>
-        <div id="radar-wrap" style="position:relative;width:100%;height:180px;background:#030d1a;border-radius:4px;margin-top:4px">
-          <canvas id="radar-canv" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+        <div style="width:100%;background:#030d1a;border-radius:4px;margin-top:4px">
+          <svg id="radar-svg" viewBox="0 0 260 200" width="100%" height="200" style="display:block"></svg>
         </div>
         <div style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#3a5570;margin-top:4px;text-align:center">
           GW+LP+EVP (cyan) vs Fixed (red) | Throughput · Delay · Effic. · LOS · EVP
@@ -1904,8 +1904,8 @@ details.csec summary:hover{background:#0a1828}
           <span class="hi">Min delay:</span> <span id="pf-d1" class="hir">--</span>s &nbsp;
           <span class="hi">Min CO&#x2082;:</span> <span id="pf-d2" style="color:var(--purple)">--</span>
         </div>
-        <div id="pareto-wrap" style="position:relative;width:100%;height:160px;background:#030d1a;border-radius:4px;overflow:hidden">
-          <canvas id="pareto-canv" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+        <div style="width:100%;background:#030d1a;border-radius:4px;overflow:hidden;margin-top:4px">
+          <svg id="pareto-svg" viewBox="0 0 300 160" width="100%" height="160" style="display:block;overflow:visible"></svg>
         </div>
         <div style="display:flex;gap:12px;justify-content:center;margin-top:5px">
           <span style="font-family:monospace;font-size:.38rem;color:#00e5ff">&#9644; Pareto front</span>
@@ -3287,7 +3287,7 @@ function rTab(n){
   var panes=document.querySelectorAll('.atab-content');
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
-  if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();setTimeout(function(){renderRadarChart();},120);}
+  if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();renderRadarChart();}
   if(n===4){setTimeout(initAIML,80);}
   if(n===5){setTimeout(initValid,80);}
   if(n===6){setTimeout(initRF,80);}
@@ -3304,87 +3304,106 @@ var paretoChart2 = null;
 function initParetoTab(){
   if(!paretoInited){
     paretoInited=true;
-    setTimeout(function(){
-      renderParetoChart();
-      renderMCSummary();
-      renderSCOOTTable();
-      renderPIBox();
-      setTimeout(function(){renderRadarChart();},200);
-    },50);
+    renderParetoChart();
+    renderMCSummary();
+    renderSCOOTTable();
+    renderPIBox();
+    renderRadarChart();
   } else {
-    // Always re-render radar (never just resize — canvas may have been 0×0 before)
-    if(paretoChart2){try{paretoChart2.resize();}catch(e){}}
-    setTimeout(function(){renderRadarChart();},120);
+    renderRadarChart();
   }
 }
 
 function renderParetoChart(){
   var pf = BACKEND.pareto;
-  if(!pf||pf.length===0){ sv('pf-n','No data'); return; }
+  var el = g('pareto-svg');
+  if(!el) return;
+  if(!pf||pf.length===0){ el.innerHTML='<text x="150" y="80" text-anchor="middle" fill="#3a5570" font-size="10" font-family="monospace">No Pareto data</text>'; return; }
+
   sv('pf-n', pf.length);
   var minD=pf[0].f1_delay, minE=pf[pf.length-1].f2_emiss;
   sv('pf-d1', minD.toFixed(1));
   sv('pf-d2', minE.toFixed(4));
-  var wrap=g('pareto-wrap');
-  var el = g('pareto-canv');
-  if(!el) return;
-  if(paretoChart2){try{paretoChart2.destroy();}catch(e){} paretoChart2=null;}
-  // Set explicit pixel dimensions so Chart.js never gets 0×0 canvas
-  var W=wrap?Math.max(wrap.clientWidth,200):260;
-  var H=wrap?Math.max(wrap.clientHeight,160):160;
-  el.width=W; el.height=H;
-  try{
-    var pts = pf.map(function(p){return {x:p.f1_delay, y:p.f2_emiss};});
-    var ctx=el.getContext('2d');
-    paretoChart2 = new Chart(ctx,{
-      type:'line',
-      data:{
-        labels: pf.map(function(p){return p.f1_delay.toFixed(0);}),
-        datasets:[{
-          label:'Pareto Front',
-          data: pts.map(function(p){return p.y;}),
-          borderColor:'#00e5ff',
-          backgroundColor:'rgba(0,229,255,0.12)',
-          pointBackgroundColor:'#00e5ff',
-          pointRadius:5,
-          pointHoverRadius:7,
-          borderWidth:2.5,
-          fill:true,
-          tension:0.35
-        },{
-          label:'Min Delay Point',
-          data: pts.map(function(p,i){return i===0?p.y:null;}),
-          borderColor:'#00ff88',
-          backgroundColor:'#00ff8888',
-          pointBackgroundColor:'#00ff88',
-          pointRadius:9,
-          pointHoverRadius:11,
-          borderWidth:0,
-          fill:false
-        }]
-      },
-      options:{
-        animation:false,responsive:false,maintainAspectRatio:false,
-        plugins:{
-          legend:{display:true,position:'bottom',labels:{
-            color:'#6a8090',font:{size:8,family:"'Share Tech Mono',monospace"},
-            boxWidth:12,padding:8}},
-          tooltip:{callbacks:{label:function(ctx){
-            var i=ctx.dataIndex;
-            return 'Delay: '+pf[i].f1_delay.toFixed(1)+'s  |  CO\u2082: '+pf[i].f2_emiss.toFixed(4);
-          }}}
-        },
-        scales:{
-          x:{display:true,
-             title:{display:true,text:'f1: Weighted Delay (s)',color:'#4a6880',font:{size:8}},
-             ticks:{color:'#3a5570',font:{size:7.5}},grid:{color:'#0d2040'}},
-          y:{display:true,
-             title:{display:true,text:'f2: CO\u2082 Proxy (PCU\xB7idle)',color:'#4a6880',font:{size:8}},
-             ticks:{color:'#3a5570',font:{size:7.5}},grid:{color:'#0d2040'}}
-        }
-      }
-    });
-  }catch(e){console.warn('Pareto chart error:',e);}
+
+  // SVG coordinate space: viewBox="0 0 300 160"
+  var VW=300, VH=160;
+  var PAD={l:42, r:12, t:10, b:32};
+  var CW=VW-PAD.l-PAD.r;
+  var CH=VH-PAD.t-PAD.b;
+
+  var f1vals = pf.map(function(p){return p.f1_delay;});
+  var f2vals = pf.map(function(p){return p.f2_emiss;});
+  var xMin=Math.min.apply(null,f1vals), xMax=Math.max.apply(null,f1vals);
+  var yMin=Math.min.apply(null,f2vals), yMax=Math.max.apply(null,f2vals);
+  // add 5% padding to ranges
+  var xR=xMax-xMin||1, yR=yMax-yMin||1;
+  xMin-=xR*0.05; xMax+=xR*0.05; yMin-=yR*0.08; yMax+=yR*0.08;
+
+  function sx(v){return PAD.l + (v-xMin)/(xMax-xMin)*CW;}
+  function sy(v){return PAD.t + CH - (v-yMin)/(yMax-yMin)*CH;}
+
+  var html='';
+
+  // Grid lines
+  for(var gi=0;gi<=4;gi++){
+    var gx=PAD.l+gi*CW/4;
+    var gy=PAD.t+gi*CH/4;
+    html+='<line x1="'+gx.toFixed(1)+'" y1="'+PAD.t+'" x2="'+gx.toFixed(1)+'" y2="'+(PAD.t+CH)+'" stroke="#0d2040" stroke-width="0.5"/>';
+    html+='<line x1="'+PAD.l+'" y1="'+gy.toFixed(1)+'" x2="'+(PAD.l+CW)+'" y2="'+gy.toFixed(1)+'" stroke="#0d2040" stroke-width="0.5"/>';
+  }
+
+  // Axes
+  html+='<line x1="'+PAD.l+'" y1="'+PAD.t+'" x2="'+PAD.l+'" y2="'+(PAD.t+CH)+'" stroke="#1a3050" stroke-width="1"/>';
+  html+='<line x1="'+PAD.l+'" y1="'+(PAD.t+CH)+'" x2="'+(PAD.l+CW)+'" y2="'+(PAD.t+CH)+'" stroke="#1a3050" stroke-width="1"/>';
+
+  // Axis labels
+  html+='<text x="'+(PAD.l+CW/2)+'" y="'+(VH-4)+'" text-anchor="middle" fill="#4a6880" font-size="7" font-family="monospace">f1: Weighted Delay (s)</text>';
+  html+='<text x="10" y="'+(PAD.t+CH/2)+'" text-anchor="middle" fill="#4a6880" font-size="7" font-family="monospace" transform="rotate(-90,10,'+(PAD.t+CH/2)+')">f2: CO\u2082 Proxy</text>';
+
+  // X tick labels
+  for(var ti=0;ti<=4;ti++){
+    var tv=xMin+ti*(xMax-xMin)/4;
+    var tx2=PAD.l+ti*CW/4;
+    html+='<text x="'+tx2.toFixed(1)+'" y="'+(PAD.t+CH+10)+'" text-anchor="middle" fill="#3a5570" font-size="6" font-family="monospace">'+tv.toFixed(0)+'</text>';
+  }
+  // Y tick labels
+  for(var ti2=0;ti2<=3;ti2++){
+    var tv2=yMin+ti2*(yMax-yMin)/3;
+    var ty2=PAD.t+CH-ti2*CH/3;
+    html+='<text x="'+(PAD.l-3)+'" y="'+(ty2+2)+'" text-anchor="end" fill="#3a5570" font-size="5.5" font-family="monospace">'+tv2.toFixed(3)+'</text>';
+  }
+
+  // Filled area under curve
+  var areaPoints=pf.map(function(p){return sx(p.f1_delay).toFixed(1)+','+sy(p.f2_emiss).toFixed(1);});
+  var lastX=sx(pf[pf.length-1].f1_delay).toFixed(1);
+  var firstX=sx(pf[0].f1_delay).toFixed(1);
+  var baseY=(PAD.t+CH).toFixed(1);
+  html+='<polygon points="'+areaPoints.join(' ')+' '+lastX+','+baseY+' '+firstX+','+baseY+'" fill="rgba(0,229,255,0.07)"/>';
+
+  // Pareto line
+  html+='<polyline points="'+areaPoints.join(' ')+'" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+
+  // Data point dots
+  pf.forEach(function(p, idx){
+    var px=sx(p.f1_delay), py=sy(p.f2_emiss);
+    var isMin=(idx===0), isMaxCO2=(idx===pf.length-1);
+    var col=isMin?'#00ff88':isMaxCO2?'#ff8c00':'#00e5ff';
+    var r=isMin||isMaxCO2?5:3;
+    html+='<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="'+r+'" fill="'+col+'" opacity="0.9"/>';
+    // Tooltip-style label for first and last
+    if(isMin){
+      html+='<text x="'+(px+6).toFixed(0)+'" y="'+(py-4).toFixed(0)+'" fill="#00ff88" font-size="6" font-family="monospace">min delay</text>';
+    }
+    if(isMaxCO2){
+      html+='<text x="'+(px-30).toFixed(0)+'" y="'+(py+10).toFixed(0)+'" fill="#ff8c00" font-size="6" font-family="monospace">min CO\u2082</text>';
+    }
+  });
+
+  // Arrow annotations
+  html+='<text x="'+(PAD.l+8)+'" y="'+(PAD.t+8)+'" fill="#3a5570" font-size="6" font-family="monospace">\u2193 better CO\u2082</text>';
+  html+='<text x="'+(PAD.l+CW-45)+'" y="'+(PAD.t+CH-4)+'" fill="#3a5570" font-size="6" font-family="monospace">better delay \u2192</text>';
+
+  el.innerHTML=html;
 }
 
 function renderMCSummary(){
@@ -3432,68 +3451,65 @@ function renderPIBox(){
 }
 
 function renderRadarChart(){
-  var wrap=g('radar-wrap');
-  var el=g('radar-canv');
+  var el=g('radar-svg');
   if(!el) return;
-  // Always destroy previous instance so re-renders work
-  if(radarChart){try{radarChart.destroy();}catch(e){} radarChart=null;}
-  // Set explicit pixel dimensions — Chart.js fails on 0×0 canvas in hidden tabs
-  var W=wrap?Math.max(wrap.clientWidth,200):260;
-  var H=wrap?Math.max(wrap.clientHeight,180):180;
-  el.width=W;
-  el.height=H;
-  try{
-    var warm=Math.min(S.booted/500,1);
-    var mul=DMUL[S.dens-1];
-    var algoBoost = S.algo==='optimal'?warm : S.algo==='lp'?warm*0.7 : S.algo==='webster'?warm*0.4 : 0;
-    var optVals  = [
-      Math.round(60+algoBoost*28),
-      Math.round(55+algoBoost*27),
-      Math.round(Math.max(10, 65-mul*8+algoBoost*15)),
-      Math.round(60+algoBoost*20),
-      S.algo==='fixed'?20:Math.round(70+algoBoost*25)
-    ];
-    var fixedVals= [62, 45, 60, 52, 20];
-    var ctx=el.getContext('2d');
-    radarChart = new Chart(ctx,{
-      type:'radar',
-      data:{
-        labels:['Throughput','Delay-Eff','v/c Ctrl','LOS','EVP Resp'],
-        datasets:[
-          {label:'Current Algo',data:optVals,
-           borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.12)',
-           pointBackgroundColor:'#00e5ff',borderWidth:2.5,pointRadius:4,
-           pointHoverRadius:6},
-          {label:'Fixed Timer',data:fixedVals,
-           borderColor:'#ff2244',backgroundColor:'rgba(255,34,68,0.10)',
-           pointBackgroundColor:'#ff2244',borderWidth:2,pointRadius:4,
-           pointHoverRadius:6}
-        ]
-      },
-      options:{
-        animation:false,
-        responsive:false,
-        maintainAspectRatio:false,
-        plugins:{
-          legend:{
-            display:true,position:'bottom',
-            labels:{color:'#6a8090',font:{size:9,family:"'Share Tech Mono',monospace"},
-              boxWidth:12,padding:8}
-          },
-          tooltip:{enabled:true}
-        },
-        scales:{r:{
-          ticks:{color:'#4a6880',font:{size:8},backdropColor:'transparent',
-            stepSize:20},
-          grid:{color:'#0d2040'},
-          angleLines:{color:'#0d2040'},
-          pointLabels:{color:'#7090b0',font:{size:9,family:"'Rajdhani',sans-serif"}},
-          min:0,max:100,beginAtZero:true
-        }}
-      }
-    });
-    radarInited=true;
-  }catch(e){console.warn('Radar chart error:',e);}
+  var warm=Math.min(S.booted/500,1);
+  var mul=DMUL[S.dens-1];
+  var algoBoost=S.algo==='optimal'?warm:S.algo==='lp'?warm*0.7:S.algo==='webster'?warm*0.4:0;
+  var labels=['Throughput','Delay-Eff','v/c Ctrl','LOS','EVP Resp'];
+  var optVals=[
+    Math.round(60+algoBoost*28),
+    Math.round(55+algoBoost*27),
+    Math.round(Math.max(10,65-mul*8+algoBoost*15)),
+    Math.round(60+algoBoost*20),
+    S.algo==='fixed'?20:Math.round(70+algoBoost*25)
+  ];
+  var fixedVals=[62,45,60,52,20];
+  var N=labels.length;
+  // SVG viewBox 0 0 260 200, centre at 130,95, radius 72
+  var CX=130,CY=95,R=72,MAX=100;
+  function polar(val,idx){
+    var angle=(idx/N)*2*Math.PI - Math.PI/2;
+    var r=(val/MAX)*R;
+    return {x:CX+r*Math.cos(angle), y:CY+r*Math.sin(angle)};
+  }
+  var html='';
+  // Background rings at 25,50,75,100
+  [25,50,75,100].forEach(function(ring){
+    var pts=[];
+    for(var i=0;i<N;i++){var p=polar(ring,i);pts.push(p.x.toFixed(1)+','+p.y.toFixed(1));}
+    html+='<polygon points="'+pts.join(' ')+'" fill="none" stroke="#0d2040" stroke-width="'+(ring===100?'1':'0.5')+'"/>';
+    // Ring label
+    var labelPt=polar(ring,0);
+    html+='<text x="'+(labelPt.x+2).toFixed(1)+'" y="'+(labelPt.y-2).toFixed(1)+'" fill="#2a4060" font-size="5.5" font-family="monospace">'+ring+'</text>';
+  });
+  // Axis spokes and labels
+  for(var i=0;i<N;i++){
+    var outer=polar(100,i);
+    html+='<line x1="'+CX+'" y1="'+CY+'" x2="'+outer.x.toFixed(1)+'" y2="'+outer.y.toFixed(1)+'" stroke="#0d2040" stroke-width="0.7"/>';
+    // Label position: push beyond ring
+    var angle2=(i/N)*2*Math.PI-Math.PI/2;
+    var lx=CX+(R+14)*Math.cos(angle2);
+    var ly=CY+(R+14)*Math.sin(angle2);
+    var anchor=Math.abs(Math.cos(angle2))<0.2?'middle':Math.cos(angle2)>0?'start':'end';
+    html+='<text x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+'" text-anchor="'+anchor+'" fill="#7090b0" font-size="7.5" font-family="Rajdhani,sans-serif" font-weight="600">'+labels[i]+'</text>';
+  }
+  // Fixed timer polygon (red, semi-transparent)
+  var fixedPts=fixedVals.map(function(v,i){var p=polar(v,i);return p.x.toFixed(1)+','+p.y.toFixed(1);});
+  html+='<polygon points="'+fixedPts.join(' ')+'" fill="rgba(255,34,68,0.12)" stroke="#ff2244" stroke-width="1.5" stroke-linejoin="round"/>';
+  // Optimal polygon (cyan, semi-transparent)
+  var optPts=optVals.map(function(v,i){var p=polar(v,i);return p.x.toFixed(1)+','+p.y.toFixed(1);});
+  html+='<polygon points="'+optPts.join(' ')+'" fill="rgba(0,229,255,0.14)" stroke="#00e5ff" stroke-width="2" stroke-linejoin="round"/>';
+  // Dots
+  optVals.forEach(function(v,i){var p=polar(v,i);html+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" fill="#00e5ff"/>';});
+  fixedVals.forEach(function(v,i){var p=polar(v,i);html+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="#ff2244"/>';});
+  // Legend
+  html+='<rect x="60" y="183" width="8" height="5" fill="rgba(0,229,255,0.4)" stroke="#00e5ff" stroke-width="1"/>';
+  html+='<text x="71" y="189" fill="#6a8090" font-size="7" font-family="monospace">'+ANAMES[S.algo]+'</text>';
+  html+='<rect x="148" y="183" width="8" height="5" fill="rgba(255,34,68,0.3)" stroke="#ff2244" stroke-width="1"/>';
+  html+='<text x="159" y="189" fill="#6a8090" font-size="7" font-family="monospace">Fixed Timer</text>';
+  el.innerHTML=html;
+  radarInited=true;
 }
 
 // ── CTM BOTTLENECK DISPLAY ────────────────────────────────────────────────────
@@ -3668,8 +3684,8 @@ function initValid(){
       vsvg.innerHTML=svgH;
     }
   }
-  // Always re-render Pareto chart (canvas-based, must have real dimensions)
-  setTimeout(function(){renderParetoChart();}, 150);
+  // Render Pareto chart as SVG — works immediately, no canvas sizing issues
+  renderParetoChart();
 }
 // ── RANDOM FOREST PANEL ──────────────────────────────────────────────────────
 var _rfDone = false;
