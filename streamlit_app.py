@@ -3592,7 +3592,10 @@ function updateMetrics(){
   }
   var moving=0,slow=0,stopped=0;
   for(var i=0;i<norm.length;i++){
-    if(norm[i].state==='moving') moving++;\n    else if(norm[i].state==='slow') slow++;\n    else stopped++;\n  }
+    if(norm[i].state==='moving') moving++;
+    else if(norm[i].state==='slow') slow++;
+    else stopped++;
+  }
   var total=particles.length;
   var lp=CUR.lp;
   var lwr=CUR.lwr;
