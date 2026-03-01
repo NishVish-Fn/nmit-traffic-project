@@ -983,7 +983,7 @@ HTML = """<!DOCTYPE html>
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
-     width:100%;height:990px;overflow:hidden;display:flex;flex-direction:column}
+     width:100%;height:1020px;overflow:hidden;display:flex;flex-direction:column}
 
 /* HEADER */
 #hdr{height:56px;flex-shrink:0;background:linear-gradient(90deg,#000a18,#020810 50%,#000a18);
@@ -1162,7 +1162,10 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .sbv{color:var(--cyan);font-weight:bold}
 .sbv.r{color:var(--red)}.sbv.g{color:var(--green)}.sbv.y{color:var(--yellow)}.sbv.p{color:var(--purple)}
 .leaflet-tile-pane{filter:brightness(.28) saturate(.2) hue-rotate(195deg)!important}
-.leaflet-container{background:var(--bg)}
+.leaflet-container{background:#020810;background-image:
+  linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+  background-size:40px 40px}
 .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
 /* LWR shock wave canvas */
 #lwrcanv{display:block;width:100%!important;height:90px!important}
@@ -2261,10 +2264,35 @@ function spawnParticles() {
 
 // ── MAP ───────────────────────────────────────────────────────────────────────
 var map=L.map('map',{center:[12.97,77.62],zoom:12,
-  zoomControl:false,attributionControl:false,preferCanvas:true});
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
-setTimeout(function(){map.invalidateSize();map.setView([12.97,77.62],12);},300);
-setTimeout(function(){map.invalidateSize();},800);
+  zoomControl:false,attributionControl:false,preferCanvas:true,
+  fadeAnimation:false,zoomAnimation:false,markerZoomAnimation:false});
+// Try multiple tile sources with fallback
+var tileAdded = false;
+var tileSources = [
+  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+];
+function tryTile(idx) {
+  if (idx >= tileSources.length) return;
+  var tl = L.tileLayer(tileSources[idx], {maxZoom:19, subdomains:'abcd'});
+  tl.on('tileerror', function() {
+    tl.remove();
+    tryTile(idx + 1);
+  });
+  tl.on('tileload', function() { tileAdded = true; });
+  tl.addTo(map);
+}
+tryTile(0);
+
+// Aggressive invalidateSize retries to handle iframe sizing delays
+var _sizeRetries = [100, 300, 600, 1000, 1800, 3000];
+_sizeRetries.forEach(function(ms) {
+  setTimeout(function() {
+    map.invalidateSize(true);
+    map.setView([12.97,77.62],12);
+  }, ms);
+});
 
 var roadLines=[];
 function drawRoads() {
@@ -3720,4 +3748,4 @@ requestAnimationFrame(loop);
 </html>
 """
 
-components.html(HTML, height=990, scrolling=False)
+components.html(HTML, height=1020, scrolling=False)
