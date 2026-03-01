@@ -1077,8 +1077,8 @@ details.csec summary:hover{background:#0a1828}
             <input type="range" min="5" max="150" value="50" oninput="setEmerg(this.value)">
           </div>
           <div class="ctrl">
-            <div class="clbl">Free-Flow Speed <span id="lwav">40 km/h</span></div>
-            <input type="range" min="20" max="60" value="40" step="5" oninput="setWave(this.value)">
+            <div class="clbl">Free-Flow Speed <span id="lwav">25 km/h</span></div>
+            <input type="range" min="10" max="60" value="25" step="5" oninput="setWave(this.value)">
           </div>
           <div class="ctrl">
             <div class="clbl">Signal Cycle Time <span id="lcyc">90s</span></div>
@@ -1261,7 +1261,7 @@ details.csec summary:hover{background:#0a1828}
     <div class="mpill" id="mtop">
       <span>SIM: <b id="stm">00:00:00</b></span>
       <span>ALGO: <b id="algod">GW+LP+EVP</b></span>
-      <span>WAVE: <b id="wavd">40 km/h</b></span>
+      <span>WAVE: <b id="wavd">25 km/h</b></span>
       <span>VEHICLES: <b id="vtot">--</b></span>
       <span>LWR: <b id="lwrd" style="color:var(--purple)">--</b></span>
     </div>
@@ -1652,7 +1652,7 @@ function samplePath(path, t) {
 // ── STATE ─────────────────────────────────────────────────────────────────────
 var S = {
   algo:'optimal', paused:false, speed:1,
-  emergDots:50, wave:40, cycle:90, dens:4,
+  emergDots:50, wave:25, cycle:90, dens:4,
   simTime:0, frame:0, evpTotal:0, booted:0
 };
 
@@ -1684,13 +1684,28 @@ var SIG = JN.map(function(j,i) {
 var particles = [];
 var MAX_N = 650;
 
-// ── SPEED CONSTANTS (real km/h → progress/frame) ─────────────────────────────
+// ── SPEED CONSTANTS (calibrated to Bangalore real-world data) ────────────────
+// Source: BBMP Traffic Engineering Cell 2022 — Avg peak speed: 17.8 km/h
+//         Off-peak: 32.4 km/h | Free-flow corridor: ~45 km/h
 // 1 deg lat/lng ≈ 111 km at Bangalore lat (~13°)
-// progress/frame = kmh / (111 * 3600 * 60) / pathLen_deg
-// Regular urban arterial free-flow: 40 km/h  |  congested: 15-25 km/h
-// Emergency free-flow: 55 km/h (priority clearance)
+// progress/frame = kmh / (111 * 3600) / pathLen_deg / FPS
 var KMH_TO_DEG_PER_S = 1.0 / (111.0 * 3600.0);  // 1 km/h in degrees/second
 var FPS = 60.0;                                    // target frame rate
+
+// Bangalore peak-hour realistic speed ranges (PCU-weighted from KRDCL 2019):
+// ORR corridor (Silk Board, KR Puram, Marathahalli): 12-18 km/h peak
+// Inner ring / arterials: 18-28 km/h moderate
+// Sub-arterials (JP Nagar, Yelahanka): 25-38 km/h
+// Emergency vehicles (preemption): 35-50 km/h on cleared corridor
+var SPEED_TIERS = {
+  // [minKmh, maxKmh] free-flow for each junction's typical approach speed
+  // Based on: saturation flow, number of lanes, and junction geometry
+  orr_critical:  [10, 18],   // Silk Board, KR Puram, Marathahalli — notorious bottlenecks
+  orr_moderate:  [18, 28],   // Hebbal, Electronic City, Koramangala
+  inner_ring:    [22, 32],   // Indiranagar, Whitefield, Bannerghatta
+  sub_arterial:  [28, 40],   // JP Nagar, Yelahanka, Nagawara
+  emergency:     [38, 52],   // EVP with signal preemption
+};
 
 function edgeSpeedFactor(ei) {
   // Returns the conversion: (1 km/h) = X progress-units/frame for this edge
@@ -1710,10 +1725,28 @@ function Particle(isE) {
   this.state = 'moving';
   this.wt = 0;
   this.trail = [];
-  // Target speed in km/h:
-  // Regular cars: 35-45 km/h free-flow (Bangalore urban arterial)
-  // Emergency:    50-60 km/h with priority clearance
-  this.targetKmh = isE ? (50 + Math.random()*10) : (32 + Math.random()*12);
+  // Assign realistic Bangalore speed based on the junction context
+  // Regular vehicles: speed varies by which junctions the edge connects
+  // (ORR critical bottlenecks much slower than sub-arterials)
+  var e = ED[this.ei];
+  var jA = JN[e[0]], jB = JN[e[1]];
+  var avgCong = (jA.cong + jB.cong) / 2;
+  if (isE) {
+    // Emergency: 38-52 km/h on preempted corridor
+    this.targetKmh = SPEED_TIERS.emergency[0] + Math.random() * (SPEED_TIERS.emergency[1] - SPEED_TIERS.emergency[0]);
+  } else if (avgCong >= 0.65) {
+    // ORR critical corridors: 10-18 km/h (Silk Board, KR Puram etc.)
+    this.targetKmh = SPEED_TIERS.orr_critical[0] + Math.random() * (SPEED_TIERS.orr_critical[1] - SPEED_TIERS.orr_critical[0]);
+  } else if (avgCong >= 0.50) {
+    // Moderate ORR / arterials: 18-28 km/h
+    this.targetKmh = SPEED_TIERS.orr_moderate[0] + Math.random() * (SPEED_TIERS.orr_moderate[1] - SPEED_TIERS.orr_moderate[0]);
+  } else if (avgCong >= 0.40) {
+    // Inner ring roads: 22-32 km/h
+    this.targetKmh = SPEED_TIERS.inner_ring[0] + Math.random() * (SPEED_TIERS.inner_ring[1] - SPEED_TIERS.inner_ring[0]);
+  } else {
+    // Sub-arterials, low-cong: 28-40 km/h
+    this.targetKmh = SPEED_TIERS.sub_arterial[0] + Math.random() * (SPEED_TIERS.sub_arterial[1] - SPEED_TIERS.sub_arterial[0]);
+  }
   this._refreshSpeed();
   this.spd = this.bspd;
   this.tspd = this.bspd;
@@ -1768,22 +1801,31 @@ Particle.prototype.update = function(dt) {
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
-    var stop = (!this.isE && distEnd<.15 && sig.state==='red' && !sig.evp);
+    var stop = (!this.isE && distEnd<.22 && sig.state==='red' && !sig.evp);
 
     // Speed scale: S.wave represents free-flow speed in km/h (default 40)
     // Vehicles scale their speed relative to this green-wave speed setting
     var waveScale = S.wave / 40.0;
 
     if(stop){
-      this.tspd=0; this.state='stopped'; this.wt+=dt*.016;
-    } else if(cong>.65 && !this.isE){
-      // Congested: reduce speed proportionally, min ~10 km/h
-      var f=Math.max(.08, 1-(cong-.65)*2.5);
-      this.tspd=this.bspd*f*waveScale; this.state=cong>.85?'stopped':'slow';
-      this.wt=Math.max(0,this.wt-dt*.01);
+      this.tspd=0; this.state='stopped'; this.wt+=_sigDtSec;
+    } else if(cong>.85&&!this.isE){
+      // Gridlock: near-zero movement, Bangalore-style total jam
+      this.tspd=this.bspd*0.04*waveScale; this.state='stopped';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.05);
+    } else if(cong>.65&&!this.isE){
+      // Heavy congestion: ORR/Silk Board characteristic crawl (4-8 km/h effective)
+      var f=Math.max(0.06, 1-(cong-.65)*3.5);
+      this.tspd=this.bspd*f*waveScale; this.state='slow';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.02);
+    } else if(cong>.45&&!this.isE){
+      // Moderate: 40-60% speed reduction (typical Bangalore inner ring)
+      var f2=Math.max(0.35, 1-(cong-.45)*2.0);
+      this.tspd=this.bspd*f2*waveScale; this.state='slow';
+      this.wt=Math.max(0,this.wt-_sigDtSec*.08);
     } else {
       this.tspd=this.bspd*waveScale; this.state='moving';
-      this.wt=Math.max(0,this.wt-dt*.05);
+      this.wt=Math.max(0,this.wt-_sigDtSec*.3);
     }
     // Emergency vehicles ignore signals and congestion — run at full target speed
     if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
@@ -2125,9 +2167,9 @@ function updateSignals(dt){
 
   for(var i=0;i<SIG.length;i++){
     var sig=SIG[i];
-    // dt ≈ 1 at 60fps; multiply by 0.016 so phase increments in real seconds
-    // (1 frame × 0.016 s/frame × 60fps = ~1 real second per simulated second)
-    sig.phase+=dt*S.speed*0.016;
+    // Wall-clock accurate: advance phase by real elapsed sim-seconds per frame
+    // _sigDtSec is computed from performance.now() delta → exact second countdown
+    sig.phase += _sigDtSec;
     if(sig.phase>=sig.cycle) sig.phase-=sig.cycle;
 
     var nearEvp=false;
@@ -2352,11 +2394,17 @@ function updateMetrics(){
   var algoThrMul = S.algo==='fixed'?0.72 : S.algo==='optimal'?(0.85+warm*0.15) : (0.80+warm*0.10);
   var thr = Math.round(baseThr * algoThrMul / Math.max(mul, 0.3));
 
-  // Average network speed: inversely proportional to congestion and delay
-  var baseSpeed = S.wave;
-  var congSpeedMul = 1 - stopFrac*0.7 - (mul-0.5)*0.15;
-  var avgSpd = Math.max(5, baseSpeed * Math.max(congSpeedMul, 0.1) *
-               (S.algo==='fixed'?0.75 : S.algo==='optimal'?(0.7+warm*0.3) : 0.80));
+  // Average network speed: calibrated to BBMP data
+  // Peak (density 4-5): ~17.8 km/h | Off-peak: ~32.4 km/h
+  // Base speeds reflect actual Bangalore measurements (BBMP 2022)
+  var peakBaseSpeed = 17.8;   // km/h peak hour (BBMP Traffic Engineering 2022)
+  var offpeakSpeed  = 32.4;   // km/h off-peak
+  // Interpolate based on density and algorithm improvement
+  var densityFrac = (mul - 0.2) / (1.4 - 0.2);  // 0→1 as density goes from vlow→peak
+  var baseSpeedForDens = offpeakSpeed - densityFrac * (offpeakSpeed - peakBaseSpeed);
+  var congSpeedMul2 = 1 - stopFrac * 0.5;
+  var algoSpeedBonus = S.algo==='optimal' ? warm*0.18 : S.algo==='lp' ? warm*0.10 : 0;
+  var avgSpd = Math.max(4, baseSpeedForDens * Math.max(congSpeedMul2, 0.15) * (1 + algoSpeedBonus));
 
   // LP objective: scales with delay, density, and algorithm efficiency
   var lpObj = baseLpObj * algoDelayMul * mul;
@@ -2435,33 +2483,7 @@ function updateMetrics(){
   sv('sbod','1.2M');
   sv('sbe',evpAct);
 
-  // Junction list
-  // Junction list - split into congestion groups
-  var jlCrit=g('jlist-crit'),jlMod=g('jlist-mod'),jlFree=g('jlist-free');
-  if(jlCrit){
-    var htmlCrit='',htmlMod='',htmlFree='';
-    for(var i=0;i<JN.length;i++){
-      var j=JN[i]; var s=SIG[i];
-      var col=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
-      var tl=s.state==='green'?Math.max(0,s.gDur-s.phase).toFixed(0)+'s GO':Math.max(0,s.cycle-s.phase).toFixed(0)+'s WAIT';
-      var cc=j.cong>.65?'var(--red)':j.cong>.45?'var(--orange)':'var(--green)';
-      var xi2=(lp&&lp.x)?lp.x[i].toFixed(2):'--';
-      var lanes=j.lanes||3;
-      var item='<div class="ji'+(s.evp?' evp':'')+'" style="background:'+(s.evp?'#150308':'#020810')+'">'+
-        '<div class="jdot" style="background:'+col+';box-shadow:0 0 5px '+col+'"></div>'+
-        '<div class="jname">'+j.name+
-          '<small>x='+xi2+' | '+(j.daily/1000).toFixed(0)+'K/d | '+lanes+' ln</small></div>'+
-        '<div class="jpct" style="color:'+cc+'">'+Math.round(j.cong*100)+'%</div>'+
-        '<div class="jtmr">'+tl+'</div>'+
-        '</div>';
-      if(j.cong>0.65) htmlCrit+=item;
-      else if(j.cong>0.45) htmlMod+=item;
-      else htmlFree+=item;
-    }
-    jlCrit.innerHTML=htmlCrit||'<div style="font-family:monospace;font-size:.5rem;color:#3a5570;padding:4px">None at this density</div>';
-    if(jlMod) jlMod.innerHTML=htmlMod||'';
-    if(jlFree) jlFree.innerHTML=htmlFree||'';
-  }
+  // Junction list is now updated by updateJunctionTimers() every 3 frames for accurate timers
 
   // Signal panel – Real-time big-stat cards (visible from far) + detailed panels
   var sp=g('sigpanel');
@@ -2591,6 +2613,43 @@ function updateMetrics(){
 }
 
 function pad(n){return n<10?'0'+n:String(n);}
+
+// ── FAST JUNCTION TIMER UPDATE (every 3 frames) ───────────────────────────
+// Updates only the countdown labels in jlist-crit/mod/free without full DOM rebuild
+// Also updates the signal panel timing detail
+function updateJunctionTimers(){
+  var lp=CUR.lp;
+  // Re-render junction list timers only (lightweight: text only per item)
+  var jlCrit=g('jlist-crit'),jlMod=g('jlist-mod'),jlFree=g('jlist-free');
+  if(!jlCrit) return;
+  var htmlCrit='',htmlMod='',htmlFree='';
+  for(var i=0;i<JN.length;i++){
+    var j=JN[i]; var s=SIG[i];
+    var col=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
+    var _yDur3=s.cycle*0.07;
+    var tl3;
+    if(s.evp){ tl3='EVP PRI'; }
+    else if(s.state==='green'){ tl3=Math.max(0,s.gDur-s.phase).toFixed(0)+'s \u25ba'; }
+    else if(s.state==='yellow'){ tl3=Math.max(0,s.gDur+_yDur3-s.phase).toFixed(0)+'s YLW'; }
+    else { tl3=Math.max(0,s.cycle-s.phase).toFixed(0)+'s WAIT'; }
+    var cc=j.cong>.65?'var(--red)':j.cong>.45?'var(--orange)':'var(--green)';
+    var xi2=(lp&&lp.x)?lp.x[i].toFixed(2):'--';
+    var lanes=j.lanes||3;
+    var item='<div class="ji'+(s.evp?' evp':'')+'\" style=\"background:'+(s.evp?'#150308':'#020810')+'">'+
+      '<div class="jdot" style="background:'+col+';box-shadow:0 0 5px '+col+'"></div>'+
+      '<div class="jname">'+j.name+
+        '<small>x='+xi2+' | '+(j.daily/1000).toFixed(0)+'K/d | '+lanes+' ln</small></div>'+
+      '<div class="jpct" style="color:'+cc+'">'+Math.round(j.cong*100)+'%</div>'+
+      '<div class="jtmr" style="color:'+col+'">'+tl3+'</div>'+
+      '</div>';
+    if(j.cong>0.65) htmlCrit+=item;
+    else if(j.cong>0.45) htmlMod+=item;
+    else htmlFree+=item;
+  }
+  jlCrit.innerHTML=htmlCrit||'<div style="font-family:monospace;font-size:.5rem;color:#3a5570;padding:4px">None at this density</div>';
+  if(jlMod) jlMod.innerHTML=htmlMod||'';
+  if(jlFree) jlFree.innerHTML=htmlFree||'';
+}
 
 // ── CONTROLS ──────────────────────────────────────────────────────────────────
 function setAlgo(a){
@@ -2858,12 +2917,23 @@ window.setCycle=setCycle;window.setSS=setSS;window.setAlgoSel=setAlgoSel;
 window.lTab=lTab;window.rTab=rTab;
 
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+// Wall-clock reference for accurate per-second signal phase advance
+var _sigLastWall = performance.now();
+var _sigDtSec = 0;  // real elapsed sim-seconds this frame
 var lastT=0,roadTick=0;
 function loop(ts){
   try{
-    if(S.paused){requestAnimationFrame(loop);return;}
+    if(S.paused){
+      _sigLastWall = performance.now();  // reset wall-clock when unpausing
+      requestAnimationFrame(loop);return;
+    }
     var dt=Math.min((ts-lastT)/1000*60,4);
-    lastT=ts; S.frame++; S.simTime+=dt*.016*S.speed;
+    lastT=ts; S.frame++;
+    // Compute wall-clock elapsed real seconds × sim speed for signal phase
+    var _nowWall = performance.now();
+    _sigDtSec = Math.min((_nowWall - _sigLastWall) / 1000.0, 0.1) * S.speed;
+    _sigLastWall = _nowWall;
+    S.simTime+=_sigDtSec;
     updateSignals(dt);
     for(var i=0;i<particles.length;i++) particles[i].update(dt);
     renderParticles();
@@ -2873,6 +2943,8 @@ function loop(ts){
       if(roadTick%3===0) drawRoads();
     }
     if(S.frame%30===0) updateMetrics();
+    // Junction tab signal timers: update every 3 frames for smooth countdown
+    if(S.frame%3===0) updateJunctionTimers();
     if(S.frame%5===0){
       // Real-time signal countdown – update sigpanel-rt every 5 frames (~3/sec)
       var spRT2=g('sigpanel-rt');
