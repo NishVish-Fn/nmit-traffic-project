@@ -970,8 +970,6 @@ HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <title>Urban Flow & Life-Lines — PhD Competition | Bangalore</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -983,7 +981,7 @@ HTML = """<!DOCTYPE html>
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
-     width:100%;height:1020px;overflow:hidden;display:flex;flex-direction:column}
+     width:100%;height:990px;overflow:hidden;display:flex;flex-direction:column}
 
 /* HEADER */
 #hdr{height:56px;flex-shrink:0;background:linear-gradient(90deg,#000a18,#020810 50%,#000a18);
@@ -1161,12 +1159,11 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .sb:last-child{border-right:none;margin-left:auto}
 .sbv{color:var(--cyan);font-weight:bold}
 .sbv.r{color:var(--red)}.sbv.g{color:var(--green)}.sbv.y{color:var(--yellow)}.sbv.p{color:var(--purple)}
-.leaflet-tile-pane{filter:brightness(.28) saturate(.2) hue-rotate(195deg)!important}
-.leaflet-container{background:#020810;background-image:
-  linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
-  linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
-  background-size:40px 40px}
-.leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+/* map background grid */
+#map{width:100%;height:100%;background:#020810;
+  background-image:linear-gradient(rgba(0,229,255,0.035) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(0,229,255,0.035) 1px,transparent 1px);
+  background-size:50px 50px}
 /* LWR shock wave canvas */
 #lwrcanv{display:block;width:100%!important;height:90px!important}
 /* LP table */
@@ -2262,42 +2259,104 @@ function spawnParticles() {
   for(var i=0;i<S.emergDots;i++) particles.push(new Particle(true));
 }
 
-// ── MAP ───────────────────────────────────────────────────────────────────────
-var map=L.map('map',{center:[12.97,77.62],zoom:12,
-  zoomControl:false,attributionControl:false,preferCanvas:true,
-  fadeAnimation:false,zoomAnimation:false,markerZoomAnimation:false});
-// Try multiple tile sources with fallback
-var tileAdded = false;
-var tileSources = [
-  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-];
-function tryTile(idx) {
-  if (idx >= tileSources.length) return;
-  var tl = L.tileLayer(tileSources[idx], {maxZoom:19, subdomains:'abcd'});
-  tl.on('tileerror', function() {
-    tl.remove();
-    tryTile(idx + 1);
-  });
-  tl.on('tileload', function() { tileAdded = true; });
-  tl.addTo(map);
+// ── PURE CANVAS MAP (no tile dependency) ─────────────────────────────────────
+// Mercator-style lat/lng → pixel projection for Bangalore bounding box
+var MAP_BOUNDS = {
+  latMin: 12.82, latMax: 13.12,
+  lngMin: 77.55, lngMax: 77.78
+};
+
+function getMapSize() {
+  var mw = document.getElementById('mw');
+  return { w: mw.offsetWidth || 800, h: mw.offsetHeight || 600 };
 }
-tryTile(0);
 
-// Aggressive invalidateSize retries to handle iframe sizing delays
-var _sizeRetries = [100, 300, 600, 1000, 1800, 3000];
-_sizeRetries.forEach(function(ms) {
-  setTimeout(function() {
-    map.invalidateSize(true);
-    map.setView([12.97,77.62],12);
-  }, ms);
+function ll2px(lat, lng) {
+  var sz = getMapSize();
+  var x = (lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin) * sz.w;
+  var y = (1 - (lat - MAP_BOUNDS.latMin) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * sz.h;
+  return { x: x, y: y };
+}
+
+// Stub map object — provides latLngToContainerPoint for backward-compat
+var map = {
+  latLngToContainerPoint: function(ll) { return ll2px(ll[0], ll[1]); },
+  invalidateSize: function() {},
+  setView: function() {}
+};
+
+// ── TOOLTIP SYSTEM ────────────────────────────────────────────────────────────
+var _tip = document.createElement('div');
+_tip.style.cssText = 'position:fixed;z-index:9999;background:rgba(2,8,16,.96);' +
+  'border:1px solid #00e5ff44;border-radius:5px;padding:10px 14px;pointer-events:none;' +
+  'display:none;font-family:monospace;font-size:11px;line-height:1.7;' +
+  'max-width:220px;box-shadow:0 4px 24px #000a;color:#b8d8f0';
+document.body.appendChild(_tip);
+
+function showTip(html, x, y) {
+  _tip.innerHTML = html;
+  _tip.style.display = 'block';
+  var tw = _tip.offsetWidth, th = _tip.offsetHeight;
+  var px = Math.min(x + 12, window.innerWidth - tw - 8);
+  var py = Math.max(y - th - 8, 8);
+  _tip.style.left = px + 'px';
+  _tip.style.top = py + 'px';
+}
+function hideTip() { _tip.style.display = 'none'; }
+
+// Junction hit-test radius
+var JN_HIT_R = 18;
+
+document.getElementById('fc').addEventListener('mousemove', function(e) {
+  var rect = e.target.getBoundingClientRect();
+  var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  var hit = -1;
+  for (var i = 0; i < JN.length; i++) {
+    var pt = ll2px(JN[i].lat, JN[i].lng);
+    var dx = mx - pt.x, dy = my - pt.y;
+    if (Math.sqrt(dx*dx + dy*dy) < JN_HIT_R) { hit = i; break; }
+  }
+  if (hit >= 0) {
+    var j = JN[hit], lp = CUR.lp;
+    var tc = j.cong > .65 ? '#ff2244' : j.cong > .45 ? '#ff8c00' : '#00ff88';
+    showTip(
+      '<b style="color:#ffd700;font-size:12px">' + j.name + '</b><br>' +
+      'Congestion: <b style="color:' + tc + '">' + Math.round(j.cong*100) + '%</b><br>' +
+      'Lanes: <b>' + (j.lanes||3) + ' per direction</b><br>' +
+      'O-D demand: <b>' + Math.round(BACKEND.od_totals[hit]).toLocaleString() + ' PCU/hr</b><br>' +
+      'Daily: <b>' + (j.daily/1000).toFixed(0) + 'K veh/day</b><br>' +
+      'LP green: <b>' + (lp.g ? lp.g[hit].toFixed(0) : 45) + 's / ' + (lp.C||90) + 's cycle</b><br>' +
+      'Webster d: <b>' + (lp.delay ? lp.delay[hit].toFixed(1) : '-') + 's/veh</b><br>' +
+      'v/c ratio: <b>' + (lp.x ? lp.x[hit].toFixed(3) : '-') + '</b>',
+      e.clientX, e.clientY
+    );
+    document.getElementById('fc').style.cursor = 'pointer';
+  } else {
+    hideTip();
+    document.getElementById('fc').style.cursor = 'default';
+  }
 });
+document.getElementById('fc').addEventListener('mouseleave', hideTip);
 
-var roadLines=[];
-function drawRoads() {
-  for(var i=0;i<roadLines.length;i++) try{roadLines[i].remove();}catch(e){}
-  roadLines=[];
+// jmkrs stub — state stored in SIG, rendered on canvas
+var jmkrs = JN.map(function() { return { _col: '#ff2244' }; });
+
+var roadLines = []; // unused but referenced by drawRoads
+function drawRoads() { /* roads drawn on canvas in renderParticles */ }
+
+// ── CANVAS OVERLAY ────────────────────────────────────────────────────────────
+var fc=document.getElementById('fc');
+var cx=fc.getContext('2d');
+function resizeFC(){
+  var mw=document.getElementById('mw');
+  fc.width=mw.offsetWidth||800;
+  fc.height=mw.offsetHeight||600;
+}
+resizeFC();
+window.addEventListener('resize',resizeFC);
+
+// ── ROAD DRAWING ON CANVAS ────────────────────────────────────────────────────
+function drawRoadsCanvas() {
   var warm=Math.min(S.booted/500,1);
   var lwr=CUR.lwr;
   for(var ri=0;ri<ED.length;ri++){
@@ -2310,83 +2369,72 @@ function drawRoads() {
     var wv=lwr[ri]?Math.abs(lwr[ri].w_km_h):0;
     var col=cong>.85?'#ff2244':cong>.65?'#ff8c00':cong>.4?'#ffd700':'#00ff88';
     var w=4+cong*7;
-    // Full curved road path via waypoints
     var path=getEdgePath(ri);
-    var latLngs=path.map(function(p){return[p[0],p[1]];});
+
     var hasEvp=false;
     for(var pi=0;pi<particles.length;pi++){
       if(particles[pi].isE&&particles[pi].ei===ri){hasEvp=true;break;}
     }
-    // Road glow shadow (wider, very faint)
-    try{
-      roadLines.push(L.polyline(latLngs,
-        {color:col+'33',weight:w+8,opacity:.3,lineJoin:'round',lineCap:'round'}).addTo(map));
-    }catch(ex){}
-    // Road base (solid, congestion coloured)
-    try{
-      roadLines.push(L.polyline(latLngs,
-        {color:col+'aa',weight:w,opacity:.9,lineJoin:'round',lineCap:'round'}).addTo(map));
-    }catch(ex){}
-    // Road centre divider line (dashed white)
-    try{
-      roadLines.push(L.polyline(latLngs,
-        {color:'#ffffff1a',weight:1,opacity:.6,dashArray:'5 9'}).addTo(map));
-    }catch(ex){}
-    // EVP corridor overlay
-    if(hasEvp){
-      try{
-        roadLines.push(L.polyline(latLngs,
-          {color:'#ff224444',weight:w+12,opacity:.45}).addTo(map));
-        roadLines.push(L.polyline(latLngs,
-          {color:'#ff44aa',weight:2,opacity:.9,dashArray:'10 6'}).addTo(map));
-      }catch(ex){}
+
+    // Build pixel path
+    function drawPath(lineW, strokeCol, dash) {
+      cx.save();
+      cx.beginPath();
+      cx.lineWidth=lineW; cx.strokeStyle=strokeCol;
+      cx.lineJoin='round'; cx.lineCap='round';
+      if(dash) cx.setLineDash(dash); else cx.setLineDash([]);
+      var p0=ll2px(path[0][0],path[0][1]);
+      cx.moveTo(p0.x,p0.y);
+      for(var pi2=1;pi2<path.length;pi2++){
+        var pp=ll2px(path[pi2][0],path[pi2][1]);
+        cx.lineTo(pp.x,pp.y);
+      }
+      cx.stroke();
+      cx.restore();
     }
-    // LWR shock wave overlay
+
+    // Glow shadow
+    drawPath(w+10, col+'28', null);
+    // Road base
+    drawPath(w, col+'cc', null);
+    // Centre divider
+    drawPath(1, '#ffffff1a', [5,9]);
+    // EVP corridor
+    if(hasEvp){
+      drawPath(w+14, '#ff224433', null);
+      drawPath(2, '#ff44aacc', [10,6]);
+    }
+    // LWR shock wave
     if(wv>15){
-      try{
-        var alpha=Math.min(wv/60,.6);
-        roadLines.push(L.polyline(latLngs,
-          {color:'rgba(187,119,255,'+alpha.toFixed(2)+')',weight:2.5,opacity:.85,dashArray:'4 8'}).addTo(map));
-      }catch(ex){}
+      var alpha=Math.min(wv/60,.6);
+      drawPath(2.5, 'rgba(187,119,255,'+alpha.toFixed(2)+')', [4,8]);
     }
   }
 }
 
-var jmkrs=JN.map(function(j,i){
-  var lanes = j.lanes || 3;
-  var r = 6 + lanes*1.5;
-  var m=L.circleMarker([j.lat,j.lng],
-    {radius:r,color:'#ffffff',weight:2,fillColor:'#ff2244',fillOpacity:.92}).addTo(map);
-  var tc=j.cong>.65?'#ff2244':j.cong>.45?'#ff8c00':'#00ff88';
-  var lp=CUR.lp;
-  m.bindTooltip(
-    '<div style="font-family:monospace;font-size:11px;line-height:1.6;min-width:180px">'+
-    '<b style="color:#ffd700;font-size:12px">'+j.name+'</b><br>'+
-    'Congestion: <b style="color:'+tc+'">'+Math.round(j.cong*100)+'%</b><br>'+
-    'Lanes: <b>'+lanes+' per direction</b><br>'+
-    'O-D demand: <b>'+Math.round(BACKEND.od_totals[i]).toLocaleString()+' PCU/hr</b><br>'+
-    'Daily: <b>'+(j.daily/1000).toFixed(0)+'K veh/day</b><br>'+
-    'LP green: <b>'+(lp.g?lp.g[i].toFixed(0):45)+'s / '+(lp.C||90)+'s cycle</b><br>'+
-    'Webster d: <b>'+(lp.delay?lp.delay[i].toFixed(1):'-')+'s/veh</b><br>'+
-    'v/c ratio: <b>'+(lp.x?lp.x[i].toFixed(3):'-')+'</b>'+
-    '</div>',
-    {direction:'top',className:'jn-tip'}
-  );
-  return m;
-});
-
-// ── CANVAS OVERLAY ────────────────────────────────────────────────────────────
-var fc=document.getElementById('fc');
-var cx=fc.getContext('2d');
-function resizeFC(){var mw=document.getElementById('mw');fc.width=mw.offsetWidth;fc.height=mw.offsetHeight;}
-resizeFC();
-window.addEventListener('resize',resizeFC);
-function ll2px(lat,lng){try{var p=map.latLngToContainerPoint([lat,lng]);return {x:p.x,y:p.y};}catch(e){return{x:-100,y:-100};}}
-
 function renderParticles(){
   cx.clearRect(0,0,fc.width,fc.height);
 
-  // Draw 4-arm signal indicators at each junction
+  // Draw roads directly on canvas (replaces Leaflet polylines)
+  drawRoadsCanvas();
+
+  // Draw junction circles (replaces Leaflet circleMarkers)
+  for(var ji2=0;ji2<JN.length;ji2++){
+    var jj=JN[ji2]; var sj2=SIG[ji2];
+    var jp2=ll2px(jj.lat,jj.lng);
+    var jcol=sj2.evp?'#ff2244':sj2.state==='green'?'#00ff88':sj2.state==='yellow'?'#ffd700':'#ff2244';
+    var jr2=7+(jj.lanes||3)*1.5;
+    cx.save(); cx.beginPath(); cx.arc(jp2.x,jp2.y,jr2+7,0,Math.PI*2);
+    cx.fillStyle=jcol+'1a'; cx.fill(); cx.restore();
+    cx.save(); cx.beginPath(); cx.arc(jp2.x,jp2.y,jr2,0,Math.PI*2);
+    cx.fillStyle=jcol+'bb'; cx.fill();
+    cx.strokeStyle='#ffffffaa'; cx.lineWidth=2; cx.stroke(); cx.restore();
+    cx.save(); cx.font='bold 9px Share Tech Mono,monospace';
+    cx.fillStyle='#ffffffaa'; cx.textAlign='center';
+    var lbl=jj.name.split(' ')[0];
+    cx.fillText(lbl, jp2.x, jp2.y+jr2+13); cx.restore();
+  }
+
   for(var ji=0;ji<JN.length;ji++){
     var j=JN[ji]; var sig=SIG[ji];
     var jpt=ll2px(j.lat,j.lng);
@@ -2633,7 +2681,7 @@ function updateJMkrs(){
   for(var i=0;i<JN.length;i++){
     var s=SIG[i];
     var c=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
-    try{jmkrs[i].setStyle({fillColor:c,color:s.evp?'#ff4466':'#ffffff'});}catch(e){}
+    jmkrs[i]._col=c;  // colour stored; canvas reads from SIG directly
   }
 }
 
@@ -3748,4 +3796,4 @@ requestAnimationFrame(loop);
 </html>
 """
 
-components.html(HTML, height=1020, scrolling=False)
+components.html(HTML, height=990, scrolling=False)
