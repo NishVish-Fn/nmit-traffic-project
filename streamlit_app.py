@@ -1497,6 +1497,34 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
   color:#3a5570;line-height:2}
 .hi{color:var(--cyan)}.hig{color:var(--green)}.hiy{color:var(--yellow)}
 .hio{color:var(--orange)}.hir{color:var(--red)}.hip{color:var(--purple)}
+/* ── FORMULA DISPLAY ─────────────────────────────────────────── */
+.eq-block{margin:7px 0;padding:0}
+.eq-label{font-family:'Share Tech Mono',monospace;font-size:.46rem;
+  color:#2a5878;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.eq-box{background:linear-gradient(135deg,#041828 0%,#061e30 100%);
+  border:1px solid #1a4060;border-left:3px solid var(--cyan);
+  border-radius:0 4px 4px 0;padding:8px 12px;
+  font-family:'Share Tech Mono',monospace;
+  font-size:.72rem;color:#e0f4ff;line-height:1.7;
+  text-align:center;letter-spacing:.3px;
+  box-shadow:0 0 12px #00e5ff18,inset 0 0 20px #00000040}
+.eq-box .eq-main{font-size:.82rem;color:#00e5ff;font-weight:bold;
+  display:block;margin:2px 0;text-shadow:0 0 8px #00e5ff55}
+.eq-box .eq-sub{font-size:.58rem;color:#4a90b0;display:block;margin-top:3px;line-height:1.5}
+.eq-box .eq-accent{color:#ffd700}
+.eq-box .eq-green{color:#00ff88}
+.eq-box .eq-orange{color:#ff8c00}
+.eq-box .eq-purple{color:#bb77ff}
+.eq-section{margin:8px 0 4px;padding:6px 8px;background:#041020;
+  border-radius:3px;border-left:2px solid #1a5070}
+.eq-section .eq-title{font-family:'Share Tech Mono',monospace;font-size:.48rem;
+  color:#00e5ff;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;
+  padding-bottom:3px;border-bottom:1px solid #0d2040}
+.eq-row{display:flex;align-items:baseline;gap:6px;margin:4px 0;
+  font-family:'Share Tech Mono',monospace}
+.eq-row .eq-lhs{font-size:.62rem;color:#4a90b0;min-width:72px;flex-shrink:0;text-align:right}
+.eq-row .eq-rhs{font-size:.67rem;color:#c8eaff;flex:1}
+.eq-row .eq-note{font-size:.45rem;color:#2a5070;margin-left:4px}
 #statusbar{height:27px;flex-shrink:0;background:var(--bg2);
   border-top:1px solid var(--cdim);display:flex;align-items:center;
   padding:0 12px;gap:0;font-family:'Share Tech Mono',monospace;font-size:0.54rem;overflow:hidden}
@@ -1667,21 +1695,29 @@ details.csec summary:hover{background:#0a1828}
       </details>
 
       <details class="csec">
-        <summary>&#x1F4D0; LP Solver Status</summary>
+        <summary>&#x1F4D0; LP Solver &amp; Objective</summary>
         <div class="csec-body">
-          <div class="lp-box" style="font-size:.53rem;line-height:1.7">
-            <span class="hi">Solver:</span> scipy HiGHS LP<br>
-            <span class="hi">Variables:</span> 12 green times g_i<br>
-            <span class="hi">Constraints:</span> &#x2211;g_i &#x2264; C&#x2212;L<br>
-            <span class="hi">Objective:</span> Minimise &#x2211; w_i&#x22C5;d_i<br>
-            <span class="hi">OD Matrix:</span> 12&#xD7;12 BBMP/KRDCL<br>
-            <span class="hi">CTM:</span> Daganzo (1994), 5 cells<br>
-            <span class="hi">Robertson:</span> &#x3B2;=0.8, TRANSYT<br>
-            <span class="hi">Status:</span> <span class="hig" id="lp-status">OPTIMAL</span><br>
-            <span class="hi">Obj Value:</span> <span class="hiy" id="lp-obj">--</span><br>
-            <span class="hi">Avg Delay:</span> <span class="hir" id="lp-wd">--</span> s<br>
-            <span class="hi">Avg x (v/c):</span> <span class="hio" id="lp-xavg">--</span>
+
+          <div class="eq-block">
+            <div class="eq-label">LP Objective (Webster, RF-adjusted)</div>
+            <div class="eq-box">
+              <span class="eq-main">min &nbsp; &#x2211;<sub>i</sub> w<sub>RF,i</sub> &sdot; d<sub>i</sub>(g<sub>i</sub>)</span>
+              <span class="eq-sub">s.t. &nbsp; &#x2211;g<sub>i</sub> &le; C&minus;L &nbsp;&middot;&nbsp; g<sub>min</sub> &le; g<sub>i</sub> &le; G</span>
+            </div>
           </div>
+
+          <div class="eq-section">
+            <div class="eq-title">Solver Status</div>
+            <div class="eq-row"><span class="eq-lhs">Solver</span><span class="eq-rhs" style="color:#4a90b0">scipy HiGHS LP</span></div>
+            <div class="eq-row"><span class="eq-lhs">Variables</span><span class="eq-rhs" style="color:#4a90b0">12 g<sub>i</sub></span></div>
+            <div class="eq-row"><span class="eq-lhs">OD Matrix</span><span class="eq-rhs" style="color:#4a90b0">12&times;12 BBMP/KRDCL</span></div>
+            <div class="eq-row"><span class="eq-lhs">CTM</span><span class="eq-rhs" style="color:#4a90b0">Daganzo 1994, 5 cells</span></div>
+            <div class="eq-row"><span class="eq-lhs">Status</span><span class="eq-rhs hig" id="lp-status">OPTIMAL</span></div>
+            <div class="eq-row"><span class="eq-lhs">Obj value</span><span class="eq-rhs hiy" id="lp-obj">--</span></div>
+            <div class="eq-row"><span class="eq-lhs">Avg delay</span><span class="eq-rhs hir" id="lp-wd">--</span><span class="eq-note">s/veh</span></div>
+            <div class="eq-row"><span class="eq-lhs">Avg x (v/c)</span><span class="eq-rhs hio" id="lp-xavg">--</span></div>
+          </div>
+
         </div>
       </details>
 
@@ -1954,20 +1990,70 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </details>
 
-      <details class="csec">
-        <summary>&#x1F4CB; Webster Formula Detail</summary>
+      <details class="csec" open>
+        <summary>&#x1F4CB; HCM Delay Formulae</summary>
         <div class="csec-body">
-          <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-            <span class="hi">d = d&#x2081;&#x22C5;PF + d&#x2082; + d&#x2083;</span> <span style="color:#3a5570">(HCM 6th §19)</span><br>
-            <span class="hi">d&#x2081;=C(1-&#x03BB;)&#xB2;/[2(1-&#x03BB;x)]</span> [uniform]<br>
-            <span class="hi">d&#x2082;=900T[(x-1)+&#x221A;((x-1)&#xB2;+8kIx/cT)]</span><br>
-            <span class="hi">PF=(1-P)/(1-&#x03BB;)</span>, P=0.33 (Arr.Type 3)<br>
-            <span style="color:#2a4060">k=0.5 pre-timed | I=1.0 isolated | T=0.25hr</span><br><br>
-            C = <span class="hio" id="w-C">90</span>s | &#x03BB; = g/C | x = q/c<br>
-            &#x03BB;_avg: <span class="hig" id="w-lam">--</span> &nbsp; x_avg: <span class="hiy" id="w-x">--</span><br>
-            d&#x2081;_avg: <span class="hio" id="w-d1">--</span>s &nbsp; d&#x2082;_avg: <span class="hio" id="w-d2">--</span>s<br>
-            d_avg: <span class="hir" id="w-d">--</span> s/veh &nbsp; Max d: <span class="hir" id="w-dmax">--</span>s
+
+          <!-- Total delay -->
+          <div class="eq-block">
+            <div class="eq-label">Total Control Delay &mdash; HCM 6th Ed. &sect;19-5</div>
+            <div class="eq-box">
+              <span class="eq-main">d = d&#x2081; &sdot; PF &nbsp;+&nbsp; d&#x2082; &nbsp;+&nbsp; d&#x2083;</span>
+              <span class="eq-sub">
+                <span class="eq-accent">d&#x2081;</span> = uniform &nbsp;|&nbsp;
+                <span class="eq-accent">d&#x2082;</span> = incremental &nbsp;|&nbsp;
+                <span class="eq-accent">d&#x2083;</span> = initial queue
+              </span>
+            </div>
           </div>
+
+          <!-- d1 -->
+          <div class="eq-block">
+            <div class="eq-label">d&#x2081; &mdash; Uniform Delay (Webster 1958)</div>
+            <div class="eq-box">
+              <span class="eq-main">d&#x2081; = C(1 &minus; &#x03BB;)&#xB2; / [2(1 &minus; &#x03BB;x)]</span>
+              <span class="eq-sub">&#x03BB; = g/C &nbsp;&middot;&nbsp; x = q/c &nbsp;&middot;&nbsp; C = <span id="w-C" class="eq-orange">90</span>s</span>
+            </div>
+          </div>
+
+          <!-- PF -->
+          <div class="eq-block">
+            <div class="eq-label">PF &mdash; Platoon Factor (HCM Exhibit&nbsp;19-19)</div>
+            <div class="eq-box">
+              <span class="eq-main">PF = (1 &minus; P) / (1 &minus; &#x03BB;)</span>
+              <span class="eq-sub">P = 0.33 &nbsp;(Arrival Type 3, random)</span>
+            </div>
+          </div>
+
+          <!-- d2 -->
+          <div class="eq-block">
+            <div class="eq-label">d&#x2082; &mdash; Incremental Delay (k=0.5, T=0.25hr)</div>
+            <div class="eq-box">
+              <span class="eq-main">d&#x2082; = 900T[(x&minus;1) + &#x221A;((x&minus;1)&#xB2; + 8kIx/cT)]</span>
+              <span class="eq-sub">k = 0.5 pre-timed &nbsp;&middot;&nbsp; I = 1.0 isolated &nbsp;&middot;&nbsp; T = 0.25 hr</span>
+            </div>
+          </div>
+
+          <!-- d3 -->
+          <div class="eq-block">
+            <div class="eq-label">d&#x2083; &mdash; Initial Queue Delay (HCM &sect;19-8)</div>
+            <div class="eq-box">
+              <span class="eq-main">d&#x2083; = Q<sub>b</sub>&sdot;C / (2&sdot;cap) &nbsp;&nbsp; Q<sub>b</sub> = max(0, x&minus;0.95)&sdot;cap&sdot;T</span>
+              <span class="eq-sub">Active only when x &gt; 0.95 &nbsp;(over-saturated approach)</span>
+            </div>
+          </div>
+
+          <!-- Live values -->
+          <div class="eq-section">
+            <div class="eq-title">&#x26A1; Live Values</div>
+            <div class="eq-row"><span class="eq-lhs">&#x03BB;_avg</span><span class="eq-rhs hig" id="w-lam">--</span><span class="eq-note">green ratio g/C</span></div>
+            <div class="eq-row"><span class="eq-lhs">x_avg</span><span class="eq-rhs hiy" id="w-x">--</span><span class="eq-note">volume/capacity</span></div>
+            <div class="eq-row"><span class="eq-lhs">d&#x2081;_avg</span><span class="eq-rhs hio" id="w-d1">--</span><span class="eq-note">s/veh uniform</span></div>
+            <div class="eq-row"><span class="eq-lhs">d&#x2082;_avg</span><span class="eq-rhs hio" id="w-d2">--</span><span class="eq-note">s/veh incremental</span></div>
+            <div class="eq-row"><span class="eq-lhs">d_avg</span><span class="eq-rhs hir" id="w-d">--</span><span class="eq-note">s/veh total</span></div>
+            <div class="eq-row"><span class="eq-lhs">d_max</span><span class="eq-rhs hir" id="w-dmax">--</span><span class="eq-note">s worst junction</span></div>
+          </div>
+
         </div>
       </details>
 
@@ -2000,20 +2086,50 @@ details.csec summary:hover{background:#0a1828}
     <div class="atab-content" id="rt3">
       <div class="sec">
         <div class="stitle">&#x1F300; LWR + CTM Hybrid Model</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">LWR PDE:</span> &#x2202;k/&#x2202;t + &#x2202;q/&#x2202;x = 0<br>
-          <span class="hi">Greenshields FD:</span> v = v_f(1&#x2212;k/k_j)<br>
-          <span class="hi">Shock speed:</span> w = (q_A&#x2212;q_B)/(k_A&#x2212;k_B)<br>
-          <span class="hi">CTM Sending:</span> &#x394;(x) = min(q_c, v_f&#x22C5;k)<br>
-          <span class="hi">CTM Receiving:</span> &#x3A3;(x) = min(q_c, w&#x22C5;(k_j&#x2212;k))<br>
-          <span class="hi">CTM Flow:</span> q = min(&#x394;_i, &#x3A3;_{i+1})<br><br>
-          v_f = 60 km/h | k_j = 120 veh/km<br>
-          q_c = 1800 veh/hr/ln | cells = 5/link<br><br>
-          <span class="hi">Active shock fronts:</span> <span class="hiy" id="lwr-shocks">--</span><br>
-          <span class="hi">Max |w|:</span> <span class="hir" id="lwr-maxw">--</span> km/h<br>
-          <span class="hi">Avg density:</span> <span class="hio" id="lwr-avgk">--</span> veh/km<br>
-          <span class="hi">Network LOS:</span> <span id="lwr-los">--</span><br>
-          <span class="hi">CTM bottleneck:</span> <span id="ctm-btn" class="hiy">--</span>
+
+        <!-- LWR -->
+        <div class="eq-block">
+          <div class="eq-label">LWR Conservation PDE (Lighthill &amp; Whitham 1955)</div>
+          <div class="eq-box">
+            <span class="eq-main">&#x2202;k/&#x2202;t &nbsp;+&nbsp; &#x2202;q/&#x2202;x &nbsp;=&nbsp; 0</span>
+            <span class="eq-sub">k = density (veh/km) &nbsp;&middot;&nbsp; q = flow (veh/hr)</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Greenshields Fundamental Diagram</div>
+          <div class="eq-box">
+            <span class="eq-main">v = v<sub>f</sub>(1 &minus; k / k<sub>j</sub>)</span>
+            <span class="eq-sub"><span class="eq-accent">v<sub>f</sub></span> = 60 km/h &nbsp;&middot;&nbsp; <span class="eq-accent">k<sub>j</sub></span> = 120 veh/km</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Shock Wave Speed</div>
+          <div class="eq-box">
+            <span class="eq-main">w<sub>shock</sub> = (q<sub>A</sub> &minus; q<sub>B</sub>) / (k<sub>A</sub> &minus; k<sub>B</sub>)</span>
+            <span class="eq-sub">w &lt; 0 &rArr; backward (congestion) &nbsp;&middot;&nbsp; w &gt; 0 &rArr; forward (recovery)</span>
+          </div>
+        </div>
+
+        <!-- CTM -->
+        <div class="eq-block">
+          <div class="eq-label">CTM Sending &amp; Receiving Functions (Daganzo 1994)</div>
+          <div class="eq-box">
+            <span class="eq-main">&#x394;(x) = min(q<sub>c</sub>,&nbsp; v<sub>f</sub> &sdot; k)</span>
+            <span class="eq-main" style="margin-top:4px">&#x3A3;(x) = min(q<sub>c</sub>,&nbsp; w &sdot; (k<sub>j</sub> &minus; k))</span>
+            <span class="eq-sub">Inter-cell flow: q = min(&#x394;<sub>i</sub>,&nbsp; &#x3A3;<sub>i+1</sub>) &nbsp;&middot;&nbsp; q<sub>c</sub> = 1800 veh/hr/ln</span>
+          </div>
+        </div>
+
+        <!-- Live CTM stats -->
+        <div class="eq-section">
+          <div class="eq-title">&#x26A1; Live Network State</div>
+          <div class="eq-row"><span class="eq-lhs">Shocks</span><span class="eq-rhs hiy" id="lwr-shocks">--</span><span class="eq-note">active fronts</span></div>
+          <div class="eq-row"><span class="eq-lhs">Max |w|</span><span class="eq-rhs hir" id="lwr-maxw">--</span><span class="eq-note">km/h</span></div>
+          <div class="eq-row"><span class="eq-lhs">Avg k</span><span class="eq-rhs hio" id="lwr-avgk">--</span><span class="eq-note">veh/km</span></div>
+          <div class="eq-row"><span class="eq-lhs">Network LOS</span><span id="lwr-los" class="eq-rhs hig">--</span></div>
+          <div class="eq-row"><span class="eq-lhs">Bottleneck</span><span id="ctm-btn" class="eq-rhs hiy">--</span></div>
         </div>
       </div>
       <div class="sec">
@@ -2042,12 +2158,26 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F4A7; Robertson Platoon Dispersion</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">Model:</span> q_d(t) = F&#x22C5;q_d(t&#x2212;1) + (1&#x2212;F)&#x22C5;q_u(t&#x2212;t_0)<br>
-          <span class="hi">F:</span> 1/(1 + &#x3B2;&#x22C5;t_0),  &#x3B2; = 0.8 (Robertson 1969)<br>
-          <span class="hi">&#x3C6;:</span> Progression factor &#x2248; 1 &#x2212; F<br>
-          <span class="hi">Delay corr.:</span> 1 &#x2212; 0.5&#x22C5;&#x3C6; (range 0.5&#x2013;1.0)<br><br>
-          <span id="platoon-summary" style="color:#4a7090">Loading...</span>
+
+        <div class="eq-block">
+          <div class="eq-label">Platoon Dispersion Model (Robertson 1969 / TRANSYT)</div>
+          <div class="eq-box">
+            <span class="eq-main">q<sub>d</sub>(t) = F &sdot; q<sub>d</sub>(t&minus;1) + (1&minus;F) &sdot; q<sub>u</sub>(t&minus;t<sub>0</sub>)</span>
+            <span class="eq-sub">F = 1 / (1 + &#x3B2;&sdot;t<sub>0</sub>) &nbsp;&middot;&nbsp; &#x3B2; = 0.8 &nbsp;&middot;&nbsp; &#x3C6; &#x2248; 1 &minus; F</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Delay Correction Factor</div>
+          <div class="eq-box">
+            <span class="eq-main">corr = 1 &minus; 0.5 &sdot; &#x3C6; &nbsp;&isin;&nbsp; [0.5,&nbsp;1.0]</span>
+            <span class="eq-sub">Lower corr = better platoon progression</span>
+          </div>
+        </div>
+
+        <div class="eq-section">
+          <div class="eq-title">&#x26A1; Live Platoon Stats</div>
+          <span id="platoon-summary" style="color:#4a7090;font-family:'Share Tech Mono',monospace;font-size:.52rem">Loading...</span>
         </div>
       </div>
       <div class="sec">
@@ -2069,19 +2199,36 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F6E2; Network PI + MC Sensitivity</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">HCM PI = &#x3B1;&#x22C5;&#x2211;d_i&#x22C5;q_i + &#x3B2;&#x22C5;&#x2211;s_i&#x22C5;q_i</span><br>
-          <span class="hi">PI total:</span> <span id="pi-total" class="hir">--</span>
-          &nbsp; <span class="hi">Fuel:</span> <span id="pi-fuel" class="hio">--</span> L/hr
-          &nbsp; <span class="hi">CO&#x2082;:</span> <span id="pi-co2" class="hip">--</span> kg/hr<br>
-          <span style="color:#2a4060;font-size:.45rem">MOVES-lite: CO&#x2082;&#x202F;=&#x202F;fuel&#x202F;&#xD7;&#x202F;2.31&#x202F;kg/L&#x202F;|&#x202F;s_i&#x202F;&#x2248;&#x202F;stops/cycle</span><br>
-          <hr style="border-color:#0d2040;margin:5px 0">
-          <span class="hi">MC Sensitivity (&#x3C3;=15%, n=200):</span><br>
-          <span class="hi">Mean obj:</span> <span id="mc-obj" style="color:var(--cyan)">--</span>
-          &nbsp; <span class="hi">&#x3C3;:</span> <span id="mc-std" class="hiy">--</span><br>
-          <span class="hi">P95 delay:</span> <span id="mc-p95" class="hir">--</span>s/veh
-          &nbsp; <span class="hi">Mean:</span> <span id="mc-avg" class="hio">--</span>s/veh<br>
-          <span class="hi">Most sensitive:</span> <span id="mc-sens" style="color:var(--yellow)">--</span>
+
+        <div class="eq-block">
+          <div class="eq-label">Network Performance Index (HCM-style)</div>
+          <div class="eq-box">
+            <span class="eq-main">PI = &#x3B1;&sdot;&#x2211;d<sub>i</sub>&sdot;q<sub>i</sub> &nbsp;+&nbsp; &#x3B2;&sdot;&#x2211;s<sub>i</sub>&sdot;q<sub>i</sub></span>
+            <span class="eq-sub">&#x3B1; = 1.0 &nbsp;&middot;&nbsp; &#x3B2; = 0.3 &nbsp;&middot;&nbsp; s<sub>i</sub> &#x2248; 1&minus;&#x03BB;<sub>i</sub> (stop proxy)</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">MOVES-lite CO&#x2082; Emission Model</div>
+          <div class="eq-box">
+            <span class="eq-main">fuel<sub>i</sub> = q<sub>i</sub>&sdot;(0.30&sdot;s<sub>i</sub> + 0.04&sdot;(1&minus;s<sub>i</sub>))</span>
+            <span class="eq-main" style="margin-top:3px">CO&#x2082; = fuel &times; 2.31 kg/L</span>
+            <span class="eq-sub">PI: <span id="pi-total" class="eq-orange">--</span> &nbsp;&middot;&nbsp; Fuel: <span id="pi-fuel" class="eq-orange">--</span> L/hr &nbsp;&middot;&nbsp; CO&#x2082;: <span id="pi-co2" style="color:#bb77ff">--</span> kg/hr</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Monte Carlo Sensitivity &mdash; &#x3C3;=15%, n=200 LP solves</div>
+          <div class="eq-box">
+            <span class="eq-main">c<sub>i</sub> ~ c<sub>i</sub> &sdot; (1 + N(0,&nbsp;0.15))</span>
+            <span class="eq-sub" style="text-align:left;padding:0 8px">
+              Mean obj: <span id="mc-obj" class="eq-accent">--</span> &nbsp;&middot;&nbsp;
+              &#x3C3;: <span id="mc-std" style="color:#ffd700">--</span><br>
+              P95 delay: <span id="mc-p95" style="color:#ff6b6b">--</span>s &nbsp;&middot;&nbsp;
+              Mean: <span id="mc-avg" class="eq-orange">--</span>s/veh<br>
+              Most sensitive: <span id="mc-sens" style="color:#ffd700">--</span>
+            </span>
+          </div>
         </div>
       </div>
       <div class="sec">
@@ -2099,31 +2246,40 @@ details.csec summary:hover{background:#0a1828}
     <div class="atab-content" id="rt4">
       <div class="sec">
         <div class="stitle">&#x1F916; Double Q-Learning + Experience Replay</div>
-        <div class="lp-box" style="font-size:.51rem;line-height:1.8">
-          <span class="hi">Algo:</span> <span style="color:#bb77ff;font-weight:bold">Double Q-Learning + Replay Buffer</span><br>
-          <span class="hi">State:</span> <span id="rl-states" style="color:#00e5ff">36</span> states (cong×phase×tod)<br>
-          <span class="hi">Actions:</span> {−15,−5, 0,+5,+15}s green &nbsp; [5 actions]<br>
-          <span class="hi">Reward:</span> −d − 0.5q + 0.3tput − 0.1|Δg|<br>
-          <span class="hi">Update:</span> QA/QB alternate | replay batch=32 | cap=1000<br>
-          η: 0.18→0.05 | γ=0.92 | ε: 1.0→0.05 | <span id="rl-ep">500</span> ep<br>
-          <em style="color:#4a7090">Van Hasselt 2010 NIPS; Mnih et al. 2015 Nature</em>
-          <hr style="border-color:#0d2040;margin:5px 0">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:4px">
-            <div class="scard" style="border-left-color:var(--yellow)">
-              <div class="sv" id="rl-d" style="font-size:.75rem;color:var(--yellow)">--</div>
-              <div class="sl">RL delay s/veh</div>
-            </div>
-            <div class="scard" style="border-left-color:var(--green)">
-              <div class="sv" id="rl-sav" style="font-size:.75rem;color:var(--green)">--%</div>
-              <div class="sl">vs LP saving</div>
-            </div>
-            <div class="scard" style="border-left-color:var(--purple)">
-              <div class="sv" id="rl-conv" style="font-size:.75rem;color:var(--purple)">--%</div>
-              <div class="sl">Conv. gain</div>
-            </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Double Q-Learning Update Rule (Van Hasselt 2010)</div>
+          <div class="eq-box">
+            <span class="eq-main">QA[s,a] += &#x03B7;&sdot;[R + &#x03B3;&sdot;QB[s&#x2019;, argmax<sub>a</sub>QA[s&#x2019;,a]] &minus; QA[s,a]]</span>
+            <span class="eq-sub" style="text-align:left;padding:0 6px">
+              <span class="eq-accent">State:</span> <span id="rl-states">36</span> states (6 cong &times; 3 phase &times; 2 tod)<br>
+              <span class="eq-accent">Actions:</span> {&minus;15, &minus;5, 0, +5, +15}s &nbsp;[5 actions]<br>
+              <span class="eq-accent">Reward:</span> R = &minus;d &minus; 0.5q + 0.3tput &minus; 0.1|&#x394;g|<br>
+              &#x03B7;: 0.18&rarr;0.05 &nbsp;&middot;&nbsp; &#x03B3;=0.92 &nbsp;&middot;&nbsp; &#x03B5;: 1.0&rarr;0.05 &nbsp;&middot;&nbsp; <span id="rl-ep">500</span> ep
+            </span>
           </div>
-          Conv. σ: <span id="rl-std" style="color:#bb77ff">--</span> &nbsp; LP ref: <span id="rl-lp" class="hig">--</span>s<br>
-          <span style="color:#2a5070;font-size:.46rem">NOVELTY: First Double Q-Learning+replay, 36-state, 5-action<br>vs HiGHS-LP on Bangalore ORR 12-jn O-D (BBMP 2022)</span>
+        </div>
+
+        <div style="font-size:.44rem;color:#2a5070;font-family:'Share Tech Mono',monospace;margin:4px 0 6px;font-style:italic">
+          Replay buffer cap=1000, batch=32 &nbsp;&middot;&nbsp; Van Hasselt 2010 NIPS; Mnih et al. 2015 Nature
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:4px">
+          <div class="scard" style="border-left-color:var(--yellow)">
+            <div class="sv" id="rl-d" style="font-size:.75rem;color:var(--yellow)">--</div>
+            <div class="sl">RL delay s/veh</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--green)">
+            <div class="sv" id="rl-sav" style="font-size:.75rem;color:var(--green)">--%</div>
+            <div class="sl">vs LP saving</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--purple)">
+            <div class="sv" id="rl-conv" style="font-size:.75rem;color:var(--purple)">--%</div>
+            <div class="sl">Conv. gain</div>
+          </div>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880">
+          Conv. &#x03C3;: <span id="rl-std" style="color:#bb77ff">--</span> &nbsp;&middot;&nbsp; LP ref: <span id="rl-lp" class="hig">--</span>s
         </div>
       </div>
       <div class="sec">
@@ -2144,29 +2300,45 @@ details.csec summary:hover{background:#0a1828}
         </div>
       </div>
       <div class="sec">
-        <div class="stitle">&#x1F4C9; ML Demand Forecast &mdash; Fourier + ExpSmoothing</div>
-        <div class="lp-box" style="font-size:.52rem;line-height:1.8">
-          <span class="hi">&#x0177;(t) = &#x2211;<sub>k=1</sub><sup>3</sup>[A<sub>k</sub>&#x22C5;sin(2&#x3C0;kt/P) + B<sub>k</sub>&#x22C5;cos(2&#x3C0;kt/P)] + ES(t)</span><br>
-          <span style="color:#2a4060;font-size:.45rem">ES: S<sub>t</sub>=&#x3B1;&#x22C5;&#x3B5;<sub>t</sub>+(1&#x2212;&#x3B1;)&#x22C5;S<sub>t&#x2212;1</sub>, &#x3B1;=0.30 | Holt 1957; Harvey 1990</span><br>
-          <span class="hi">Data:</span> BBMP 2022 24hr ORR profile | OLS fit | P=96 (15-min slots)<br>
-          <hr style="border-color:#0d2040;margin:5px 0">
-          <span style="color:#ff6b35;font-weight:bold">&#x1F517; FORECAST &#x2192; LP DENSITY INPUT (Novel)</span><br>
-          <span style="color:#4a8090;font-size:.46rem">&#x3B4;<sub>LP</sub> = &#x0177;(t<sub>sim</sub>) / &#x0177;&#x0305; &nbsp; &mdash; forecast at current slot scales LP demand factor</span><br>
-          LP density scale: <span id="ml-scale" class="hiy" style="font-size:.8rem;font-weight:bold">--</span>
-          <span id="ml-fore-note" style="color:#2a5070;font-size:.44rem;display:block;margin-top:3px"></span>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px">
-            <div class="scard" style="border-left-color:var(--green)">
-              <div class="sv" id="ml-rmse" style="font-size:.75rem;color:var(--green)">--</div>
-              <div class="sl">RMSE</div>
-            </div>
-            <div class="scard" style="border-left-color:var(--yellow)">
-              <div class="sv" id="ml-mape" style="font-size:.75rem;color:var(--yellow)">--%</div>
-              <div class="sl">MAPE %</div>
-            </div>
-            <div class="scard" style="border-left-color:var(--red)">
-              <div class="sv" id="ml-peaks" style="font-size:.55rem;color:var(--red);line-height:1.2">--</div>
-              <div class="sl">Peak Windows</div>
-            </div>
+        <div class="stitle">&#x1F4C9; ML Demand Forecast &mdash; Fourier + Exp. Smoothing</div>
+
+        <div class="eq-block">
+          <div class="eq-label">Fourier Series Demand Model (Holt 1957 / Harvey 1990)</div>
+          <div class="eq-box">
+            <span class="eq-main">&#x0177;(t) = &#x2211;<sub>k=1</sub><sup>3</sup> [A<sub>k</sub>&sdot;sin(2&#x3C0;kt/P) + B<sub>k</sub>&sdot;cos(2&#x3C0;kt/P)] + ES(t)</span>
+            <span class="eq-sub">P = 96 slots (15-min) &nbsp;&middot;&nbsp; OLS fit on BBMP 2022 24hr profile</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">Exponential Smoothing Correction</div>
+          <div class="eq-box">
+            <span class="eq-main">S<sub>t</sub> = &#x3B1;&sdot;&#x3B5;<sub>t</sub> + (1&minus;&#x3B1;)&sdot;S<sub>t&minus;1</sub></span>
+            <span class="eq-sub">&#x3B1; = 0.30</span>
+          </div>
+        </div>
+
+        <div class="eq-block">
+          <div class="eq-label">&#x1F517; Novel: Forecast &rarr; LP Density Coupling</div>
+          <div class="eq-box" style="border-left-color:#ff6b35">
+            <span class="eq-main" style="color:#ff8c50">&#x3B4;<sub>LP</sub> = &#x0177;(t<sub>sim</sub>) / &#x0177;&#x0305;</span>
+            <span class="eq-sub">Forecast at current slot scales LP demand factor &nbsp;&middot;&nbsp; clip [0.5, 2.0]</span>
+            <span class="eq-sub">Scale: <span id="ml-scale" class="eq-accent" style="font-size:.78rem;font-weight:bold">--</span> &nbsp; <span id="ml-fore-note" style="color:#2a5070"></span></span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px">
+          <div class="scard" style="border-left-color:var(--green)">
+            <div class="sv" id="ml-rmse" style="font-size:.75rem;color:var(--green)">--</div>
+            <div class="sl">RMSE</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--yellow)">
+            <div class="sv" id="ml-mape" style="font-size:.75rem;color:var(--yellow)">--%</div>
+            <div class="sl">MAPE %</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--red)">
+            <div class="sv" id="ml-peaks" style="font-size:.55rem;color:var(--red);line-height:1.2">--</div>
+            <div class="sl">Peak Windows</div>
           </div>
         </div>
       </div>
@@ -2183,15 +2355,17 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F517; CTM-LP Coupled Feedback (Novel)</div>
-        <div class="lp-box" style="font-size:.51rem;line-height:1.8">
-          <span style="color:#ff6b35;font-weight:bold">DATA FLOW:</span>
-          <span style="color:#4a8090;font-size:.46rem"> CTM &#x2192; bottleneck detection &#x2192; extra LP inequality &#x2192; g*</span><br>
-          <span class="hi">Trigger:</span> CTM utilisation u<sub>i</sub> &gt; 0.85<br>
-          <span class="hi">Constraint added:</span> g<sub>i</sub> + g<sub>j</sub> &#x2265; 2g<sub>min</sub> + 10s<br>
-          <span class="hi">Effect:</span> Bottleneck pairs forced to share more green<br>
-          <em style="color:#4a7090;font-size:.45rem">Daganzo 1994 CTM | Lo 1999 CTM-LP coupling | novel for Bangalore ORR</em><br><br>
-          Active coupled constraints: <span id="ctm-lp-n" class="hiy" style="font-size:.9rem;font-weight:bold">--</span><br>
-          Avg delay (coupled LP): <span id="ctm-lp-d" class="hig">--</span> s/veh
+
+        <div class="eq-block">
+          <div class="eq-label">CTM Bottleneck &rarr; LP Constraint (Daganzo 1994 / Lo 1999)</div>
+          <div class="eq-box" style="border-left-color:#ff6b35">
+            <span class="eq-main" style="color:#ff8c50">if u<sub>i</sub> &gt; 0.85 &nbsp;&rArr;&nbsp; g<sub>i</sub> + g<sub>j</sub> &ge; 2g<sub>min</sub> + 10s</span>
+            <span class="eq-sub">
+              u<sub>i</sub> = CTM cell utilisation &nbsp;&middot;&nbsp; bottleneck pairs forced to share green<br>
+              Active coupled constraints: <span id="ctm-lp-n" class="eq-accent" style="font-size:.82rem;font-weight:bold">--</span>
+              &nbsp;&middot;&nbsp; Avg delay (coupled LP): <span id="ctm-lp-d" class="eq-green">--</span> s/veh
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -2274,34 +2448,42 @@ details.csec summary:hover{background:#0a1828}
     <div class="atab-content" id="rt6">
       <div class="sec">
         <div class="stitle">&#x1F4CA; scikit-learn Random Forest — Active Control</div>
-        <div class="lp-box" style="font-size:.51rem;line-height:1.7">
-          <span class="hi">Model:</span> <span id="rf-model" class="hig" style="font-size:.44rem">--</span><br>
-          <span class="hi">Library:</span> <span id="rf-lib" class="hiy" style="font-size:.43rem">--</span><br>
-          <span class="hi">Training:</span> <span id="rf-n" class="hig">--</span> samples &nbsp; <span id="rf-nfeat" style="color:#bb77ff">--</span> features<br>
-          <hr style="border-color:#0d2040;margin:5px 0">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
-            <div class="scard" style="border-left-color:var(--red)">
-              <div class="sv" id="rf-rmse" style="color:var(--red);font-size:1rem;font-family:'Orbitron',monospace">--</div>
-              <div class="sl">Test RMSE (s)</div>
-            </div>
-            <div class="scard" style="border-left-color:var(--green)">
-              <div class="sv" id="rf-r2" style="color:var(--green);font-size:1rem;font-family:'Orbitron',monospace">--</div>
-              <div class="sl">Test R²</div>
-            </div>
-            <div class="scard" style="border-left-color:var(--cyan)">
-              <div class="sv" id="rf-cv-rmse" style="color:var(--cyan);font-size:.85rem;font-family:'Orbitron',monospace">--</div>
-              <div class="sl">5-Fold CV RMSE ±<span id="rf-cv-rmse-std">--</span></div>
-            </div>
-            <div class="scard" style="border-left-color:var(--yellow)">
-              <div class="sv" id="rf-cv-r2" style="color:var(--yellow);font-size:.85rem;font-family:'Orbitron',monospace">--</div>
-              <div class="sl">5-Fold CV R² ±<span id="rf-cv-r2-std">--</span></div>
-            </div>
+
+        <div class="eq-block">
+          <div class="eq-label">&#x1F517; Novel: RF &rarr; LP Weight Adjustment Loop</div>
+          <div class="eq-box" style="border-left-color:#ff6b35">
+            <span class="eq-main" style="color:#ff8c50">w<sub>RF,i</sub> = w<sub>i</sub> &sdot; (1 + 0.25 &sdot; (d&#x0302;<sub>i</sub> &minus; d&#x0305;) / d&#x0305;)</span>
+            <span class="eq-sub">RF-predicted delay &rarr; scales LP objective weights &nbsp;&middot;&nbsp; &#x3B1;=0.25 &nbsp;&middot;&nbsp; clip [0.5, 2.0]</span>
           </div>
-          <div id="rf-rmse-live" style="display:none">--</div>
-          <span style="color:#ff6b35;font-weight:bold">&#x1F517; RF &#x2192; LP CONTROL LOOP (Novel)</span><br>
-          <span style="color:#4a8090;font-size:.46rem">w<sub>RF,i</sub> = w<sub>i</sub> &#x22C5; (1 + 0.25&#x22C5;(d&#x0302;<sub>i</sub>&#x2212;d&#x0305;)/d&#x0305;) &nbsp;&mdash; 8-feature, Bangalore-calibrated</span><br>
-          <span id="rf-lp-note" style="color:#2a5070;font-size:.43rem"></span>
         </div>
+
+        <div class="eq-section">
+          <div class="eq-title">Model Info</div>
+          <div class="eq-row"><span class="eq-lhs">Model</span><span class="eq-rhs hig" id="rf-model" style="font-size:.5rem">--</span></div>
+          <div class="eq-row"><span class="eq-lhs">Library</span><span class="eq-rhs hiy" id="rf-lib" style="font-size:.46rem">--</span></div>
+          <div class="eq-row"><span class="eq-lhs">Training</span><span class="eq-rhs hig" id="rf-n">--</span><span class="eq-note">samples &nbsp; <span id="rf-nfeat" style="color:#bb77ff">--</span></span></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0">
+          <div class="scard" style="border-left-color:var(--red)">
+            <div class="sv" id="rf-rmse" style="color:var(--red);font-size:1rem;font-family:'Orbitron',monospace">--</div>
+            <div class="sl">Test RMSE (s)</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--green)">
+            <div class="sv" id="rf-r2" style="color:var(--green);font-size:1rem;font-family:'Orbitron',monospace">--</div>
+            <div class="sl">Test R²</div>
+          </div>
+          <div class="scard" style="border-left-color:var(--cyan)">
+            <div class="sv" id="rf-cv-rmse" style="color:var(--cyan);font-size:.85rem;font-family:'Orbitron',monospace">--</div>
+            <div class="sl">5-Fold CV RMSE ±<span id="rf-cv-rmse-std">--</span></div>
+          </div>
+          <div class="scard" style="border-left-color:var(--yellow)">
+            <div class="sv" id="rf-cv-r2" style="color:var(--yellow);font-size:.85rem;font-family:'Orbitron',monospace">--</div>
+            <div class="sl">5-Fold CV R² ±<span id="rf-cv-r2-std">--</span></div>
+          </div>
+        </div>
+        <div id="rf-rmse-live" style="display:none">--</div>
+        <span id="rf-lp-note" style="color:#2a5070;font-size:.43rem;font-family:'Share Tech Mono',monospace"></span>
       </div>
       <div class="sec">
         <div class="stitle">&#x1F3AF; Feature Importances (Gini / Permutation &#x394;RMSE)</div>
