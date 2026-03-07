@@ -952,7 +952,7 @@ def ml_demand_forecast():
         "peak_windows": peak_labels,
         "model": "Fourier(k=3) + ExpSmoothing(alpha=0.30) | OLS",
         "density_scale_factor": density_scale_factor,
-        "forecast_note": f"Slot {SIM_SLOT} (08:00) forecast={forecast_at_peak:.3f} → LP density scale={density_scale_factor:.3f}. Forecast feeds LP demand input.",
+        "forecast_note": f"Slot {SIM_SLOT} (08:00) forecast={forecast_at_peak:.3f} → LP density scale={density_scale_factor:.3f}. Scale factor live-wired into run_lp(density_factor) — forecast directly controls signal timing.",
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1253,20 +1253,29 @@ def validation_metrics(lp_result):
 #     ORDER: RF first → weights → LP (so RF actively controls signal timing)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── STEP 0: Fourier+ES forecast FIRST — density_scale_factor feeds LP ────────
+# This closes the Fourier→LP loop: peak-slot forecast normalised to network
+# average becomes the demand scaling factor passed into run_lp().
+ML_DATA   = ml_demand_forecast()
+_ML_DF    = float(ML_DATA.get("density_scale_factor", 1.0))  # e.g. ~1.24 at 08:00
+
 # ── STEP 1: Compute RF delay predictor (no LP dependency) ────────────────────
 RF_DATA = rf_delay_predictor()
 _RF_ADJ = RF_DATA["rf_weight_adj"]   # list of 12 per-junction LP weight multipliers
 
 if "lp_result" not in st.session_state:
-    st.session_state.lp_result  = run_lp(C=90, density_factor=1.0, rf_weight_adj=_RF_ADJ)
-    st.session_state.lwr_result = lwr_shock_waves(density_factor=1.0)
+    # LP uses Fourier-derived density factor so forecast directly scales demand
+    st.session_state.lp_result  = run_lp(C=90, density_factor=_ML_DF, rf_weight_adj=_RF_ADJ)
+    st.session_state.lwr_result = lwr_shock_waves(density_factor=_ML_DF)
     st.session_state.compute_count = 0
     st.session_state.last_C     = 90
-    st.session_state.last_dens  = 1.0
+    st.session_state.last_dens  = _ML_DF
 
 # ── STEP 2: Precompute all density levels WITH RF-guided LP ──────────────────
+# The "high" density level is anchored to the Fourier-scaled factor (_ML_DF)
+# so that the 08:00 simulation slot directly reflects the forecast demand.
 dens_precomp = {}
-for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]:
+for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]:
     lp_r  = run_lp(C=90, density_factor=df, rf_weight_adj=_RF_ADJ)
     dens_precomp[name] = {
         "lp":      lp_r,
@@ -1278,12 +1287,11 @@ for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]
     }
 
 # Heavy one-time computations (run once at startup)
-PARETO_DATA   = multi_objective_pareto(C=90, density_factor=1.0, n_eps=10)
-MC_SENSITIVITY = monte_carlo_sensitivity(C=90, density_factor=1.0, n_samples=200)
+PARETO_DATA   = multi_objective_pareto(C=90, density_factor=_ML_DF, n_eps=10)
+MC_SENSITIVITY = monte_carlo_sensitivity(C=90, density_factor=_ML_DF, n_samples=200)
 SCOOT_ALL = {k: v["scoot"] for k,v in dens_precomp.items()}
-RL_DATA   = rl_q_learning_controller(density_factor=1.0, n_episodes=300)
-ML_DATA   = ml_demand_forecast()
-CTM_LP    = {k: ctm_lp_coupled(density_factor=df) for df,k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(1.0,"high"),(1.4,"peak")]}
+RL_DATA   = rl_q_learning_controller(density_factor=_ML_DF, n_episodes=500)
+CTM_LP    = {k: ctm_lp_coupled(density_factor=df) for df,k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]}
 VALID     = validation_metrics(dens_precomp["high"]["lp"])
 
 BACKEND_JSON = json.dumps({
