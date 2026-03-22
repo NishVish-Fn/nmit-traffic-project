@@ -1413,7 +1413,9 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 
 /* LEFT PANEL */
 #lp{width:286px;flex-shrink:0;background:var(--bg2);
-  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0;
+  transition:width .25s ease,opacity .2s ease}
+#lp.collapsed{width:0;opacity:0;border-right:none;pointer-events:none}
 .tabs{display:flex;border-bottom:1px solid var(--cdim)}
 .tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
   font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
@@ -4045,6 +4047,10 @@ function rTab(n){
   var panes=document.querySelectorAll('.atab-content');
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
+  // Collapse left panel for tabs where it's not needed (signals, valid, rf, novel, demo, deploy, arch)
+  var lpEl=g('lp');
+  var needsLP=[0,1,3]; // GRAPHS, LP, LWR tabs use the left controls panel
+  if(lpEl) lpEl.classList.toggle('collapsed', needsLP.indexOf(n)===-1);
   if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();renderRadarChart();}
   if(n===4){setTimeout(initAIML,80);}
   if(n===5){setTimeout(initValid,80);}
@@ -4820,6 +4826,13 @@ renderLWRTable();
 renderPIBox();
 updateCTMDisplay();
 updatePlatoonDisplay();
+// Set initial left panel state — collapse if starting tab doesn't need it
+(function(){
+  var lpEl=g('lp');
+  var initTab=0; // GRAPHS is default (tab 0), which needs LP
+  var needsLP=[0,1,3];
+  if(lpEl) lpEl.classList.toggle('collapsed', needsLP.indexOf(initTab)===-1);
+})();
 // Populate RF live cards immediately from pre-computed data
 (function(){
   var rf=BACKEND.rf;
