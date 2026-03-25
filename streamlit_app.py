@@ -1,3 +1,4 @@
+
 """
 Urban Flow & Life-Lines | Bangalore — National PhD Competition Edition
 ======================================================================
@@ -175,43 +176,14 @@ def run_lp(C=90, density_factor=1.0, evp_mask=None, rf_weight_adj=None):
     g_min_b = 10.0
     g_max_b = G_total - g_min_b
 
-    # ── WEBSTER MARGINAL DELAY WEIGHTS — Full derivation ────────────────────────
-    # Source: Webster (1958) TRRL Report 39; Akcelik (1988) Aust. Road Research 18(4)
-    #
-    # Webster's uniform delay per vehicle (Eq. 5 from Webster 1958):
-    #   d_u = C(1-λ)² / [2(1-λx)]       where λ = g/C, x = y/λ, y = q/S
-    #
-    # The LP minimises Σ d_u over green-time g_i.  Taking ∂d_u/∂g_i gives the
-    # marginal delay sensitivity — junctions with higher y/(1-y) are more
-    # sensitive to green changes, so the LP weights them more.
-    #
-    # Deriving LP objective coefficient (simplified Webster 1958 §4.3):
-    #   ∂d_u/∂g ∝ -y / (1-y)   →   minimising delay ≡ maximising w_maj*g_maj
-    #              ≡ minimising (w_min - w_maj)*g_maj  for two-phase split
-    #
-    # w_i = y_i / (1 - y_i) is the "degree-of-saturation weight" from
-    #   Akcelik (1988) who showed this is the exact first-order Taylor
-    #   coefficient of Webster delay w.r.t. green time near the optimum.
-    #
-    # Stability floor: denominator clamped at 0.03 to prevent numerical
-    #   explosion when y → 1 (oversaturated); such junctions receive EVP
-    #   treatment or maximum green by bound constraint.
+    # Webster marginal delay weights (Akcelik 1988 calibration)
     w_maj = y_maj / np.maximum(1.0 - y_maj, 0.03)
     w_min = y_min / np.maximum(1.0 - y_min, 0.03)
 
     for i, evp in enumerate(evp_mask):
         if evp:
-            # EVP (Emergency Vehicle Preemption): boost w_maj × 250 so
-            # HiGHS drives g_i → g_max_b under the budget constraint.
-            # Factor 250 >> typical w_maj (~2–25), ensuring EVP junction
-            # always wins the green budget allocation.
-            w_maj[i] *= 250.0
+            w_maj[i] *= 250.0  # EVP preemption → force maximum green
 
-    # LP objective: c_obj·g is minimised by scipy HiGHS
-    # c_obj[i] = w_min[i] - w_maj[i]
-    # If w_maj >> w_min (congested major phase), c_obj[i] < 0,
-    # so HiGHS pushes g_i → upper bound → more green to major phase.
-    # This is exactly Webster's optimal split criterion (Webster 1958 Eq. 9).
     c_obj = w_min - w_maj
 
     # ── RF-GUIDED LP WEIGHT ADJUSTMENT (Novel contribution) ─────────────────
@@ -231,12 +203,6 @@ def run_lp(C=90, density_factor=1.0, evp_mask=None, rf_weight_adj=None):
         rf_lp_active = True
 
     # Constraint 1: global green budget (network-level efficiency)
-    # Σ g_i ≤ n × G_total × 0.82
-    # Budget factor 0.82 = 1 - Y_reserve where Y_reserve = 0.18 accounts for:
-    #   • Signal coordination slack between junctions (SCOOT-style headway buffer)
-    #   • Demand uncertainty margin (±15% from MC sensitivity §7)
-    #   • Akcelik (1988) recommends 15–20% reserve for pre-timed urban networks
-    # This is equivalent to requiring Σy_i ≤ 0.82 × n (network saturation cap).
     A_ub = np.ones((1, n))
     b_ub = np.array([n * G_total * 0.82])
 
@@ -1413,9 +1379,7 @@ body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
 
 /* LEFT PANEL */
 #lp{width:286px;flex-shrink:0;background:var(--bg2);
-  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0;
-  transition:width .25s ease,opacity .2s ease}
-#lp.collapsed{width:0;opacity:0;border-right:none;pointer-events:none}
+  border-right:1px solid var(--cdim);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .tabs{display:flex;border-bottom:1px solid var(--cdim)}
 .tab{flex:1;padding:8px 0;text-align:center;cursor:pointer;
   font-family:'Share Tech Mono',monospace;font-size:0.53rem;letter-spacing:1px;
@@ -1933,7 +1897,6 @@ details.csec summary:hover{background:#0a1828}
       <div class="tab" onclick="rTab(7)" style="font-size:.42rem;color:#ff6b35">&#x26A1;NOVEL</div>
       <div class="tab" onclick="rTab(8)" style="font-size:.42rem;color:#00e5ff">&#x25B6;DEMO</div>
       <div class="tab" onclick="rTab(9)" style="font-size:.40rem;color:#00ff88">&#x1F680;DEPLOY</div>
-      <div class="tab" onclick="rTab(10)" style="font-size:.40rem;color:#bb77ff">&#x1F5FA;ARCH</div>
     </div>
 
     <div class="atab-content on" id="rt0">
@@ -2448,8 +2411,8 @@ details.csec summary:hover{background:#0a1828}
       </div>
       <div class="sec">
         <div class="stitle">&#x1F4CA; Field vs LP-Optimal</div>
-        <div id="val-chart-wrap" style="position:relative;height:auto;background:#030d1a;border-radius:3px;overflow:hidden;margin-top:4px">
-          <svg id="val-svg" width="100%" viewBox="0 0 260 110" preserveAspectRatio="xMidYMid meet" style="display:block;width:100%"></svg>
+        <div id="val-chart-wrap" style="position:relative;height:110px;background:#030d1a;border-radius:3px;overflow:hidden;margin-top:4px">
+          <svg id="val-svg" width="100%" height="100%" viewBox="0 0 260 110" preserveAspectRatio="none" style="position:absolute;top:0;left:0"></svg>
           <div id="val-dots" style="position:absolute;inset:0"></div>
         </div>
         <div style="font-family:monospace;font-size:.42rem;color:#3a5570;margin-top:3px;text-align:center">
@@ -2727,120 +2690,6 @@ details.csec summary:hover{background:#0a1828}
           <tr><td>Model validation &#x3C1;</td><td style="color:var(--green)">1.0000 (n=12)</td></tr>
           <tr><td>Pearson r (field vs LP)</td><td style="color:var(--green)">&gt;0.99</td></tr>
         </table>
-      </div>
-    </div>
-
-    <!-- rt10: System Architecture Diagram -->
-    <div class="atab-content" id="rt10">
-      <div class="sec">
-        <div class="stitle">&#x1F5FA; System Architecture — Data Flow</div>
-        <div class="lp-box" style="font-size:.47rem;line-height:1.6;margin-bottom:6px">
-          <span style="color:#bb77ff">15-layer pipeline</span>: Demand &#x2192; Forecast &#x2192; LP &#x2192; CTM &#x2192; RL &#x2192; Simulation<br>
-          <span style="color:#3a5070">Each arrow = data dependency. &#x2605; = novel contribution.</span>
-        </div>
-        <svg viewBox="0 0 280 425" width="100%" style="display:block">
-          <defs>
-            <marker id="arr"   markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#2a4a60"/></marker>
-            <marker id="arr-g" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#00ff88"/></marker>
-            <marker id="arr-c" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#00e5ff"/></marker>
-            <marker id="arr-p" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#bb77ff"/></marker>
-          </defs>
-          <!-- Row 0: Data -->
-          <rect x="5"   y="5"  width="128" height="20" rx="2" fill="#06111e" stroke="#1a3a55" stroke-width=".5"/>
-          <text x="69"  y="13" text-anchor="middle" fill="#4a7090" font-size="4.8" font-family="Share Tech Mono">DATA SOURCES</text>
-          <text x="69"  y="21" text-anchor="middle" fill="#6090a0" font-size="4.5">BBMP/KRDCL 2022 · O-D 12×12</text>
-          <rect x="147" y="5"  width="128" height="20" rx="2" fill="#06111e" stroke="#1a3a55" stroke-width=".5"/>
-          <text x="211" y="13" text-anchor="middle" fill="#4a7090" font-size="4.8" font-family="Share Tech Mono">SIGNAL PARAMETERS</text>
-          <text x="211" y="21" text-anchor="middle" fill="#6090a0" font-size="4.5">12 junctions · sat_flow · cong</text>
-          <line x1="69"  y1="25" x2="69"  y2="35" stroke="#2a4a60" stroke-width=".7" marker-end="url(#arr)"/>
-          <line x1="211" y1="25" x2="211" y2="35" stroke="#2a4a60" stroke-width=".7" marker-end="url(#arr)"/>
-          <!-- Row 1: Fourier Forecast -->
-          <rect x="25" y="36" width="230" height="22" rx="2" fill="#060f1e" stroke="#00ff8855" stroke-width="1"/>
-          <text x="140" y="45" text-anchor="middle" fill="#00ff88" font-size="5.5" font-family="Share Tech Mono">&#x2460; FOURIER+ES DEMAND FORECAST</text>
-          <text x="140" y="54" text-anchor="middle" fill="#2a5040" font-size="4.5">OLS Fourier(k=3)+ExpSmoothing(&#x3B1;=0.30) · BBMP 24hr profile &#x2192; density_scale_factor</text>
-          <line x1="140" y1="58" x2="140" y2="68" stroke="#00ff88" stroke-width=".7" marker-end="url(#arr-g)"/>
-          <!-- Row 2: RF -->
-          <rect x="25" y="69" width="230" height="22" rx="2" fill="#060f1e" stroke="#ffd70055" stroke-width="1"/>
-          <text x="140" y="78" text-anchor="middle" fill="#ffd700" font-size="5.5" font-family="Share Tech Mono">&#x2461; RANDOM FOREST DELAY PREDICTOR</text>
-          <text x="140" y="87" text-anchor="middle" fill="#3a3010" font-size="4.5">8 features · 1200 samples · 5-fold CV (Breiman 2001) &#x2192; rf_weight_adj[12]</text>
-          <line x1="140" y1="91" x2="140" y2="101" stroke="#ffd700" stroke-width=".7" marker-end="url(#arr)"/>
-          <!-- Row 3: HiGHS LP (wider box, highlight) -->
-          <rect x="5" y="102" width="270" height="30" rx="3" fill="#040c1a" stroke="#00e5ff88" stroke-width="1.5"/>
-          <text x="140" y="113" text-anchor="middle" fill="#00e5ff" font-size="6" font-family="Share Tech Mono" font-weight="bold">&#x2462; SCIPY HiGHS LP — WEBSTER OPTIMAL</text>
-          <text x="140" y="122" text-anchor="middle" fill="#1a4555" font-size="4.5">min&#x2211;(w_min&#x2212;w_maj)&#xB7;g&#x1D62; &nbsp;|&nbsp; Budget &#x2211;g&#x1D62;&#x2264;n&#xB7;G&#xB7;0.82 &nbsp;|&nbsp; w&#x1D62;=y/(1&#x2212;y) [Webster 1958]</text>
-          <text x="140" y="129" text-anchor="middle" fill="#0e2530" font-size="4">HCM d1&#xD7;PF+d2+d3 delay &nbsp;|&nbsp; EVP &#xD7;250 boost &nbsp;|&nbsp; RF-guided weights &nbsp;|&nbsp; CTM-LP coupling</text>
-          <!-- branch lines from LP -->
-          <line x1="70"  y1="132" x2="55"  y2="144" stroke="#00e5ff" stroke-width=".7" marker-end="url(#arr-c)"/>
-          <line x1="140" y1="132" x2="140" y2="144" stroke="#00e5ff" stroke-width=".7" marker-end="url(#arr-c)"/>
-          <line x1="210" y1="132" x2="225" y2="144" stroke="#00e5ff" stroke-width=".7" marker-end="url(#arr-c)"/>
-          <!-- Row 4: LWR / CTM / Robertson -->
-          <rect x="3"   y="145" width="95"  height="20" rx="2" fill="#060f1e" stroke="#bb77ff44" stroke-width=".8"/>
-          <text x="50"  y="153" text-anchor="middle" fill="#bb77ff" font-size="4.8" font-family="Share Tech Mono">&#x2463; LWR SHOCK WAVES</text>
-          <text x="50"  y="161" text-anchor="middle" fill="#2a1a40" font-size="4">Greenshields · Rankine-Hugoniot</text>
-          <rect x="103" y="145" width="95"  height="20" rx="2" fill="#060f1e" stroke="#00e5ff33" stroke-width=".8"/>
-          <text x="150" y="153" text-anchor="middle" fill="#00e5ff" font-size="4.8" font-family="Share Tech Mono">&#x2464; CTM (Daganzo 1994)</text>
-          <text x="150" y="161" text-anchor="middle" fill="#0e2530" font-size="4">5 cells/link · demand/supply</text>
-          <rect x="203" y="145" width="74"  height="20" rx="2" fill="#060f1e" stroke="#ff8c0033" stroke-width=".8"/>
-          <text x="240" y="153" text-anchor="middle" fill="#ff8c00" font-size="4.8" font-family="Share Tech Mono">&#x2465; ROBERTSON</text>
-          <text x="240" y="161" text-anchor="middle" fill="#2a1500" font-size="4">F=1/(1+&#x3B2;t&#x2080;) &#x3B2;=0.8</text>
-          <line x1="150" y1="165" x2="150" y2="175" stroke="#2a4a60" stroke-width=".7" marker-end="url(#arr)"/>
-          <!-- Row 5: SCOOT + CTM-LP coupling -->
-          <rect x="3"   y="176" width="137" height="20" rx="2" fill="#060f1e" stroke="#00ff8833" stroke-width=".8"/>
-          <text x="71"  y="184" text-anchor="middle" fill="#00ff88" font-size="4.8" font-family="Share Tech Mono">&#x2466; SCOOT ADAPTIVE CYCLE</text>
-          <text x="71"  y="192" text-anchor="middle" fill="#0e2515" font-size="4">C_opt=(1.5L+5)/(1&#x2212;Y) · ±5s step</text>
-          <rect x="145" y="176" width="132" height="20" rx="2" fill="#060f1e" stroke="#ff6b3555" stroke-width=".8"/>
-          <text x="211" y="184" text-anchor="middle" fill="#ff6b35" font-size="4.8" font-family="Share Tech Mono">&#x2467; CTM-LP COUPLING &#x2605;</text>
-          <text x="211" y="192" text-anchor="middle" fill="#2a1005" font-size="4">u&gt;0.85 &#x2192; g&#x1D62;+g&#x2C7C;&#x2265;2g_min+10s (novel)</text>
-          <line x1="140" y1="196" x2="140" y2="206" stroke="#2a4a60" stroke-width=".7" marker-end="url(#arr)"/>
-          <!-- Row 6: Double Q-RL -->
-          <rect x="5" y="207" width="270" height="28" rx="3" fill="#080318" stroke="#bb77ff88" stroke-width="1.5"/>
-          <text x="140" y="217" text-anchor="middle" fill="#bb77ff" font-size="6" font-family="Share Tech Mono" font-weight="bold">&#x2468; DOUBLE Q-LEARNING + REPLAY &#x2605;</text>
-          <text x="140" y="226" text-anchor="middle" fill="#2a1545" font-size="4.5">36-state · 5-action · 500ep · buf=1000 · Van Hasselt 2010 · Mnih 2015</text>
-          <text x="140" y="233" text-anchor="middle" fill="#1a0b2a" font-size="4">Eliminates max-bias · breaks autocorrelation · adaptive &#x3B7;: 0.18&#x2192;0.05</text>
-          <line x1="80"  y1="235" x2="60"  y2="247" stroke="#bb77ff" stroke-width=".7" marker-end="url(#arr-p)"/>
-          <line x1="200" y1="235" x2="220" y2="247" stroke="#bb77ff" stroke-width=".7" marker-end="url(#arr-p)"/>
-          <!-- Row 7: MC + Pareto -->
-          <rect x="3"   y="248" width="115" height="20" rx="2" fill="#060f1e" stroke="#ff224433" stroke-width=".8"/>
-          <text x="60"  y="256" text-anchor="middle" fill="#ff4466" font-size="4.8" font-family="Share Tech Mono">&#x2469; MONTE CARLO SENSITIVITY</text>
-          <text x="60"  y="264" text-anchor="middle" fill="#2a0810" font-size="4">±15% demand · 200 samples · p95</text>
-          <rect x="162" y="248" width="115" height="20" rx="2" fill="#060f1e" stroke="#bb77ff33" stroke-width=".8"/>
-          <text x="219" y="256" text-anchor="middle" fill="#bb77ff" font-size="4.8" font-family="Share Tech Mono">&#x246A; &#x03B5;-PARETO LP</text>
-          <text x="219" y="264" text-anchor="middle" fill="#1a0b2a" font-size="4">Delay vs CO&#x2082; · 10 Pareto pts</text>
-          <line x1="140" y1="268" x2="140" y2="278" stroke="#2a4a60" stroke-width=".7" marker-end="url(#arr)"/>
-          <!-- Row 8: Network PI -->
-          <rect x="25" y="279" width="230" height="20" rx="2" fill="#060f1e" stroke="#ffd70033" stroke-width=".8"/>
-          <text x="140" y="288" text-anchor="middle" fill="#ffd700" font-size="5.2" font-family="Share Tech Mono">&#x246B; NETWORK PERFORMANCE INDEX</text>
-          <text x="140" y="296" text-anchor="middle" fill="#2a2010" font-size="4">PI=&#x2211;(w_d&#xB7;d+w_q&#xB7;Q+w_s&#xB7;stops) · MOVES-lite CO&#x2082; · fuel estimate</text>
-          <line x1="140" y1="299" x2="140" y2="309" stroke="#2a4a60" stroke-width=".7" marker-end="url(#arr)"/>
-          <!-- Row 9: Validation -->
-          <rect x="25" y="310" width="230" height="20" rx="2" fill="#060f1e" stroke="#00ff8866" stroke-width="1"/>
-          <text x="140" y="319" text-anchor="middle" fill="#00ff88" font-size="5.2" font-family="Share Tech Mono">&#x246C; FIELD VALIDATION</text>
-          <text x="140" y="328" text-anchor="middle" fill="#0e2515" font-size="4">BBMP/KRDCL/BDA 2022 · Spearman &#x3C1; · RMSE · Bootstrap 95% CI · n=12</text>
-          <line x1="140" y1="330" x2="140" y2="340" stroke="#00ff88" stroke-width=".7" marker-end="url(#arr-g)"/>
-          <!-- Row 10: Frontend -->
-          <rect x="5" y="341" width="270" height="22" rx="2" fill="#040c1a" stroke="#00e5ff44" stroke-width="1"/>
-          <text x="140" y="351" text-anchor="middle" fill="#00e5ff" font-size="5.5" font-family="Share Tech Mono">&#x246D; STREAMLIT + LEAFLET + CHART.JS</text>
-          <text x="140" y="360" text-anchor="middle" fill="#0e2530" font-size="4">Live map · Animated signals · LOS panels · Algorithm switching · EVP corridor</text>
-          <!-- Legend -->
-          <rect x="5"   y="370" width="6" height="5" fill="#060f1e" stroke="#00ff88" stroke-width=".8"/>
-          <text x="13"  y="376" fill="#3a5070" font-size="4">Forecast/ML</text>
-          <rect x="60"  y="370" width="6" height="5" fill="#060f1e" stroke="#00e5ff" stroke-width=".8"/>
-          <text x="68"  y="376" fill="#3a5070" font-size="4">LP/Optimisation</text>
-          <rect x="128" y="370" width="6" height="5" fill="#060f1e" stroke="#bb77ff" stroke-width=".8"/>
-          <text x="136" y="376" fill="#3a5070" font-size="4">AI/RL</text>
-          <text x="165" y="376" fill="#ff6b35" font-size="4">&#x2605; = Novel contribution</text>
-        </svg>
-      </div>
-      <div class="sec">
-        <div class="stitle">&#x1F4CC; Key Design Decisions with Citations</div>
-        <div class="lp-box" style="font-size:.49rem;line-height:1.9">
-          <span style="color:#00e5ff">LP weight w=y/(1-y)</span> &mdash; Webster (1958) Eq.5 &#x2202;d/&#x2202;g; Akcelik (1988) calibration.<br>
-          <span style="color:#00e5ff">Budget factor 0.82</span> &mdash; Akcelik 15&#x2013;20% reserve; matches &#xB115;% MC demand uncertainty.<br>
-          <span style="color:#bb77ff">Double Q-Learning</span> &mdash; eliminates max-bias; replay breaks autocorr. (Van Hasselt 2010).<br>
-          <span style="color:#ff6b35">CTM-LP Coupling</span> &mdash; u&gt;0.85 adds g<sub>i</sub>+g<sub>j</sub>&#x2265;2g<sub>min</sub>+10s (Daganzo 1999).<br>
-          <span style="color:#00ff88">RF&#x2192;LP Loop</span> &mdash; &#x3B1;=0.25 scales c<sub>obj</sub>; RF is control actuator not just predictor.<br>
-          <span style="color:#ffd700">Fourier&#x2192;LP</span> &mdash; slot 32 (08:00) / mean_forecast &#x2192; density_factor fed live to HiGHS.
-        </div>
       </div>
     </div>
 
@@ -4047,10 +3896,6 @@ function rTab(n){
   var panes=document.querySelectorAll('.atab-content');
   for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on',i===n);
   for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on',i===n);
-  // Collapse left panel for tabs where it's not needed (signals, valid, rf, novel, demo, deploy, arch)
-  var lpEl=g('lp');
-  var needsLP=[0,1,3]; // GRAPHS, LP, LWR tabs use the left controls panel
-  if(lpEl) lpEl.classList.toggle('collapsed', needsLP.indexOf(n)===-1);
   if(n===3){renderSCOOTTable();renderMCSummary();renderPIBox();renderRadarChart();}
   if(n===4){setTimeout(initAIML,80);}
   if(n===5){setTimeout(initValid,80);}
@@ -4058,7 +3903,6 @@ function rTab(n){
   if(n===7){setTimeout(initNovelty,80);}
   if(n===8){/* Demo ready on open */}
   if(n===9){/* Deploy tab: static HTML, no init needed */}
-  if(n===10){/* Architecture tab: pure SVG, no JS init needed */}
 }
 
 // ── PARETO TAB INIT ───────────────────────────────────────────────────────────
@@ -4470,47 +4314,27 @@ function initValid(){
       tb.innerHTML=th;
     }
 
-    // ── Field vs LP bar chart (horizontal, dual bars per junction) ──────────
+    // SVG scatter
     var vsvg=g('val-svg');
     if(vsvg&&val.details){
-      var maxF=Math.max.apply(null,val.details.map(function(d){return d.measured;}))*1.08;
-      var W2=260,rowH=15,padL=62,padR=8,padT=6;
-      var H2=padT + val.details.length*rowH + 16;
-      vsvg.setAttribute('viewBox','0 0 '+W2+' '+H2);
-      vsvg.setAttribute('height',H2);
-      var svgH='';
-      // Axis line
-      svgH+='<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(H2-12)+'" stroke="#1a3a55" stroke-width=".5"/>';
-      // Axis ticks at 0, 50, 100 s
-      [0,50,100,150].forEach(function(tv){
-        var tx=padL+(tv/maxF)*(W2-padL-padR);
-        if(tx<=W2-padR){
-          svgH+='<line x1="'+tx.toFixed(1)+'" y1="'+padT+'" x2="'+tx.toFixed(1)+'" y2="'+(H2-12)+'" stroke="#0d2035" stroke-width=".4"/>';
-          svgH+='<text x="'+tx.toFixed(1)+'" y="'+(H2-4)+'" text-anchor="middle" fill="#2a4a60" font-size="5">'+tv+'s</text>';
-        }
-      });
-      // Legend
-      svgH+='<rect x="'+padL+'" y="1" width="7" height="4" fill="#00e5ff44" stroke="#00e5ff" stroke-width=".5"/>';
-      svgH+='<text x="'+(padL+9)+'" y="5.5" fill="#00e5ff" font-size="4.5">Field measured</text>';
-      svgH+='<rect x="'+(padL+70)+'" y="1" width="7" height="4" fill="#00ff8844" stroke="#00ff88" stroke-width=".5"/>';
-      svgH+='<text x="'+(padL+79)+'" y="5.5" fill="#00ff88" font-size="4.5">LP-optimal</text>';
-      val.details.forEach(function(d,i){
-        var y0=padT+4+i*rowH;
-        var jnShort=d.junction.length>9?d.junction.substring(0,9):d.junction;
-        svgH+='<text x="'+(padL-2)+'" y="'+(y0+5.5)+'" text-anchor="end" fill="#4a6880" font-size="5">'+jnShort+'</text>';
-        // Field bar
-        var bwF=(d.measured/maxF)*(W2-padL-padR);
-        svgH+='<rect x="'+padL+'" y="'+y0+'" width="'+bwF.toFixed(1)+'" height="5.5" fill="#00e5ff22" stroke="#00e5ff66" stroke-width=".5"/>';
-        svgH+='<text x="'+(padL+bwF+1).toFixed(1)+'" y="'+(y0+5)+'" fill="#00e5ff" font-size="4.5">'+d.measured+'</text>';
-        // LP bar
-        var bwL=(d.modelled/maxF)*(W2-padL-padR);
-        var lpCol=d.savings_pct>70?'#00ff88':d.savings_pct>40?'#ffd700':'#ff8c00';
-        svgH+='<rect x="'+padL+'" y="'+(y0+6.5)+'" width="'+bwL.toFixed(1)+'" height="5.5" fill="'+lpCol+'33" stroke="'+lpCol+'88" stroke-width=".5"/>';
-        svgH+='<text x="'+(padL+bwL+1).toFixed(1)+'" y="'+(y0+12)+'" fill="'+lpCol+'" font-size="4.5">'+d.modelled+'s (&#x2193;'+d.savings_pct+'%)</text>';
+      var meas2=val.details.map(function(d){return d.measured;});
+      var lps=val.details.map(function(d){return d.modelled;});
+      var maxF=Math.max.apply(null,meas2)*1.1;
+      var W2=260,H2=110,pad2=14;
+      function fx(v){return pad2+(v/maxF)*(W2-2*pad2);}
+      function fy(v){return H2-pad2-(v/maxF)*(H2-2*pad2);}
+      var svgH='<line x1="'+fx(0)+'" y1="'+fy(0)+'" x2="'+fx(maxF)+'" y2="'+fy(maxF)+'" stroke="#00e5ff22" stroke-width="1" stroke-dasharray="5 4"/>';
+      svgH+='<text x="'+pad2+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">0</text>';
+      svgH+='<text x="'+(W2-20)+'" y="'+(H2-3)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'s</text>';
+      svgH+='<text x="2" y="'+(pad2+4)+'" fill="#3a5570" font-size="6">'+Math.round(maxF)+'</text>';
+      val.details.forEach(function(d,idx){
+        var cx2=fx(d.measured), cy2=fy(d.modelled);
+        var dotCol=d.savings_pct>70?'#00ff88':d.savings_pct>50?'#ffd700':'#ff8c00';
+        svgH+='<circle cx="'+cx2.toFixed(1)+'" cy="'+cy2.toFixed(1)+'" r="5" fill="'+dotCol+'" fill-opacity="0.85"/>';
+        var lx=cx2>W2-50?cx2-2:cx2+7;
+        svgH+='<text x="'+lx.toFixed(0)+'" y="'+(cy2-3).toFixed(0)+'" fill="'+dotCol+'" font-size="5.5">'+d.junction.substring(0,6)+'</text>';
       });
       vsvg.innerHTML=svgH;
-      vsvg.setAttribute('height',H2);
-      g('val-chart-wrap').style.height=(H2+4)+'px';
     }
   }
   renderParetoChart();
@@ -4826,13 +4650,6 @@ renderLWRTable();
 renderPIBox();
 updateCTMDisplay();
 updatePlatoonDisplay();
-// Set initial left panel state — collapse if starting tab doesn't need it
-(function(){
-  var lpEl=g('lp');
-  var initTab=0; // GRAPHS is default (tab 0), which needs LP
-  var needsLP=[0,1,3];
-  if(lpEl) lpEl.classList.toggle('collapsed', needsLP.indexOf(initTab)===-1);
-})();
 // Populate RF live cards immediately from pre-computed data
 (function(){
   var rf=BACKEND.rf;
