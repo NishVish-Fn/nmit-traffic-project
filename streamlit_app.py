@@ -5177,8 +5177,8 @@ function startRoadAnimation(idx){
       // Windows
       for(var wx = b.x+6; wx < b.x+b.w-6; wx += 12){
         for(var wy = b.y+6; wy < b.y+b.h-6; wy += 10){
-          var lit = Math.random() > 0.4;
-          ctx.fillStyle = lit ? '#ffd70022' : '#040c18';
+          var hash = (wx * 7 + wy * 13) % 10;
+          ctx.fillStyle = hash < 6 ? '#ffd70018' : '#040c18';
           ctx.fillRect(wx, wy, 6, 5);
         }
       }
@@ -5380,24 +5380,35 @@ function roundRect(ctx, x, y, w, h, r){
 function makeRoadVehicle(canvas, idx){
   var dirs = ['N','S','E','W'];
   var dir  = dirs[Math.floor(Math.random()*dirs.length)];
-  return {dir: dir, pos: Math.random()*0.9, lane: Math.random()>0.5?1:-1,
-    speed: 0.008 + Math.random()*0.012, state:'moving',
+  // Stagger starting positions; avoid spawning inside the stop zone
+  var startPos = Math.random();
+  if(startPos > 0.36 && startPos < 0.50) startPos = Math.random() < 0.5 ? 0.28 : 0.52;
+  return {dir: dir, pos: startPos, lane: Math.random()>0.5?1:-1,
+    speed: 0.018 + Math.random()*0.018, state:'moving',
     col: Math.random()<0.08?'#ff2244':'#00ccff',
     len: 8+Math.random()*4, wid: 4+Math.random()*2};
 }
 
 function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
-  var half = armW/2;
-  var stopLine = 0.55; // normalised progress where vehicle stops at red
-  // Each direction checks the relevant signal phase
+  // stopLine: normalised pos (0=road start, 1=road end) where vehicle halts on red.
+  // Intersection box spans ~0.43-0.57, so stop just before it.
+  var stopLine = 0.43;
   var nsState = sig.nsState || sig.state;
   var ewState = sig.ewState || 'red';
   var isNSdir = (v.dir === 'N' || v.dir === 'S');
-  var relevantState = sig.evp ? (isNSdir ? sig.nsState : sig.ewState) : (isNSdir ? nsState : ewState);
-  var isRed = relevantState === 'red';
-  var atStop = isRed && v.pos > stopLine - 0.05 && v.pos < stopLine + 0.03;
-  var speedMul = atStop ? 0 : isRed && v.pos > stopLine - 0.15 ? 0.2 : 1.0;
-  speedMul *= (1 - cong * 0.6);
+  var relevantState = sig.evp ? (isNSdir ? (sig.nsState||nsState) : (sig.ewState||ewState))
+                               : (isNSdir ? nsState : ewState);
+  var isRed = (relevantState === 'red');
+  // Hard stop at line
+  var atStop = isRed && v.pos >= stopLine - 0.03 && v.pos < stopLine + 0.02;
+  // Gradual slow-down approaching red
+  var approaching = isRed && v.pos >= stopLine - 0.16 && v.pos < stopLine - 0.03;
+  var speedMul;
+  if(atStop)           speedMul = 0;
+  else if(approaching) speedMul = Math.max(0.06, (stopLine - 0.03 - v.pos) / 0.13);
+  else                 speedMul = 1.0;
+  // Congestion reduces speed by at most 30% — never freezes vehicles on green
+  speedMul *= (1 - cong * 0.30);
   v.pos += v.speed * speedMul * dt * 30;
   if(v.pos > 1.05) v.pos = 0;
 }
