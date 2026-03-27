@@ -4878,6 +4878,7 @@ function loop(ts){
 
 var _curIntxIdx = -1;
 var _roadAnimId = null;
+var _roadAnimTimeoutId = null;
 var _roadLastT  = 0;
 var _roadVehicles = [];
 
@@ -4923,6 +4924,7 @@ function closeIntx(){
   var modal = document.getElementById('intx-modal');
   if(modal) modal.classList.remove('open');
   if(_roadAnimId){ cancelAnimationFrame(_roadAnimId); _roadAnimId = null; }
+  if(_roadAnimTimeoutId){ clearTimeout(_roadAnimTimeoutId); _roadAnimTimeoutId = null; }
   _curIntxIdx = -1;
   // Reset tab highlight
   document.querySelectorAll('.intx-tab')[0].classList.add('on');
@@ -5028,6 +5030,18 @@ function renderIntxModal(idx){
   '</div>';
   document.getElementById('imod-signal-display').innerHTML = sigHtml;
 
+  // Immediately populate signal timer + phase bar (don't wait for liveUpdateIntxStats)
+  var initRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
+                 : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+                 : Math.max(0, sig.cycle - sig.phase);
+  var initColor = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+  var _tmr = document.getElementById('imod-signal-timer');
+  var _lbl = document.getElementById('imod-signal-label');
+  var _fil = document.getElementById('imod-phase-fill');
+  if(_tmr){ _tmr.textContent = initRemain.toFixed(1)+'s'; _tmr.style.color = initColor; _tmr.style.textShadow='0 0 20px '+initColor+'cc'; }
+  if(_lbl){ _lbl.textContent = sig.evp?'EVP PRIORITY':sig.state.toUpperCase()+' PHASE'; _lbl.style.color = initColor; }
+  if(_fil){ _fil.style.width = Math.round(sig.phase/sig.cycle*100)+'%'; _fil.style.background = initColor; _fil.style.boxShadow='0 0 6px '+initColor+'88'; }
+
   // Queue snake visualisation
   var qMax = Math.max(qlen, 1);
   var snakeHtml = '';
@@ -5125,12 +5139,15 @@ function renderIntxModal(idx){
 // ── POLICE ROAD CANVAS RENDERER ─────────────────────────────────────
 function startRoadAnimation(idx){
   if(_roadAnimId){ cancelAnimationFrame(_roadAnimId); _roadAnimId = null; }
+  // Defer by one frame so the modal flex layout has rendered and offsetHeight > 0
+  _roadAnimTimeoutId = setTimeout(function(){
   var canvas = document.getElementById('road-canvas');
   if(!canvas) return;
+  if(_curIntxIdx !== idx) return;  // guard: user switched away during defer
   // Ensure canvas has correct pixel dimensions
   var parent = canvas.parentElement;
   canvas.width  = parent.offsetWidth  || 420;
-  canvas.height = parent.offsetHeight || 440;
+  canvas.height = (parent.offsetHeight > 0 ? parent.offsetHeight : 520);
   var ctx = canvas.getContext('2d');
 
   // Spawn small road vehicles for the road canvas
@@ -5356,11 +5373,16 @@ function startRoadAnimation(idx){
     ctx.textAlign = 'left';
 
     // Update live signal display in left panel
+    var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
+                : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+                : Math.max(0, sig.cycle - sig.phase);
+    var sColor  = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
     updateIntxSignalPanel(idx, sig, sRemain, sColor);
 
     _roadAnimId = requestAnimationFrame(drawRoadScene);
   }
   _roadAnimId = requestAnimationFrame(drawRoadScene);
+  }, 0); // end setTimeout — ensures flex layout has painted before reading offsetHeight
 }
 
 function roundRect(ctx, x, y, w, h, r){
@@ -5443,10 +5465,15 @@ function updateIntxSignalPanel(idx, sig, remain, sColor){
   var fillEl = document.getElementById('imod-phase-fill');
   var housingEl = document.getElementById('imod-signal-display');
   if(!tmrEl) return;
-  tmrEl.textContent = remain.toFixed(0);
+  tmrEl.textContent = remain.toFixed(1) + 's';
   tmrEl.style.color = sColor;
+  tmrEl.style.textShadow = '0 0 20px ' + sColor + 'cc';
   if(lblEl){ lblEl.textContent = (sig.evp?'EVP PRIORITY':sig.state.toUpperCase())+' PHASE'; lblEl.style.color=sColor; }
-  if(fillEl){ fillEl.style.width = Math.round(sig.phase/sig.cycle*100)+'%'; fillEl.style.background = sColor; }
+  if(fillEl){
+    fillEl.style.width = Math.round(sig.phase/sig.cycle*100)+'%';
+    fillEl.style.background = sColor;
+    fillEl.style.boxShadow = '0 0 6px ' + sColor + '88';
+  }
   // Update signal lamps in left panel housing
   if(housingEl && housingEl.firstChild){
     var lamps = housingEl.firstChild.querySelectorAll('.sig-lamp');
@@ -5572,6 +5599,28 @@ function liveUpdateIntxStats(idx){
       lamps2[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
       lamps2[2].className = 'sig-lamp ' + (sig.state==='green'&&!sig.evp?'on-g':'off');
     }
+  }
+
+  // ── Update signal timer countdown + phase progress bar ──────────────
+  var timerEl = document.getElementById('imod-signal-timer');
+  var labelEl = document.getElementById('imod-signal-label');
+  var fillEl  = document.getElementById('imod-phase-fill');
+  var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
+              : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+              : Math.max(0, sig.cycle - sig.phase);
+  var sColor  = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+  if(timerEl){
+    timerEl.textContent = sRemain.toFixed(1) + 's';
+    timerEl.style.color = sColor;
+  }
+  if(labelEl){
+    labelEl.textContent = sig.evp ? 'EVP PREEMPT ACTIVE' : sig.state.toUpperCase() + ' PHASE';
+    labelEl.style.color = sColor;
+  }
+  if(fillEl){
+    fillEl.style.width = Math.round(sig.phase / sig.cycle * 100) + '%';
+    fillEl.style.background = sColor;
+    fillEl.style.boxShadow = '0 0 6px ' + sColor + '88';
   }
 
   // ── Update bottom stats bar ───────────────────────────────────────
