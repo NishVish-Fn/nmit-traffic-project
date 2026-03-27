@@ -3167,7 +3167,13 @@ Particle.prototype.update = function(dt) {
     var dLng = Math.abs(jB.lng - jA.lng);
     var isNS = dLat >= dLng;  // true = N-S traveler, false = E-W traveler
     var relevantState = sig.evp ? 'green' : (isNS ? sig.nsState : sig.ewState);
-    var stop = (!this.isE && distEnd<.22 && relevantState==='red' && !sig.evp);
+    // STOP_WALL: hard position boundary — vehicle front must not cross this while red.
+    // distEnd = distance remaining to the end junction (0 = at junction, 1 = far away).
+    // We hold vehicles at distEnd >= STOP_WALL (i.e. prog <= 1-STOP_WALL for dir=1).
+    var STOP_WALL  = 0.04;   // ~4% of edge length from junction centre — hard wall
+    var BRAKE_ZONE = 0.28;   // start braking this far out (wider than before)
+    var atRed = (!this.isE && relevantState === 'red' && !sig.evp);
+    var stop = (atRed && distEnd < BRAKE_ZONE);
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
 
     // Speed scale: S.wave represents free-flow speed in km/h (default 40)
@@ -3175,7 +3181,11 @@ Particle.prototype.update = function(dt) {
     var waveScale = S.wave / 40.0;
 
     if(stop){
-      this.tspd=0; this.state='stopped'; this.wt+=_sigDtSec;
+      // Graduated braking: linearly reduce target speed to 0 as vehicle approaches wall
+      var brakeFrac = Math.max(0, (distEnd - STOP_WALL) / (BRAKE_ZONE - STOP_WALL));
+      this.tspd = this.bspd * brakeFrac * waveScale;
+      this.state = distEnd < STOP_WALL + 0.04 ? 'stopped' : 'slow';
+      if(this.state === 'stopped') this.wt += _sigDtSec;
     } else if(cong>.85&&!this.isE){
       // Gridlock: near-zero movement, Bangalore-style total jam
       this.tspd=this.bspd*0.04*waveScale; this.state='stopped';
@@ -3196,9 +3206,18 @@ Particle.prototype.update = function(dt) {
     }
     // Emergency vehicles ignore signals and congestion — run at full target speed
     if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
-    // Smooth acceleration/deceleration
-    this.spd+=(this.tspd-this.spd)*.10;
+    // Smooth acceleration/deceleration — use faster brake rate when stopping for red
+    var lerpRate = (stop && distEnd < BRAKE_ZONE * 0.5) ? 0.35 : 0.10;
+    this.spd+=(this.tspd-this.spd)*lerpRate;
     this.prog+=this.spd*this.dir*S.speed;
+    // ── HARD WALL: never let vehicle cross the stop line while red ────────────
+    if(atRed && !this.isE){
+      if(this.dir===1 && this.prog > 1 - STOP_WALL){
+        this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; this.state = 'stopped';
+      } else if(this.dir===-1 && this.prog < STOP_WALL){
+        this.prog = STOP_WALL;     this.spd = 0; this.tspd = 0; this.state = 'stopped';
+      }
+    }
     if(this.isE){
       var p=this.pos();
       this.trail.unshift({lat:p.lat,lng:p.lng});
