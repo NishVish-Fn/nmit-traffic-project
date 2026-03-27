@@ -1,4 +1,3 @@
-
 """
 Urban Flow & Life-Lines | Bangalore — National PhD Competition Edition
 ======================================================================
@@ -1332,7 +1331,7 @@ HTML = """<!DOCTYPE html>
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
-     width:100%;height:990px;overflow:hidden;display:flex;flex-direction:column}
+     width:100%;height:1026px;overflow:hidden;display:flex;flex-direction:column}
 
 /* HEADER */
 #hdr{height:56px;flex-shrink:0;background:linear-gradient(90deg,#000a18,#020810 50%,#000a18);
@@ -1534,6 +1533,85 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .eq-row .eq-lhs{font-size:.62rem;color:#4a90b0;min-width:72px;flex-shrink:0;text-align:right}
 .eq-row .eq-rhs{font-size:.67rem;color:#c8eaff;flex:1}
 .eq-row .eq-note{font-size:.45rem;color:#2a5070;margin-left:4px}
+
+/* ── INTERSECTION TABS SYSTEM ──────────────────────────────────────── */
+#intx-nav{height:36px;flex-shrink:0;background:#020c18;border-top:1px solid #091828;
+  display:flex;align-items:center;padding:0 6px;gap:3px;overflow-x:auto;z-index:1000;
+  scrollbar-width:none}
+#intx-nav::-webkit-scrollbar{display:none}
+.intx-tab{font-family:'Share Tech Mono',monospace;font-size:.48rem;letter-spacing:1px;
+  padding:3px 9px;border:1px solid #0d2040;border-radius:3px;cursor:pointer;
+  transition:all .2s;background:transparent;text-transform:uppercase;white-space:nowrap;
+  color:#3a5570;flex-shrink:0}
+.intx-tab:hover{border-color:#00e5ff44;color:#6090a0}
+.intx-tab.on{border-color:var(--cyan);color:var(--cyan);background:#00e5ff0a;
+  box-shadow:0 0 8px #00e5ff22}
+.intx-tab.crit.on{border-color:var(--red);color:var(--red);background:#ff22440a}
+.intx-tab.crit{color:#884433}
+#intx-label{font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#1a3050;
+  letter-spacing:2px;margin-right:4px;padding-right:6px;border-right:1px solid #0d2040;
+  white-space:nowrap}
+/* ── INTERSECTION MODAL OVERLAY ─────────────────────────────────────── */
+#intx-modal{position:fixed;inset:0;z-index:9000;background:rgba(1,4,10,.97);
+  display:none;flex-direction:column;overflow:hidden}
+#intx-modal.open{display:flex}
+#imod-hdr{height:54px;background:linear-gradient(90deg,#000a18,#040e1e,#000a18);
+  border-bottom:2px solid;display:flex;align-items:center;padding:0 18px;gap:14px;flex-shrink:0}
+#imod-icon{font-size:1.4rem}
+#imod-name{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:900;letter-spacing:3px}
+#imod-meta{font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#4a6880;letter-spacing:2px;margin-top:2px}
+#imod-close{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:.52rem;
+  padding:6px 14px;border:1px solid #3a5570;color:#5a7590;border-radius:3px;
+  cursor:pointer;background:transparent;letter-spacing:1px;transition:.2s}
+#imod-close:hover{border-color:var(--red);color:var(--red);background:#ff224411}
+/* Modal body: 3-col layout */
+#imod-body{flex:1;display:grid;grid-template-columns:260px 1fr 260px;overflow:hidden;min-height:0}
+#imod-left{border-right:1px solid #0d2040;overflow-y:auto;display:flex;flex-direction:column;gap:0;padding:10px;
+  scrollbar-width:thin;scrollbar-color:#0d2040 transparent}
+#imod-center{background:#010810;overflow:hidden;position:relative;display:flex;flex-direction:column}
+#imod-right{border-left:1px solid #0d2040;overflow-y:auto;display:flex;flex-direction:column;gap:0;padding:10px;
+  scrollbar-width:thin;scrollbar-color:#0d2040 transparent}
+/* Police dashboard KPI cards */
+.p-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
+.p-kpi{background:#030d1a;border:1px solid #0d2040;border-radius:4px;padding:8px 10px;
+  border-left:3px solid}
+.p-kpi-v{font-family:'Orbitron',monospace;font-size:1.25rem;font-weight:900;line-height:1;margin-bottom:3px}
+.p-kpi-l{font-family:'Share Tech Mono',monospace;font-size:.42rem;color:#3a5570;
+  letter-spacing:1px;text-transform:uppercase}
+.p-section{background:#030d1a;border:1px solid #0d2040;border-radius:4px;padding:8px;margin-bottom:6px}
+.p-section-t{font-family:'Orbitron',monospace;font-size:.46rem;font-weight:700;color:var(--cyan);
+  letter-spacing:2px;text-transform:uppercase;padding-bottom:5px;margin-bottom:6px;
+  border-bottom:1px solid #0d2040}
+/* Signal face */
+.sig-housing{background:#0a1000;border:2px solid #1a2a10;border-radius:6px;
+  padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;width:36px}
+.sig-lamp{width:22px;height:22px;border-radius:50%;border:1px solid #222}
+.sig-lamp.on-r{background:#ff2244;box-shadow:0 0 14px #ff2244,0 0 6px #ff2244}
+.sig-lamp.on-y{background:#ffd700;box-shadow:0 0 14px #ffd700,0 0 6px #ffd700}
+.sig-lamp.on-g{background:#00ff88;box-shadow:0 0 14px #00ff88,0 0 6px #00ff88}
+.sig-lamp.off{background:#0a1828}
+/* Approach/arm bars */
+.arm-row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.arm-name{font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#4a6880;width:46px;text-align:right;flex-shrink:0}
+.arm-bar{flex:1;height:8px;background:#0a1828;border-radius:4px;overflow:hidden}
+.arm-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.arm-pct{font-family:'Share Tech Mono',monospace;font-size:.44rem;width:30px;text-align:right;flex-shrink:0}
+/* Countdown ring */
+.cdown-wrap{display:flex;align-items:center;justify-content:center;position:relative;margin:6px auto}
+/* Vehicle queue snake */
+.queue-snake{display:flex;flex-wrap:wrap;gap:2px;padding:4px;max-height:60px;overflow:hidden}
+.q-car{width:8px;height:5px;border-radius:1px;background:#00e5ff;border:1px solid #00e5ff44}
+.q-car.red{background:#ff2244;border-color:#ff224444}
+/* Road canvas */
+#road-canvas{width:100%;flex:1;display:block}
+/* Bottom stats bar in modal */
+#imod-bottom{height:44px;border-top:1px solid #0d2040;background:#020810;
+  display:flex;align-items:center;padding:0 14px;gap:16px;flex-shrink:0}
+.imod-stat{text-align:center}
+.imod-stat-v{font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700;line-height:1}
+.imod-stat-l{font-family:'Share Tech Mono',monospace;font-size:.38rem;color:#3a5570;
+  letter-spacing:1px;margin-top:2px;text-transform:uppercase}
+
 #statusbar{height:27px;flex-shrink:0;background:var(--bg2);
   border-top:1px solid var(--cdim);display:flex;align-items:center;
   padding:0 12px;gap:0;font-family:'Share Tech Mono',monospace;font-size:0.54rem;overflow:hidden}
@@ -2694,6 +2772,82 @@ details.csec summary:hover{background:#0a1828}
     </div>
 
 </div>
+
+<!-- INTERSECTION TAB NAVIGATION BAR -->
+<div id="intx-nav">
+  <div id="intx-label">&#x1F6A6; INTERSECTIONS</div>
+</div>
+
+<!-- INTERSECTION DETAIL MODAL (Police Dashboard) -->
+<div id="intx-modal">
+  <div id="imod-hdr">
+    <div id="imod-icon">&#x1F6A6;</div>
+    <div>
+      <div id="imod-name">SILK BOARD</div>
+      <div id="imod-meta">BANGALORE OUTER RING ROAD &nbsp;&#x2502;&nbsp; POLICE MONITORING DASHBOARD</div>
+    </div>
+    <div id="imod-close" onclick="closeIntx()">&#x2715; CLOSE</div>
+  </div>
+  <div id="imod-body">
+    <!-- LEFT: KPIs + approach arms -->
+    <div id="imod-left">
+      <div class="p-kpi-grid" id="imod-kpis"></div>
+      <div class="p-section">
+        <div class="p-section-t">&#x1F4CD; Signal State</div>
+        <div id="imod-signal-display" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px"></div>
+        <div id="imod-signal-timer" style="font-family:'Orbitron',monospace;font-size:2.4rem;font-weight:900;text-align:center;line-height:1;text-shadow:0 0 20px currentColor"></div>
+        <div id="imod-signal-label" style="font-family:'Share Tech Mono',monospace;font-size:.5rem;text-align:center;color:#4a6880;letter-spacing:2px;margin-top:3px"></div>
+        <div id="imod-phase-bar" style="margin-top:8px;height:6px;background:#0a1828;border-radius:3px;overflow:hidden">
+          <div id="imod-phase-fill" style="height:100%;border-radius:3px;transition:width .3s linear"></div>
+        </div>
+      </div>
+      <div class="p-section">
+        <div class="p-section-t">&#x1F6A6; Approach Arms</div>
+        <div id="imod-approaches"></div>
+      </div>
+      <div class="p-section">
+        <div class="p-section-t">&#x1F697; Queue Snapshot</div>
+        <div id="imod-queue-snake" class="queue-snake"></div>
+        <div id="imod-queue-label" style="font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#4a6880;text-align:center;margin-top:4px"></div>
+      </div>
+    </div>
+    <!-- CENTER: Road diagram canvas -->
+    <div id="imod-center">
+      <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);
+        font-family:'Orbitron',monospace;font-size:.45rem;color:#1a3050;
+        letter-spacing:3px;z-index:5;white-space:nowrap;pointer-events:none">
+        &#9650; NORTH
+      </div>
+      <canvas id="road-canvas"></canvas>
+      <div id="road-overlay" style="position:absolute;inset:0;pointer-events:none;z-index:4"></div>
+    </div>
+    <!-- RIGHT: Data panels -->
+    <div id="imod-right">
+      <div class="p-section">
+        <div class="p-section-t">&#x1F4CA; HCM Delay Components</div>
+        <div id="imod-delay-bars"></div>
+      </div>
+      <div class="p-section">
+        <div class="p-section-t">&#x26A1; LP Optimization</div>
+        <div id="imod-lp-data" style="font-family:'Share Tech Mono',monospace;font-size:.52rem;line-height:2;color:#3a5570"></div>
+      </div>
+      <div class="p-section">
+        <div class="p-section-t">&#x1F30A; Flow Rates</div>
+        <div id="imod-od-rows"></div>
+      </div>
+      <div class="p-section">
+        <div class="p-section-t">&#x1F4C8; Performance Index</div>
+        <div id="imod-pi-data" style="font-family:'Share Tech Mono',monospace;font-size:.52rem;line-height:2;color:#3a5570"></div>
+      </div>
+      <div class="p-section">
+        <div class="p-section-t">&#x1F6E2; Emissions</div>
+        <div id="imod-emissions" style="font-family:'Share Tech Mono',monospace;font-size:.52rem;line-height:2;color:#3a5570"></div>
+      </div>
+    </div>
+  </div>
+  <div id="imod-bottom" id="imod-bot"></div>
+</div>
+
 <div id="statusbar">
   <div class="sb">&#x1F551; <span id="sbt" class="sbv">00:00:00</span></div>
   <div class="sb">ALGO <span id="sba" class="sbv">GW+LP+EVP</span></div>
@@ -4641,6 +4795,551 @@ function loop(ts){
   requestAnimationFrame(loop);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+// INTERSECTION TABS + POLICE DASHBOARD — Enhancement Module
+// ═══════════════════════════════════════════════════════════════════
+
+var _curIntxIdx = -1;
+var _roadAnimId = null;
+var _roadLastT  = 0;
+var _roadVehicles = [];
+
+// Build the intersection navigation tabs
+(function buildIntxNav(){
+  var nav = document.getElementById('intx-nav');
+  if(!nav) return;
+  // Overview tab
+  var overviewTab = document.createElement('div');
+  overviewTab.className = 'intx-tab on';
+  overviewTab.textContent = '⬛ OVERVIEW';
+  overviewTab.addEventListener('click', function(){ closeIntx(); setIntxTab(null, overviewTab); });
+  nav.appendChild(overviewTab);
+  // Per-junction tabs
+  JN.forEach(function(j, i){
+    var tab = document.createElement('div');
+    tab.className = 'intx-tab' + (j.cong > 0.65 ? ' crit' : '');
+    var congPct = Math.round(j.cong * 100);
+    var indicator = j.cong > 0.65 ? '🔴' : j.cong > 0.45 ? '🟡' : '🟢';
+    tab.textContent = indicator + ' ' + j.name.toUpperCase();
+    tab.title = j.name + ' — ' + congPct + '% congestion';
+    tab.addEventListener('click', (function(_i, _tab){ return function(){ openIntx(_i, _tab); }; })(i, tab));
+    nav.appendChild(tab);
+  });
+})();
+
+function setIntxTab(idx, clickedTab){
+  document.querySelectorAll('.intx-tab').forEach(function(t){ t.classList.remove('on'); });
+  if(clickedTab) clickedTab.classList.add('on');
+}
+
+function openIntx(idx, tab){
+  setIntxTab(idx, tab);
+  _curIntxIdx = idx;
+  var modal = document.getElementById('intx-modal');
+  if(!modal) return;
+  modal.classList.add('open');
+  renderIntxModal(idx);
+  startRoadAnimation(idx);
+}
+
+function closeIntx(){
+  var modal = document.getElementById('intx-modal');
+  if(modal) modal.classList.remove('open');
+  if(_roadAnimId){ cancelAnimationFrame(_roadAnimId); _roadAnimId = null; }
+  _curIntxIdx = -1;
+  // Reset tab highlight
+  document.querySelectorAll('.intx-tab')[0].classList.add('on');
+}
+window.closeIntx = closeIntx;
+
+function renderIntxModal(idx){
+  var j = JN[idx];
+  var sig = SIG[idx];
+  var lp = CUR.lp;
+  var pi = CUR.pi;
+  var rf = BACKEND.rf;
+
+  // Header
+  var congColor = j.cong > 0.65 ? '#ff2244' : j.cong > 0.45 ? '#ff8c00' : '#00ff88';
+  document.getElementById('imod-hdr').style.borderBottomColor = congColor;
+  document.getElementById('imod-name').textContent = j.name.toUpperCase();
+  document.getElementById('imod-name').style.color = congColor;
+  document.getElementById('imod-icon').textContent = j.cong > 0.65 ? '🚨' : j.cong > 0.45 ? '⚠️' : '✅';
+  document.getElementById('imod-meta').textContent =
+    j.name.toUpperCase() + '  |  ' + j.lanes + ' LANES  |  ' +
+    (j.daily/1000).toFixed(0) + 'K VEH/DAY  |  SAT.FLOW ' + j.sat_flow + ' PCU/HR/LN';
+
+  // KPI grid
+  var x = lp && lp.x ? lp.x[idx] : j.cong;
+  var delay = lp && lp.delay ? lp.delay[idx] : 80;
+  var qlen = lp && lp.q_len ? lp.q_len[idx] : 0;
+  var los = lp && lp.los ? lp.los[idx] : 'D';
+  var green = lp && lp.g ? lp.g[idx] : 45;
+  var lam = lp && lp.lambda ? lp.lambda[idx] : 0.5;
+  var rfDelay = rf && rf.jn_predicted_delay ? rf.jn_predicted_delay[idx] : null;
+  var piJ = pi && pi.per_jct && pi.per_jct[idx] ? pi.per_jct[idx] : null;
+  var losColors = {'A':'#00ff88','B':'#00cc66','C':'#ffd700','D':'#ff8c00','E':'#ff4422','F':'#ff0033'};
+
+  var kpis = [
+    {v: Math.round(j.cong*100)+'%', l:'Congestion', c: j.cong>0.65?'#ff2244':j.cong>0.45?'#ff8c00':'#00ff88', border:'var(--red)'},
+    {v: delay.toFixed(0)+'s',        l:'HCM Delay',   c: delay>80?'#ff2244':delay>35?'#ff8c00':'#00ff88', border:'var(--orange)'},
+    {v: x.toFixed(3),                l:'v/c Ratio',   c: x>0.9?'#ff2244':x>0.7?'#ff8c00':'#00ff88', border:'var(--cyan)'},
+    {v: green.toFixed(0)+'s',        l:'Green Time',  c:'var(--cyan)', border:'var(--cyan)'},
+    {v: qlen,                         l:'Queue (veh)', c:'var(--yellow)', border:'var(--yellow)'},
+    {v: los,                          l:'HCM LOS',    c:losColors[los]||'#ffd700', border:losColors[los]||'#ffd700'},
+    {v: (lam*100).toFixed(0)+'%',    l:'Green Ratio', c:'var(--purple)', border:'var(--purple)'},
+    {v: (j.peak/1000).toFixed(1)+'K',l:'Peak PCU/hr', c:'var(--green)', border:'var(--green)'},
+  ];
+  document.getElementById('imod-kpis').innerHTML = kpis.map(function(k){
+    return '<div class="p-kpi" style="border-left-color:'+k.border+'">'+
+      '<div class="p-kpi-v" style="color:'+k.c+'">'+k.v+'</div>'+
+      '<div class="p-kpi-l">'+k.l+'</div></div>';
+  }).join('');
+
+  // Approach arms (N/S/E/W) — using OD matrix rows/cols for this junction
+  var odRow = BACKEND.od_matrix[idx];   // outgoing flows
+  var odCol = BACKEND.od_matrix.map(function(r){ return r[idx]; }); // incoming
+  var totalIn  = odCol.reduce(function(a,b){return a+b;},0);
+  var totalOut = odRow.reduce(function(a,b){return a+b;},0);
+  var maxFlow  = Math.max(totalIn, totalOut, 1);
+  var armNames = ['North In','South In','East In','West In','North Out','South Out'];
+  var armColors= ['#00e5ff','#00e5ff','#00ff88','#ff8c00','#bb77ff','#ffd700'];
+  // Build 4-arm approach from OD sums (simulate N/S/E/W splits)
+  var inSplit  = [0.35, 0.28, 0.22, 0.15].map(function(f){return f * totalIn;});
+  var outSplit = [0.30, 0.25, 0.25, 0.20].map(function(f){return f * totalOut;});
+  var dirs = ['↑ NORTH','↓ SOUTH','→ EAST','← WEST'];
+  var approachHtml = '';
+  dirs.forEach(function(d, di){
+    var inF  = inSplit[di],  inPct  = Math.round(inF/maxFlow*100);
+    var outF = outSplit[di], outPct = Math.round(outF/maxFlow*100);
+    var inCol  = inPct>70?'#ff2244':inPct>40?'#ff8c00':'#00e5ff';
+    var outCol = '#00ff88';
+    approachHtml +=
+      '<div style="margin-bottom:6px">'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#4a6880;margin-bottom:3px">'+d+'</div>'+
+        '<div class="arm-row">'+
+          '<span class="arm-name" style="color:#3a5570">IN</span>'+
+          '<div class="arm-bar"><div class="arm-fill" style="width:'+inPct+'%;background:'+inCol+'"></div></div>'+
+          '<span class="arm-pct" style="color:'+inCol+'">'+Math.round(inF).toLocaleString()+'</span>'+
+        '</div>'+
+        '<div class="arm-row">'+
+          '<span class="arm-name" style="color:#3a5570">OUT</span>'+
+          '<div class="arm-bar"><div class="arm-fill" style="width:'+outPct+'%;background:'+outCol+'"></div></div>'+
+          '<span class="arm-pct" style="color:'+outCol+'">'+Math.round(outF).toLocaleString()+'</span>'+
+        '</div>'+
+      '</div>';
+  });
+  document.getElementById('imod-approaches').innerHTML = approachHtml;
+
+  // Signal housing
+  var lamps = sig.state === 'green' ? ['off','off','on-g'] :
+              sig.state === 'yellow'? ['off','on-y','off'] : ['on-r','off','off'];
+  var sigHtml = '<div class="sig-housing">'+
+    '<div class="sig-lamp '+lamps[0]+'"></div>'+
+    '<div class="sig-lamp '+lamps[1]+'"></div>'+
+    '<div class="sig-lamp '+lamps[2]+'"></div>'+
+  '</div>'+
+  '<div style="margin-left:8px;flex:1">'+
+    '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570;margin-bottom:4px">'+
+      'Phase: <span style="color:'+congColor+'">'+sig.state.toUpperCase()+'</span></div>'+
+    '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
+      'Cycle: <span style="color:var(--cyan)">'+sig.cycle.toFixed(0)+'s</span></div>'+
+    '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
+      'g_LP: <span style="color:var(--green)">'+green.toFixed(0)+'s</span></div>'+
+    '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
+      'EVP: <span style="color:'+(sig.evp?'#ff2244':'#3a5570')+'">'+(sig.evp?'ACTIVE':'OFF')+'</span></div>'+
+  '</div>';
+  document.getElementById('imod-signal-display').innerHTML = sigHtml;
+
+  // Queue snake visualisation
+  var qMax = Math.max(qlen, 1);
+  var snakeHtml = '';
+  for(var qi = 0; qi < Math.min(qlen, 60); qi++){
+    var ratio = qi/qMax;
+    snakeHtml += '<div class="q-car'+(ratio>0.7?' red':'')+'"></div>';
+  }
+  document.getElementById('imod-queue-snake').innerHTML = snakeHtml;
+  document.getElementById('imod-queue-label').textContent =
+    qlen + ' vehicles queued • ' + (qlen*6.5).toFixed(0) + 'm back';
+
+  // HCM delay components bar chart
+  var d1 = lp && lp.delay_d1 ? lp.delay_d1[idx] : delay*0.55;
+  var d2 = lp && lp.delay_d2 ? lp.delay_d2[idx] : delay*0.35;
+  var d3 = lp && lp.delay_d3 ? lp.delay_d3[idx] : delay*0.10;
+  var maxD = Math.max(d1, d2, d3, delay, 0.1);
+  var delayBars = [
+    {l:'d₁ Uniform ×PF', v:d1, c:'#00e5ff'},
+    {l:'d₂ Incremental', v:d2, c:'#ff8c00'},
+    {l:'d₃ Initial Queue',v:d3, c:'#bb77ff'},
+    {l:'Total d',         v:delay, c:'#ffd700'},
+  ];
+  document.getElementById('imod-delay-bars').innerHTML = delayBars.map(function(b){
+    var pct = Math.round(b.v/maxD*100);
+    return '<div style="margin-bottom:6px">'+
+      '<div style="display:flex;justify-content:space-between;font-family:Share Tech Mono,monospace;font-size:.44rem;color:#4a6880;margin-bottom:2px">'+
+        '<span>'+b.l+'</span><span style="color:'+b.c+'">'+b.v.toFixed(1)+'s</span></div>'+
+      '<div style="height:8px;background:#0a1828;border-radius:4px;overflow:hidden">'+
+        '<div style="width:'+pct+'%;height:100%;background:'+b.c+';border-radius:4px;box-shadow:0 0 6px '+b.c+'44;transition:width .4s"></div>'+
+      '</div></div>';
+  }).join('');
+
+  // LP data
+  var lpHtml = '<div><span style="color:#4a6880">Solver: </span><span style="color:#00e5ff">scipy HiGHS LP</span></div>'+
+    '<div><span style="color:#4a6880">g_opt: </span><span style="color:#00ff88">'+green.toFixed(1)+'s</span></div>'+
+    '<div><span style="color:#4a6880">λ=g/C: </span><span style="color:#bb77ff">'+lam.toFixed(4)+'</span></div>'+
+    '<div><span style="color:#4a6880">x=q/c: </span><span style="color:'+congColor+'">'+x.toFixed(4)+'</span></div>'+
+    '<div><span style="color:#4a6880">C_opt: </span><span style="color:#ffd700">'+(lp&&lp.C_opt_per?lp.C_opt_per[idx].toFixed(0):90)+'s</span></div>'+
+    '<div><span style="color:#4a6880">PF:    </span><span style="color:#ff8c00">'+(lp&&lp.PF?lp.PF[idx].toFixed(3):'-')+'</span></div>'+
+    (rfDelay?'<div><span style="color:#4a6880">RF d̂:  </span><span style="color:#ffd700">'+rfDelay.toFixed(1)+'s</span></div>':'');
+  document.getElementById('imod-lp-data').innerHTML = lpHtml;
+
+  // OD flows (top 5 destinations)
+  var odFlows = [];
+  for(var di2 = 0; di2 < JN.length; di2++){
+    if(di2 !== idx && BACKEND.od_matrix[idx][di2] > 0)
+      odFlows.push({to: JN[di2].name, flow: BACKEND.od_matrix[idx][di2]});
+  }
+  odFlows.sort(function(a,b){return b.flow-a.flow;});
+  var maxFlow2 = odFlows[0] ? odFlows[0].flow : 1;
+  document.getElementById('imod-od-rows').innerHTML = odFlows.slice(0,5).map(function(r){
+    var pct = Math.round(r.flow/maxFlow2*100);
+    return '<div style="margin-bottom:4px">'+
+      '<div style="display:flex;justify-content:space-between;font-family:Share Tech Mono,monospace;font-size:.44rem;color:#4a6880;margin-bottom:2px">'+
+        '<span>→ '+r.to+'</span><span style="color:#00e5ff">'+r.flow.toLocaleString()+'</span></div>'+
+      '<div style="height:5px;background:#0a1828;border-radius:3px;overflow:hidden">'+
+        '<div style="width:'+pct+'%;height:100%;background:#00e5ff44;border-radius:3px"></div>'+
+      '</div></div>';
+  }).join('');
+
+  // PI + emissions
+  if(piJ){
+    document.getElementById('imod-pi-data').innerHTML =
+      '<div><span style="color:#4a6880">PI_i: </span><span style="color:#ffd700">'+piJ.pi_i.toFixed(0)+'</span></div>'+
+      '<div><span style="color:#4a6880">Flow q: </span><span style="color:#00e5ff">'+piJ.q_i.toFixed(0)+' PCU/hr</span></div>'+
+      '<div><span style="color:#4a6880">Stop rate: </span><span style="color:#ff8c00">'+piJ.s_i.toFixed(3)+'</span></div>';
+    document.getElementById('imod-emissions').innerHTML =
+      '<div><span style="color:#4a6880">Fuel: </span><span style="color:#ff8c00">'+piJ.fuel_lph.toFixed(1)+' L/hr</span></div>'+
+      '<div><span style="color:#4a6880">CO₂: </span><span style="color:#00ff88">'+piJ.co2_kph.toFixed(1)+' kg/hr</span></div>'+
+      '<div style="font-size:.42rem;color:#2a4060;margin-top:4px">MOVES-lite estimate</div>';
+  }
+
+  // Bottom stats bar
+  var botEl = document.getElementById('imod-bottom');
+  if(botEl){
+    var stats = [
+      {v: j.name, l:'Junction'},
+      {v: Math.round(j.cong*100)+'%', l:'Congestion Level'},
+      {v: delay.toFixed(0)+'s', l:'Webster Delay'},
+      {v: x.toFixed(3), l:'v/c Ratio'},
+      {v: los, l:'HCM LOS'},
+      {v: qlen, l:'Queue (veh)'},
+      {v: green.toFixed(0)+'s', l:'LP Green Time'},
+      {v: j.lanes, l:'Lanes'},
+      {v: (j.daily/1000).toFixed(0)+'K', l:'Daily Volume'},
+    ];
+    botEl.innerHTML = stats.map(function(s){
+      return '<div class="imod-stat">'+
+        '<div class="imod-stat-v" style="color:'+congColor+'">'+s.v+'</div>'+
+        '<div class="imod-stat-l">'+s.l+'</div></div>';
+    }).join('<div style="width:1px;height:28px;background:#0d2040;flex-shrink:0"></div>');
+  }
+}
+
+// ── POLICE ROAD CANVAS RENDERER ─────────────────────────────────────
+function startRoadAnimation(idx){
+  if(_roadAnimId){ cancelAnimationFrame(_roadAnimId); _roadAnimId = null; }
+  var canvas = document.getElementById('road-canvas');
+  if(!canvas) return;
+  // Ensure canvas has correct pixel dimensions
+  var parent = canvas.parentElement;
+  canvas.width  = parent.offsetWidth  || 420;
+  canvas.height = parent.offsetHeight || 440;
+  var ctx = canvas.getContext('2d');
+
+  // Spawn small road vehicles for the road canvas
+  _roadVehicles = [];
+  for(var i = 0; i < 30; i++) _roadVehicles.push(makeRoadVehicle(canvas, idx));
+  _roadLastT = performance.now();
+
+  function drawRoadScene(ts){
+    if(_curIntxIdx !== idx){ return; }
+    var dt = Math.min((ts - _roadLastT)/1000, 0.05);
+    _roadLastT = ts;
+    var j = JN[idx];
+    var sig = SIG[idx];
+    var lp = CUR.lp;
+    var W = canvas.width, H = canvas.height;
+    var cx = W/2, cy = H/2;
+    ctx.clearRect(0, 0, W, H);
+
+    // ─── Background (top-down road view) ────────────────────────
+    ctx.fillStyle = '#010812';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw subtle grid (city block reference)
+    ctx.strokeStyle = '#0a1828';
+    ctx.lineWidth = 0.5;
+    for(var gx = 0; gx < W; gx += 40){
+      ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke();
+    }
+    for(var gy = 0; gy < H; gy += 40){
+      ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke();
+    }
+
+    // ─── Buildings (city blocks) ─────────────────────────────────
+    var bldgs = [
+      {x:10,y:10,w:cx-80,h:cy-80},{x:cx+80,y:10,w:W-cx-90,h:cy-80},
+      {x:10,y:cy+80,w:cx-80,h:H-cy-90},{x:cx+80,y:cy+80,w:W-cx-90,h:H-cy-90}
+    ];
+    bldgs.forEach(function(b){
+      ctx.fillStyle = '#060f1e';
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = '#0d2040';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      // Windows
+      for(var wx = b.x+6; wx < b.x+b.w-6; wx += 12){
+        for(var wy = b.y+6; wy < b.y+b.h-6; wy += 10){
+          var lit = Math.random() > 0.4;
+          ctx.fillStyle = lit ? '#ffd70022' : '#040c18';
+          ctx.fillRect(wx, wy, 6, 5);
+        }
+      }
+    });
+
+    // ─── Road surfaces (4 arms + box) ──────────────────────────
+    var armW = 70; // road arm width
+    var congMul = DMUL[S.dens-1];
+    var cong = Math.min(j.cong * congMul, 0.98);
+    var roadCol = cong>0.85?'#1a0808':cong>0.65?'#180e04':cong>0.45?'#0e1104':'#061208';
+
+    // North arm
+    ctx.fillStyle = roadCol;
+    ctx.fillRect(cx-armW/2, 0, armW, cy-armW/2);
+    // South arm
+    ctx.fillRect(cx-armW/2, cy+armW/2, armW, H-cy-armW/2);
+    // East arm
+    ctx.fillRect(cx+armW/2, cy-armW/2, W-cx-armW/2, armW);
+    // West arm
+    ctx.fillRect(0, cy-armW/2, cx-armW/2, armW);
+    // Intersection box
+    ctx.fillRect(cx-armW/2, cy-armW/2, armW, armW);
+
+    // Road edges (kerb lines)
+    ctx.strokeStyle = '#ffffff18';
+    ctx.lineWidth = 1;
+    [[cx-armW/2, 0, cx-armW/2, cy-armW/2],[cx+armW/2, 0, cx+armW/2, cy-armW/2],
+     [cx-armW/2,cy+armW/2,cx-armW/2,H],[cx+armW/2,cy+armW/2,cx+armW/2,H],
+     [0,cy-armW/2,cx-armW/2,cy-armW/2],[W,cy-armW/2,cx+armW/2,cy-armW/2],
+     [0,cy+armW/2,cx-armW/2,cy+armW/2],[W,cy+armW/2,cx+armW/2,cy+armW/2]
+    ].forEach(function(l){
+      ctx.beginPath(); ctx.moveTo(l[0],l[1]); ctx.lineTo(l[2],l[3]); ctx.stroke();
+    });
+
+    // Lane markings (dashed centre lines)
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = '#ffffff22';
+    ctx.lineWidth = 1;
+    // N-S centre
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, cy-armW/2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy+armW/2); ctx.lineTo(cx, H); ctx.stroke();
+    // E-W centre
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(cx-armW/2, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+armW/2, cy); ctx.lineTo(W, cy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Stop lines
+    var slCol = sig.state === 'red' ? '#ff224488' : '#ffffff22';
+    ctx.strokeStyle = slCol; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx-armW/2, cy-armW/2-4); ctx.lineTo(cx+armW/2, cy-armW/2-4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-armW/2, cy+armW/2+4); ctx.lineTo(cx+armW/2, cy+armW/2+4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-armW/2-4, cy-armW/2); ctx.lineTo(cx-armW/2-4, cy+armW/2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+armW/2+4, cy-armW/2); ctx.lineTo(cx+armW/2+4, cy+armW/2); ctx.stroke();
+
+    // Zebra crossings
+    ctx.fillStyle = '#ffffff08';
+    for(var zi = 0; zi < 5; zi++){
+      var zoff = (zi/4)*(armW-10)+5;
+      ctx.fillRect(cx-armW/2+zoff-4, cy-armW/2-22, 6, 16);
+      ctx.fillRect(cx-armW/2+zoff-4, cy+armW/2+6,  6, 16);
+      ctx.fillRect(cx-armW/2-22, cy-armW/2+zoff-4, 16, 6);
+      ctx.fillRect(cx+armW/2+6,  cy-armW/2+zoff-4, 16, 6);
+    }
+
+    // ─── Signal heads (4 corners) ─────────────────────────────
+    var sigState = sig.evp ? 'evp' : sig.state;
+    var sigGlow  = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    if(sig.evp) sigGlow = '#ff2244';
+    var corners = [
+      [cx+armW/2+6, cy-armW/2-38],
+      [cx-armW/2-34, cy-armW/2-38],
+      [cx+armW/2+6, cy+armW/2+6],
+      [cx-armW/2-34, cy+armW/2+6]
+    ];
+    corners.forEach(function(c){
+      // Signal housing
+      ctx.fillStyle = '#0a1008';
+      ctx.strokeStyle = '#1a2a14';
+      ctx.lineWidth = 1;
+      roundRect(ctx, c[0], c[1], 26, 38, 4);
+      ctx.fill(); ctx.stroke();
+      // Lamps
+      var lpos = [{y:c[1]+6,st:'red'},{y:c[1]+16,st:'yellow'},{y:c[1]+26,st:'green'}];
+      lpos.forEach(function(lp2){
+        var active = (lp2.st==='red'&&sig.state==='red') ||
+                     (lp2.st==='yellow'&&sig.state==='yellow') ||
+                     (lp2.st==='green'&&(sig.state==='green'||sig.evp));
+        var lampcol = lp2.st==='red'?'#ff2244':lp2.st==='yellow'?'#ffd700':'#00ff88';
+        ctx.beginPath();
+        ctx.arc(c[0]+13, lp2.y+5, 5, 0, Math.PI*2);
+        ctx.fillStyle = active ? lampcol : '#0a1828';
+        if(active){ ctx.shadowBlur = 12; ctx.shadowColor = lampcol; }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+    });
+
+    // ─── Congestion heat overlay ─────────────────────────────
+    if(cong > 0.45){
+      var heat = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W,H)*0.45);
+      var alpha = (cong - 0.45) * 0.25;
+      var heatCol = cong>0.85?'rgba(255,34,68,':'rgba(255,140,0,';
+      heat.addColorStop(0, heatCol + (alpha*1.5).toFixed(3) + ')');
+      heat.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = heat;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // ─── Moving vehicles ─────────────────────────────────────
+    _roadVehicles.forEach(function(v){
+      updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H);
+      drawRoadVehicle(ctx, v);
+    });
+
+    // ─── Intersection labels ──────────────────────────────────
+    ctx.fillStyle = '#00e5ff55';
+    ctx.font = 'bold 11px Orbitron, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(j.name.toUpperCase(), cx, cy + armW/2 + 52);
+    ctx.font = '8px Share Tech Mono, monospace';
+    ctx.fillStyle = '#3a5570';
+    ctx.fillText(Math.round(j.cong*100)+'% CONGESTION  |  '+
+      (lp&&lp.delay?lp.delay[idx].toFixed(0):'-')+'s DELAY  |  LOS '+(lp&&lp.los?lp.los[idx]:'-'), cx, cy+armW/2+66);
+
+    // Signal timer overlaid at top of road view
+    var sColor = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    var sRemain = sig.state==='green' ? Math.max(0,sig.gDur-sig.phase) :
+                  sig.state==='yellow'? Math.max(0,sig.gDur+sig.cycle*0.07-sig.phase) :
+                  Math.max(0,sig.cycle-sig.phase);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 28px Orbitron, monospace';
+    ctx.fillStyle = sColor;
+    ctx.shadowBlur = 20; ctx.shadowColor = sColor;
+    ctx.fillText(sRemain.toFixed(0), cx, 52);
+    ctx.shadowBlur = 0;
+    ctx.font = '9px Share Tech Mono, monospace';
+    ctx.fillStyle = sColor;
+    ctx.fillText((sig.evp?'EVP PRIORITY':sig.state.toUpperCase())+' — '+sRemain.toFixed(0)+'s REMAINING', cx, 68);
+
+    // North/South/East/West labels
+    ctx.font = '8px Share Tech Mono, monospace';
+    ctx.fillStyle = '#3a5570';
+    [['N', cx, 14], ['S', cx, H-6], ['E', W-8, cy+4], ['W', 8, cy+4]].forEach(function(l){
+      ctx.textAlign = l[2]===8?'left':l[2]===W-8?'right':'center';
+      ctx.fillText(l[0], l[1], l[2]);
+    });
+    ctx.textAlign = 'left';
+
+    // Update live signal display in left panel
+    updateIntxSignalPanel(idx, sig, sRemain, sColor);
+
+    _roadAnimId = requestAnimationFrame(drawRoadScene);
+  }
+  _roadAnimId = requestAnimationFrame(drawRoadScene);
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function makeRoadVehicle(canvas, idx){
+  var dirs = ['N','S','E','W'];
+  var dir  = dirs[Math.floor(Math.random()*dirs.length)];
+  return {dir: dir, pos: Math.random()*0.9, lane: Math.random()>0.5?1:-1,
+    speed: 0.008 + Math.random()*0.012, state:'moving',
+    col: Math.random()<0.08?'#ff2244':'#00ccff',
+    len: 8+Math.random()*4, wid: 4+Math.random()*2};
+}
+
+function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
+  var half = armW/2;
+  var stopLine = 0.55; // normalised progress where vehicle stops at red
+  var isRed = sig.state === 'red' && !sig.evp;
+  var inBox  = v.pos > stopLine && v.pos < 0.7;
+  var atStop = isRed && v.pos > stopLine - 0.05 && v.pos < stopLine + 0.03;
+  var speedMul = atStop ? 0 : isRed && v.pos > stopLine - 0.15 ? 0.2 : 1.0;
+  speedMul *= (1 - cong * 0.6);
+  v.pos += v.speed * speedMul * dt * 30;
+  if(v.pos > 1.05) v.pos = 0;
+}
+
+function drawRoadVehicle(ctx, v){
+  var canvas = document.getElementById('road-canvas');
+  if(!canvas) return;
+  var W = canvas.width, H = canvas.height;
+  var cx = W/2, cy = H/2, half = 35;
+  var x, y, rot;
+  var t = v.pos;
+  var laneOff = v.lane * 12;
+  if(v.dir==='N'){ x = cx + laneOff; y = H - t*H; rot = 0; }
+  else if(v.dir==='S'){ x = cx - laneOff; y = t*H; rot = Math.PI; }
+  else if(v.dir==='E'){ x = t*W; y = cy + laneOff; rot = Math.PI/2; }
+  else { x = W - t*W; y = cy - laneOff; rot = -Math.PI/2; }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = v.col + 'cc';
+  ctx.fillRect(-v.wid/2, -v.len/2, v.wid, v.len);
+  // Headlights
+  ctx.fillStyle = '#ffffff88';
+  ctx.fillRect(-v.wid/2, v.len/2-2, v.wid/2-1, 1.5);
+  ctx.fillRect(1, v.len/2-2, v.wid/2-1, 1.5);
+  ctx.restore();
+}
+
+function updateIntxSignalPanel(idx, sig, remain, sColor){
+  var tmrEl  = document.getElementById('imod-signal-timer');
+  var lblEl  = document.getElementById('imod-signal-label');
+  var fillEl = document.getElementById('imod-phase-fill');
+  var housingEl = document.getElementById('imod-signal-display');
+  if(!tmrEl) return;
+  tmrEl.textContent = remain.toFixed(0);
+  tmrEl.style.color = sColor;
+  if(lblEl){ lblEl.textContent = (sig.evp?'EVP PRIORITY':sig.state.toUpperCase())+' PHASE'; lblEl.style.color=sColor; }
+  if(fillEl){ fillEl.style.width = Math.round(sig.phase/sig.cycle*100)+'%'; fillEl.style.background = sColor; }
+  // Update signal lamps in left panel housing
+  if(housingEl && housingEl.firstChild){
+    var lamps = housingEl.firstChild.querySelectorAll('.sig-lamp');
+    if(lamps.length === 3){
+      lamps[0].className = 'sig-lamp ' + (sig.state==='red'||sig.evp?'on-r':'off');
+      lamps[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
+      lamps[2].className = 'sig-lamp ' + (sig.state==='green'&&!sig.evp?'on-g':'off');
+    }
+  }
+}
+
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 refreshCUR();
 spawnParticles();
@@ -4666,4 +5365,4 @@ requestAnimationFrame(loop);
 </html>
 """
 
-components.html(HTML, height=990, scrolling=False)
+components.html(HTML, height=1026, scrolling=False)
