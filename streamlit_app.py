@@ -5480,11 +5480,13 @@ function makeRoadVehicle(canvas, idx){
 
   // Real speed: base free-flow for this junction, px/s calculated in update()
   var avgCong = j.cong;
+  // Base speeds raised: on an 80m canvas 30 km/h crosses in ~9.6s — looks right.
+  // Congested junctions still feel slow; free-flow feels brisk.
   var baseKmh;
-  if (avgCong >= 0.65)      baseKmh = 10 + Math.random() * 8;   // 10-18 km/h ORR critical
-  else if (avgCong >= 0.50) baseKmh = 18 + Math.random() * 10;  // 18-28 km/h moderate
-  else if (avgCong >= 0.40) baseKmh = 22 + Math.random() * 10;  // 22-32 km/h inner ring
-  else                      baseKmh = 28 + Math.random() * 12;  // 28-40 km/h sub-arterial
+  if (avgCong >= 0.65)      baseKmh = 20 + Math.random() * 15;  // 20-35 km/h ORR critical
+  else if (avgCong >= 0.50) baseKmh = 30 + Math.random() * 15;  // 30-45 km/h moderate
+  else if (avgCong >= 0.40) baseKmh = 35 + Math.random() * 15;  // 35-50 km/h inner ring
+  else                      baseKmh = 40 + Math.random() * 20;  // 40-60 km/h sub-arterial
 
   // Vehicle appearance
   var rnd = Math.random();
@@ -5503,60 +5505,56 @@ function makeRoadVehicle(canvas, idx){
 }
 
 function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
-  // ── Compute pixel-per-second speed from real km/h ──────────────────────────
-  // Canvas represents ~300m of road (each arm ≈ 150m one-way).
-  // W px = 300m  →  1m = W/300 px  →  1 km/h = 1000/3600 m/s = W/(300*3.6) px/s
-  var realMetres = 300.0;
-  var pxPerM  = (v.dir === 'N' || v.dir === 'S') ? H / realMetres : W / realMetres;
-  var pxPerKmh = pxPerM * 1000.0 / 3600.0;
-
-  // ── Determine signal state for this vehicle's direction ───────────────────
+  // ── Speed model: canvas intersection view ≈ 80m across  ──────────────────
+  // At 30 km/h a car crosses the canvas (~80m) in ~9.6s → looks real.
+  // normSpeed/s = kmh * (1000/3600) / 80  = kmh / 288
+  // We work in normalised coords [0..1] = one full canvas length.
+  var CANVAS_METRES = 80.0;  // visual scale: canvas ≈ 80m of real road
   var isNS = (v.dir === 'N' || v.dir === 'S');
+
+  // ── Signal state for this direction ──────────────────────────────────────
   var sigState = sig.evp ? 'green'
                : isNS   ? (sig.nsState || sig.state)
                          : (sig.ewState || 'red');
+  var isRed = (sigState === 'red' || sigState === 'yellow');
 
-  // ── Stop line logic ────────────────────────────────────────────────────────
-  // Intersection box centre at pos≈0.5; stop line just before it at pos≈0.40
-  var STOP = 0.40;
-  var isRed  = (sigState === 'red' || sigState === 'yellow');
-  // Queue behind stop: if red AND approaching the stop line
-  var distToStop = STOP - v.pos;  // positive = not yet at stop
-  var stopping   = isRed && distToStop > -0.02 && distToStop < 0.18;
-  var atStop     = isRed && distToStop >= -0.01 && distToStop < 0.03;
+  // ── Stop line: intersection box starts at ~0.38 normalised ───────────────
+  var STOP = 0.38;
+  var distToStop = STOP - v.pos;
+  var atStop   = isRed && distToStop >= -0.01 && distToStop < 0.025;
+  var stopping = isRed && distToStop >   0.025 && distToStop < 0.20;
 
-  // ── Target speed ───────────────────────────────────────────────────────────
-  var freeKmh = v.baseKmh * S.wave / 25.0;  // slider scales free-flow speed
-  // Congestion factor: reduces speed proportionally (never below 15% on green)
-  var congFactor = Math.max(0.15, 1.0 - cong * 0.65);
+  // ── Free-flow speed in km/h (slider S.wave scales it 0.4x–2.4x) ─────────
+  // S.wave default 25 → scale 1.0; range 10–60 → scale 0.4–2.4
+  var waveScale = S.wave / 25.0;
+  var freeKmh   = v.baseKmh * waveScale;
+
+  // Congestion: mild reduction only (never below 25% on green)
+  var congFactor = Math.max(0.25, 1.0 - cong * 0.5);
+
   var tgtKmh;
   if (atStop) {
     tgtKmh = 0;
   } else if (stopping) {
-    // Smooth deceleration: ramp from full to 0 over 0.18 normalised distance
-    var ramp = Math.max(0, distToStop / 0.18);
+    var ramp = Math.max(0.05, distToStop / 0.20);
     tgtKmh = freeKmh * congFactor * ramp;
   } else {
     tgtKmh = freeKmh * congFactor;
   }
-  v.targetSpeedPxS = tgtKmh * pxPerKmh * S.speed;
 
-  // ── Smooth acceleration / deceleration ────────────────────────────────────
-  // Decel much faster than accel (realistic braking vs pull-away)
-  var accelRate = v.targetSpeedPxS > v.curSpeedPxS ? 60 : 180;  // px/s²
-  var diff = v.targetSpeedPxS - v.curSpeedPxS;
+  // Convert km/h → normalised progress per second
+  var tgtNorm = tgtKmh * (1000.0 / 3600.0) / CANVAS_METRES * S.speed;
+  v.targetSpeedPxS = tgtNorm;  // reused field, now stores norm/s
+
+  // ── Smooth accel / decel ──────────────────────────────────────────────────
+  var accelRate = tgtNorm > v.curSpeedPxS ? 0.8 : 3.0;  // norm/s² (fast brake, slow accel)
+  var diff = tgtNorm - v.curSpeedPxS;
   v.curSpeedPxS += Math.sign(diff) * Math.min(Math.abs(diff), accelRate * dt);
 
-  // ── Move in normalised coordinates ────────────────────────────────────────
-  // Convert px/s back to normalised progress/s
-  var axisLen = isNS ? H : W;
-  var normSpeedPerS = v.curSpeedPxS / axisLen;
-  v.pos += normSpeedPerS * dt;
+  v.pos += v.curSpeedPxS * dt;
 
-  // Wrap around: vehicle exits top/right, re-enters from bottom/left
   if (v.pos > 1.05) {
     v.pos = 0;
-    // Randomise lane on re-entry
     v.laneIdx = Math.floor(Math.random() * v.lanesPerSide);
   }
 }
