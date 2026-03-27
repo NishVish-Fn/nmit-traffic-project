@@ -3010,9 +3010,17 @@ var GD = {g0:[],g1:[],g2:[],g3:[],g4:[],g5:[]};
 for (var k in GD) { for (var i=0;i<GL;i++) GD[k].push(0); }
 
 // ── SIGNALS ───────────────────────────────────────────────────────────────────
+// Real-world 4-signal logic: N-S and E-W are OPPOSITE phases.
+// When NS is green, EW is red, and vice versa (with yellow transitions).
+// phase is the master clock [0, cycle). NS green = [0, gDur), EW green = [gDur+yDur, cycle-yDur)
 var SIG = JN.map(function(j,i) {
-  return {id:i, phase:Math.random()*90, cycle:90,
-          state:'red', evp:false, gDur:45, eff:0.5, wait:Math.floor(j.cong*50)};
+  // Stagger starting phases so junctions don't all switch simultaneously
+  var startPhase = (i * 17.3) % 90;  // offset each junction
+  return {id:i, phase:startPhase, cycle:90,
+          state:'red',      // legacy: NS state (for sidebar/UI panels)
+          nsState:'red',    // North-South signal state
+          ewState:'green',  // East-West signal state (opposite phase)
+          evp:false, gDur:45, eff:0.5, wait:Math.floor(j.cong*50)};
 });
 
 // ── PARTICLES ─────────────────────────────────────────────────────────────────
@@ -3135,8 +3143,16 @@ Particle.prototype.update = function(dt) {
     var af = S.algo==='fixed' ? 1.25 : 1.0;
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
+    // Determine if this vehicle is traveling primarily N-S or E-W
+    // by comparing the lat vs lng displacement of the edge
+    var startId = this.dir===1 ? e[0] : e[1];
+    var jA = JN[startId], jB = JN[endId];
+    var dLat = Math.abs(jB.lat - jA.lat);
+    var dLng = Math.abs(jB.lng - jA.lng);
+    var isNS = dLat >= dLng;  // true = N-S traveler, false = E-W traveler
+    var relevantState = sig.evp ? 'green' : (isNS ? sig.nsState : sig.ewState);
+    var stop = (!this.isE && distEnd<.22 && relevantState==='red' && !sig.evp);
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
-    var stop = (!this.isE && distEnd<.22 && sig.state==='red' && !sig.evp);
 
     // Speed scale: S.wave represents free-flow speed in km/h (default 40)
     // Vehicles scale their speed relative to this green-wave speed setting
@@ -3315,27 +3331,38 @@ function renderParticles(){
   for(var ji=0;ji<JN.length;ji++){
     var j=JN[ji]; var sig=SIG[ji];
     var jpt=ll2px(j.lat,j.lng);
-    var col=sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
     var R=8+(j.lanes||3)*1.5;
-    // 4 signal arms (N/S/E/W)
-    var arms=[{dx:0,dy:-(R+6)},{dx:0,dy:R+6},{dx:R+6,dy:0},{dx:-(R+6),dy:0}];
+
+    // Determine NS and EW colors independently (real-world 4-signal)
+    function sigColor(st, evp){ return evp?'#ff2244':st==='green'?'#00ff88':st==='yellow'?'#ffd700':'#ff2244'; }
+    var colNS = sigColor(sig.nsState, sig.evp);
+    var colEW = sigColor(sig.ewState, sig.evp);
+
+    // 4 signal arms: N and S share NS phase, E and W share EW phase
+    var arms=[
+      {dx:0,  dy:-(R+6), col:colNS},   // North
+      {dx:0,  dy: R+6,   col:colNS},   // South
+      {dx: R+6, dy:0,    col:colEW},   // East
+      {dx:-(R+6),dy:0,   col:colEW}    // West
+    ];
     for(var ai=0;ai<arms.length;ai++){
       var arm=arms[ai];
       cx.save();
-      cx.fillStyle=col+'cc';
-      cx.shadowBlur=7; cx.shadowColor=col;
+      cx.fillStyle=arm.col+'cc';
+      cx.shadowBlur=7; cx.shadowColor=arm.col;
       cx.fillRect(jpt.x+arm.dx-3,jpt.y+arm.dy-3,6,6);
       cx.shadowBlur=0; cx.restore();
     }
-    // Junction glow ring
+    // Junction glow ring — use NS color as primary
+    var glowCol = sig.evp?'#ff2244':colNS;
     cx.save(); cx.beginPath();
     cx.arc(jpt.x,jpt.y,R+3,0,Math.PI*2);
-    cx.fillStyle=col+'12'; cx.fill(); cx.restore();
+    cx.fillStyle=glowCol+'12'; cx.fill(); cx.restore();
     // Phase progress arc
     var pct=sig.phase/sig.cycle;
     cx.save(); cx.beginPath();
     cx.arc(jpt.x,jpt.y,R,-Math.PI/2,-Math.PI/2+pct*2*Math.PI);
-    cx.strokeStyle=col+'77'; cx.lineWidth=2.5; cx.stroke(); cx.restore();
+    cx.strokeStyle=glowCol+'77'; cx.lineWidth=2.5; cx.stroke(); cx.restore();
   }
 
   // Draw regular vehicles as directional mini-cars
@@ -3523,7 +3550,7 @@ function updateSignals(dt){
       var ov=document.getElementById('evpo');
       if(ov){ov.classList.add('on');setTimeout(function(){var o=document.getElementById('evpo');if(o)o.classList.remove('on');},600);}
     }
-    if(sig.evp){sig.state='green';sig.eff=1;sig.gDur=S.cycle*.95;continue;}
+    if(sig.evp){sig.state='green';sig.nsState='green';sig.ewState='green';sig.eff=1;sig.gDur=S.cycle*.95;continue;}
 
     // LP-optimal green time (from Python scipy solver)
     var gDur=S.cycle*.5;
@@ -3546,9 +3573,23 @@ function updateSignals(dt){
 
     sig.gDur=gDur; sig.cycle=S.cycle;
     var yDur=S.cycle*.07;
-    if(sig.phase<gDur) sig.state='green';
-    else if(sig.phase<gDur+yDur) sig.state='yellow';
-    else sig.state='red';
+    // ── REAL-WORLD 4-SIGNAL LOGIC ─────────────────────────────────────────────
+    // N-S phase: green=[0, gDur), yellow=[gDur, gDur+yDur), red=rest
+    // E-W phase: opposite — green=[gDur+yDur, cycle-yDur), yellow=[cycle-yDur, cycle), red=[0, gDur+yDur)
+    var ewStart = gDur + yDur;          // EW green starts after NS red+yellow
+    var ewDur   = S.cycle - ewStart - yDur;  // EW green duration (fills remaining time minus EW yellow)
+    if(ewDur < 8) ewDur = 8;           // minimum green guard
+
+    if(sig.phase < gDur){
+      sig.nsState = 'green';  sig.ewState = 'red';
+    } else if(sig.phase < gDur + yDur){
+      sig.nsState = 'yellow'; sig.ewState = 'red';
+    } else if(sig.phase < ewStart + ewDur){
+      sig.nsState = 'red';    sig.ewState = 'green';
+    } else {
+      sig.nsState = 'red';    sig.ewState = 'yellow';
+    }
+    sig.state = sig.nsState;  // legacy state = NS for existing panels
     sig.eff=(gDur/S.cycle)*warm;
     sig.wait=sig.state==='red'?Math.floor(JN[i].cong*45*DMUL[S.dens-1]):Math.floor(JN[i].cong*10);
   }
