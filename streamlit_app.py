@@ -4708,6 +4708,8 @@ function loop(ts){
     // Junction tab signal timers: update every 3 frames for smooth countdown
     if(S.frame%3===0) updateJunctionTimers();
     if(S.frame%5===0){
+      // Live-update intersection modal stats when open
+      if(_curIntxIdx >= 0) liveUpdateIntxStats(_curIntxIdx);
       // Real-time signal countdown – update sigpanel-rt every 5 frames (~3/sec)
       var spRT2=g('sigpanel-rt');
       if(spRT2&&spRT2.children.length===SIG.length){
@@ -5336,6 +5338,159 @@ function updateIntxSignalPanel(idx, sig, remain, sColor){
       lamps[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
       lamps[2].className = 'sig-lamp ' + (sig.state==='green'&&!sig.evp?'on-g':'off');
     }
+  }
+}
+
+// ── LIVE INTERSECTION STATS UPDATE ─────────────────────────────────────────
+// Called every 5 frames from the main loop when the intersection modal is open.
+// Updates KPIs, queue snake, delay bars, and signal panel WITHOUT rebuilding
+// static sections (header, approach arms, OD flows, LP solver data).
+function liveUpdateIntxStats(idx){
+  if(idx < 0 || idx >= JN.length) return;
+  var modal = document.getElementById('intx-modal');
+  if(!modal || !modal.classList.contains('open')) return;
+
+  var j   = JN[idx];
+  var sig = SIG[idx];
+  var lp  = CUR.lp;
+  var pi  = CUR.pi;
+  var rf  = BACKEND.rf;
+
+  var congColor  = j.cong > 0.65 ? '#ff2244' : j.cong > 0.45 ? '#ff8c00' : '#00ff88';
+  var losColors  = {'A':'#00ff88','B':'#00cc66','C':'#ffd700','D':'#ff8c00','E':'#ff4422','F':'#ff0033'};
+
+  // Derive live values
+  var algoMul = S.algo==='fixed'?1.35 : S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20)
+              : S.algo==='optimal'?(1-Math.min(S.booted/500,1)*0.35)
+              : S.algo==='webster'?(1-Math.min(S.booted/500,1)*0.15) : 1.0;
+  var C_optL  = lp && lp.C_opt ? lp.C_opt : 90;
+  var cydL    = 1 + Math.abs(S.cycle - C_optL) / C_optL * 0.6;
+
+  var x      = lp && lp.x      ? lp.x[idx]      : j.cong;
+  var delay  = lp && lp.delay  ? Math.min(lp.delay[idx] * algoMul * cydL, 300) : 80;
+  var qlen   = lp && lp.q_len  ? lp.q_len[idx]  : 0;
+  // Recompute live queue from current signal phase (more dynamic)
+  if(lp && lp.q_pcu && lp.lambda){
+    var _qR  = lp.q_pcu[idx] / 3600;
+    var _lam = lp.lambda[idx];
+    var _xN  = Math.min(x, 0.999);
+    qlen = Math.max(0, Math.min(Math.round(_qR * sig.cycle * (1-_lam)*(1-_lam) /
+           Math.max(2*(1-_lam*_xN), 0.01)), 999));
+    // Grow queue during red, drain during green
+    if(sig.state === 'red' && !sig.evp){
+      var redFrac = Math.min(sig.phase / sig.cycle, 1);
+      qlen = Math.round(qlen * (0.7 + 0.6 * redFrac));
+    } else if(sig.state === 'green'){
+      var greenFrac = Math.min(sig.phase / sig.gDur, 1);
+      qlen = Math.round(qlen * Math.max(0.1, 1 - greenFrac * 0.8));
+    }
+  }
+  var los    = lp && lp.los    ? lp.los[idx]    : 'D';
+  var green  = lp && lp.g      ? lp.g[idx]      : sig.gDur;
+  var lam    = lp && lp.lambda ? lp.lambda[idx] : 0.5;
+
+  // ── Update congestion / icon header ──────────────────────────────
+  var iconEl = document.getElementById('imod-icon');
+  if(iconEl) iconEl.textContent = j.cong > 0.65 ? '🚨' : j.cong > 0.45 ? '⚠️' : '✅';
+
+  // ── Update KPI grid ───────────────────────────────────────────────
+  var kpis = [
+    {v: Math.round(j.cong*100)+'%', l:'Congestion', c: j.cong>0.65?'#ff2244':j.cong>0.45?'#ff8c00':'#00ff88', border:'var(--red)'},
+    {v: delay.toFixed(0)+'s',        l:'HCM Delay',  c: delay>80?'#ff2244':delay>35?'#ff8c00':'#00ff88', border:'var(--orange)'},
+    {v: x.toFixed(3),                l:'v/c Ratio',  c: x>0.9?'#ff2244':x>0.7?'#ff8c00':'#00ff88', border:'var(--cyan)'},
+    {v: green.toFixed(0)+'s',        l:'Green Time', c:'var(--cyan)', border:'var(--cyan)'},
+    {v: qlen,                         l:'Queue (veh)',c:'var(--yellow)', border:'var(--yellow)'},
+    {v: los,                          l:'HCM LOS',   c:losColors[los]||'#ffd700', border:losColors[los]||'#ffd700'},
+    {v: (lam*100).toFixed(0)+'%',    l:'Green Ratio',c:'var(--purple)', border:'var(--purple)'},
+    {v: (j.peak/1000).toFixed(1)+'K',l:'Peak PCU/hr',c:'var(--green)', border:'var(--green)'},
+  ];
+  var kpiEl = document.getElementById('imod-kpis');
+  if(kpiEl) kpiEl.innerHTML = kpis.map(function(k){
+    return '<div class="p-kpi" style="border-left-color:'+k.border+'">'+
+      '<div class="p-kpi-v" style="color:'+k.c+'">'+k.v+'</div>'+
+      '<div class="p-kpi-l">'+k.l+'</div></div>';
+  }).join('');
+
+  // ── Update queue snake ────────────────────────────────────────────
+  var qSnake = document.getElementById('imod-queue-snake');
+  var qLabel = document.getElementById('imod-queue-label');
+  if(qSnake){
+    var snakeHtml = '';
+    for(var qi = 0; qi < Math.min(qlen, 60); qi++){
+      var ratio = qi / Math.max(qlen, 1);
+      snakeHtml += '<div class="q-car'+(ratio > 0.7 ? ' red' : '')+'"></div>';
+    }
+    qSnake.innerHTML = snakeHtml;
+  }
+  if(qLabel) qLabel.textContent = qlen + ' vehicles queued • ' + (qlen * 6.5).toFixed(0) + 'm back';
+
+  // ── Update HCM delay component bars ───────────────────────────────
+  var d1v = lp && lp.delay_d1 ? lp.delay_d1[idx] : delay * 0.55;
+  var d2v = lp && lp.delay_d2 ? lp.delay_d2[idx] : delay * 0.35;
+  var d3v = lp && lp.delay_d3 ? lp.delay_d3[idx] : delay * 0.10;
+  var maxD = Math.max(d1v, d2v, d3v, delay, 0.1);
+  var delayBars = [
+    {l:'d₁ Uniform ×PF', v:d1v, c:'#00e5ff'},
+    {l:'d₂ Incremental', v:d2v, c:'#ff8c00'},
+    {l:'d₃ Initial Queue',v:d3v,c:'#bb77ff'},
+    {l:'Total d',         v:delay,c:'#ffd700'},
+  ];
+  var dbEl = document.getElementById('imod-delay-bars');
+  if(dbEl) dbEl.innerHTML = delayBars.map(function(b){
+    var pct = Math.round(b.v / maxD * 100);
+    return '<div style="margin-bottom:6px">'+
+      '<div style="display:flex;justify-content:space-between;font-family:Share Tech Mono,monospace;font-size:.44rem;color:#4a6880;margin-bottom:2px">'+
+        '<span>'+b.l+'</span><span style="color:'+b.c+'">'+b.v.toFixed(1)+'s</span></div>'+
+      '<div style="height:8px;background:#0a1828;border-radius:4px;overflow:hidden">'+
+        '<div style="width:'+pct+'%;height:100%;background:'+b.c+';border-radius:4px;box-shadow:0 0 6px '+b.c+'44;transition:width .4s"></div>'+
+      '</div></div>';
+  }).join('');
+
+  // ── Update signal housing lamps (duplicate-safe) ──────────────────
+  var housingEl = document.getElementById('imod-signal-display');
+  if(housingEl && housingEl.firstChild){
+    var lamps2 = housingEl.firstChild.querySelectorAll('.sig-lamp');
+    if(lamps2.length === 3){
+      lamps2[0].className = 'sig-lamp ' + (sig.state==='red'||sig.evp?'on-r':'off');
+      lamps2[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
+      lamps2[2].className = 'sig-lamp ' + (sig.state==='green'&&!sig.evp?'on-g':'off');
+    }
+  }
+
+  // ── Update bottom stats bar ───────────────────────────────────────
+  var botEl = document.getElementById('imod-bottom');
+  if(botEl){
+    var stats = [
+      {v: j.name,                          l:'Junction'},
+      {v: Math.round(j.cong*100)+'%',      l:'Congestion Level'},
+      {v: delay.toFixed(0)+'s',            l:'Webster Delay'},
+      {v: x.toFixed(3),                    l:'v/c Ratio'},
+      {v: los,                              l:'HCM LOS'},
+      {v: qlen,                             l:'Queue (veh)'},
+      {v: green.toFixed(0)+'s',            l:'LP Green Time'},
+      {v: j.lanes,                          l:'Lanes'},
+      {v: (j.daily/1000).toFixed(0)+'K',  l:'Daily Volume'},
+    ];
+    botEl.innerHTML = stats.map(function(s){
+      return '<div class="imod-stat">'+
+        '<div class="imod-stat-v" style="color:'+congColor+'">'+s.v+'</div>'+
+        '<div class="imod-stat-l">'+s.l+'</div></div>';
+    }).join('<div style="width:1px;height:28px;background:#0d2040;flex-shrink:0"></div>');
+  }
+
+  // ── Update PI + emissions ─────────────────────────────────────────
+  var piJ = pi && pi.per_jct && pi.per_jct[idx] ? pi.per_jct[idx] : null;
+  if(piJ){
+    var piEl = document.getElementById('imod-pi-data');
+    var emEl = document.getElementById('imod-emissions');
+    if(piEl) piEl.innerHTML =
+      '<div><span style="color:#4a6880">PI_i: </span><span style="color:#ffd700">'+piJ.pi_i.toFixed(0)+'</span></div>'+
+      '<div><span style="color:#4a6880">Flow q: </span><span style="color:#00e5ff">'+piJ.q_i.toFixed(0)+' PCU/hr</span></div>'+
+      '<div><span style="color:#4a6880">Stop rate: </span><span style="color:#ff8c00">'+piJ.s_i.toFixed(3)+'</span></div>';
+    if(emEl) emEl.innerHTML =
+      '<div><span style="color:#4a6880">Fuel: </span><span style="color:#ff8c00">'+piJ.fuel_lph.toFixed(1)+' L/hr</span></div>'+
+      '<div><span style="color:#4a6880">CO₂: </span><span style="color:#00ff88">'+piJ.co2_kph.toFixed(1)+' kg/hr</span></div>'+
+      '<div style="font-size:.42rem;color:#2a4060;margin-top:4px">MOVES-lite estimate</div>';
   }
 }
 
