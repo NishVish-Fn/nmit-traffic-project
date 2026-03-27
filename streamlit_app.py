@@ -1331,7 +1331,7 @@ HTML = """<!DOCTYPE html>
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:#b8d8f0;font-family:'Rajdhani',sans-serif;
-     width:100%;height:1026px;overflow:hidden;display:flex;flex-direction:column}
+     width:100%;height:1026px;overflow:hidden;display:flex;flex-direction:column;position:relative}
 
 /* HEADER */
 #hdr{height:56px;flex-shrink:0;background:linear-gradient(90deg,#000a18,#020810 50%,#000a18);
@@ -1552,7 +1552,7 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
   letter-spacing:2px;margin-right:4px;padding-right:6px;border-right:1px solid #0d2040;
   white-space:nowrap}
 /* ── INTERSECTION MODAL OVERLAY ─────────────────────────────────────── */
-#intx-modal{position:fixed;inset:0;z-index:9000;background:rgba(1,4,10,.97);
+#intx-modal{position:absolute;inset:0;z-index:9000;background:rgba(1,4,10,.97);
   display:none;flex-direction:column;overflow:hidden}
 #intx-modal.open{display:flex}
 #imod-hdr{height:54px;background:linear-gradient(90deg,#000a18,#040e1e,#000a18);
