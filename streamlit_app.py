@@ -3012,15 +3012,29 @@ for (var k in GD) { for (var i=0;i<GL;i++) GD[k].push(0); }
 // ── SIGNALS ───────────────────────────────────────────────────────────────────
 // Real-world 4-signal logic: N-S and E-W are OPPOSITE phases.
 // When NS is green, EW is red, and vice versa (with yellow transitions).
-// phase is the master clock [0, cycle). NS green = [0, gDur), EW green = [gDur+yDur, cycle-yDur)
+// Helper: compute NS/EW states from phase
+function computeSigStates(phase, gDur, cycle) {
+  var yDur = cycle * 0.07;
+  var ewStart = gDur + yDur;
+  var ewEnd   = cycle - yDur;
+  var ns, ew;
+  if (phase < gDur)             { ns = 'green';  ew = 'red';    }
+  else if (phase < gDur + yDur) { ns = 'yellow'; ew = 'red';    }
+  else if (phase < ewEnd)       { ns = 'red';    ew = 'green';  }
+  else                           { ns = 'red';    ew = 'yellow'; }
+  return {ns: ns, ew: ew};
+}
+
 var SIG = JN.map(function(j,i) {
   // Stagger starting phases so junctions don't all switch simultaneously
-  var startPhase = (i * 17.3) % 90;  // offset each junction
+  var startPhase = (i * 17.3) % 90;
+  var gDur = 45;
+  var states = computeSigStates(startPhase, gDur, 90);
   return {id:i, phase:startPhase, cycle:90,
-          state:'red',      // legacy: NS state (for sidebar/UI panels)
-          nsState:'red',    // North-South signal state
-          ewState:'green',  // East-West signal state (opposite phase)
-          evp:false, gDur:45, eff:0.5, wait:Math.floor(j.cong*50)};
+          state:states.ns,      // legacy NS state for UI panels
+          nsState:states.ns,    // North-South signal
+          ewState:states.ew,    // East-West signal (opposite)
+          evp:false, gDur:gDur, eff:0.5, wait:Math.floor(j.cong*50)};
 });
 
 // ── PARTICLES ─────────────────────────────────────────────────────────────────
@@ -3324,8 +3338,17 @@ resizeFC();
 window.addEventListener('resize',resizeFC);
 function ll2px(lat,lng){try{var p=map.latLngToContainerPoint([lat,lng]);return {x:p.x,y:p.y};}catch(e){return{x:-100,y:-100};}}
 
+// Signal arm color helper — global scope, used in renderParticles
+function _sigArmColor(st, evp){
+  if(evp) return '#ff2244';
+  if(st === 'green')  return '#00ff88';
+  if(st === 'yellow') return '#ffd700';
+  return '#ff2244';
+}
+
 function renderParticles(){
   cx.clearRect(0,0,fc.width,fc.height);
+
 
   // Draw 4-arm signal indicators at each junction
   for(var ji=0;ji<JN.length;ji++){
@@ -3333,17 +3356,16 @@ function renderParticles(){
     var jpt=ll2px(j.lat,j.lng);
     var R=8+(j.lanes||3)*1.5;
 
-    // Determine NS and EW colors independently (real-world 4-signal)
-    function sigColor(st, evp){ return evp?'#ff2244':st==='green'?'#00ff88':st==='yellow'?'#ffd700':'#ff2244'; }
-    var colNS = sigColor(sig.nsState, sig.evp);
-    var colEW = sigColor(sig.ewState, sig.evp);
+    // NS and EW are opposite phases — never both green
+    var colNS = _sigArmColor(sig.nsState || sig.state, sig.evp);
+    var colEW = _sigArmColor(sig.ewState || 'red',     sig.evp);
 
-    // 4 signal arms: N and S share NS phase, E and W share EW phase
+    // 4 signal arms: N and S use NS phase color, E and W use EW phase color
     var arms=[
-      {dx:0,  dy:-(R+6), col:colNS},   // North
-      {dx:0,  dy: R+6,   col:colNS},   // South
-      {dx: R+6, dy:0,    col:colEW},   // East
-      {dx:-(R+6),dy:0,   col:colEW}    // West
+      {dx:0,      dy:-(R+6), col:colNS},   // North
+      {dx:0,      dy: R+6,   col:colNS},   // South
+      {dx: R+6,   dy:0,      col:colEW},   // East
+      {dx:-(R+6), dy:0,      col:colEW}    // West
     ];
     for(var ai=0;ai<arms.length;ai++){
       var arm=arms[ai];
@@ -3572,23 +3594,11 @@ function updateSignals(dt){
     // fixed timer: gDur stays at cycle*.5
 
     sig.gDur=gDur; sig.cycle=S.cycle;
-    var yDur=S.cycle*.07;
     // ── REAL-WORLD 4-SIGNAL LOGIC ─────────────────────────────────────────────
-    // N-S phase: green=[0, gDur), yellow=[gDur, gDur+yDur), red=rest
-    // E-W phase: opposite — green=[gDur+yDur, cycle-yDur), yellow=[cycle-yDur, cycle), red=[0, gDur+yDur)
-    var ewStart = gDur + yDur;          // EW green starts after NS red+yellow
-    var ewDur   = S.cycle - ewStart - yDur;  // EW green duration (fills remaining time minus EW yellow)
-    if(ewDur < 8) ewDur = 8;           // minimum green guard
-
-    if(sig.phase < gDur){
-      sig.nsState = 'green';  sig.ewState = 'red';
-    } else if(sig.phase < gDur + yDur){
-      sig.nsState = 'yellow'; sig.ewState = 'red';
-    } else if(sig.phase < ewStart + ewDur){
-      sig.nsState = 'red';    sig.ewState = 'green';
-    } else {
-      sig.nsState = 'red';    sig.ewState = 'yellow';
-    }
+    // Uses computeSigStates() — NS and EW are always opposite phases
+    var _st = computeSigStates(sig.phase, gDur, S.cycle);
+    sig.nsState = _st.ns;
+    sig.ewState = _st.ew;
     sig.state = sig.nsState;  // legacy state = NS for existing panels
     sig.eff=(gDur/S.cycle)*warm;
     sig.wait=sig.state==='red'?Math.floor(JN[i].cong*45*DMUL[S.dens-1]):Math.floor(JN[i].cong*10);
