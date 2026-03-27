@@ -1251,63 +1251,65 @@ def validation_metrics(lp_result):
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. Compute everything & inject into session state as JSON
 #     ORDER: RF first → weights → LP (so RF actively controls signal timing)
+#     ALL heavy computations are cached in st.session_state so they only run
+#     ONCE per browser session — reopening the panel will NOT re-randomise stats.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── STEP 0: Fourier+ES forecast FIRST — density_scale_factor feeds LP ────────
-# This closes the Fourier→LP loop: peak-slot forecast normalised to network
-# average becomes the demand scaling factor passed into run_lp().
-ML_DATA   = ml_demand_forecast()
-_ML_DF    = float(ML_DATA.get("density_scale_factor", 1.0))  # e.g. ~1.24 at 08:00
+if "backend_json" not in st.session_state:
+    # ── STEP 0: Fourier+ES forecast FIRST — density_scale_factor feeds LP ──
+    ML_DATA   = ml_demand_forecast()
+    _ML_DF    = float(ML_DATA.get("density_scale_factor", 1.0))
 
-# ── STEP 1: Compute RF delay predictor (no LP dependency) ────────────────────
-RF_DATA = rf_delay_predictor()
-_RF_ADJ = RF_DATA["rf_weight_adj"]   # list of 12 per-junction LP weight multipliers
+    # ── STEP 1: RF delay predictor (no LP dependency) ───────────────────────
+    RF_DATA = rf_delay_predictor()
+    _RF_ADJ = RF_DATA["rf_weight_adj"]
 
-if "lp_result" not in st.session_state:
-    # LP uses Fourier-derived density factor so forecast directly scales demand
+    # ── STEP 2: LP + session-state helpers ──────────────────────────────────
     st.session_state.lp_result  = run_lp(C=90, density_factor=_ML_DF, rf_weight_adj=_RF_ADJ)
     st.session_state.lwr_result = lwr_shock_waves(density_factor=_ML_DF)
     st.session_state.compute_count = 0
     st.session_state.last_C     = 90
     st.session_state.last_dens  = _ML_DF
 
-# ── STEP 2: Precompute all density levels WITH RF-guided LP ──────────────────
-# The "high" density level is anchored to the Fourier-scaled factor (_ML_DF)
-# so that the 08:00 simulation slot directly reflects the forecast demand.
-dens_precomp = {}
-for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]:
-    lp_r  = run_lp(C=90, density_factor=df, rf_weight_adj=_RF_ADJ)
-    dens_precomp[name] = {
-        "lp":      lp_r,
-        "lwr":     lwr_shock_waves(density_factor=df),
-        "ctm":     ctm_analysis(density_factor=df),
-        "platoon": robertson_platoon_dispersion(density_factor=df),
-        "scoot":   scoot_adaptive_cycles(density_factor=df),
-        "pi":      network_performance_index(lp_r, density_factor=df),
-    }
+    # ── STEP 3: Precompute all density levels WITH RF-guided LP ─────────────
+    dens_precomp = {}
+    for df, name in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]:
+        lp_r  = run_lp(C=90, density_factor=df, rf_weight_adj=_RF_ADJ)
+        dens_precomp[name] = {
+            "lp":      lp_r,
+            "lwr":     lwr_shock_waves(density_factor=df),
+            "ctm":     ctm_analysis(density_factor=df),
+            "platoon": robertson_platoon_dispersion(density_factor=df),
+            "scoot":   scoot_adaptive_cycles(density_factor=df),
+            "pi":      network_performance_index(lp_r, density_factor=df),
+        }
 
-# Heavy one-time computations (run once at startup)
-PARETO_DATA   = multi_objective_pareto(C=90, density_factor=_ML_DF, n_eps=10)
-MC_SENSITIVITY = monte_carlo_sensitivity(C=90, density_factor=_ML_DF, n_samples=200)
-SCOOT_ALL = {k: v["scoot"] for k,v in dens_precomp.items()}
-RL_DATA   = rl_q_learning_controller(density_factor=_ML_DF, n_episodes=500)
-CTM_LP    = {k: ctm_lp_coupled(density_factor=df) for df,k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]}
-VALID     = validation_metrics(dens_precomp["high"]["lp"])
+    # ── STEP 4: Heavy one-time computations ─────────────────────────────────
+    PARETO_DATA    = multi_objective_pareto(C=90, density_factor=_ML_DF, n_eps=10)
+    MC_SENSITIVITY = monte_carlo_sensitivity(C=90, density_factor=_ML_DF, n_samples=200)
+    SCOOT_ALL      = {k: v["scoot"] for k, v in dens_precomp.items()}
+    RL_DATA        = rl_q_learning_controller(density_factor=_ML_DF, n_episodes=500)
+    CTM_LP         = {k: ctm_lp_coupled(density_factor=df) for df, k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]}
+    VALID          = validation_metrics(dens_precomp["high"]["lp"])
 
-BACKEND_JSON = json.dumps({
-    "dens_precomp":  dens_precomp,
-    "junctions":     JN,
-    "od_matrix":     OD.tolist(),
-    "od_totals":     q_demand.tolist(),
-    "pareto":        PARETO_DATA,
-    "mc_sensitivity": MC_SENSITIVITY,
-    "scoot_all":     SCOOT_ALL,
-    "rl":            RL_DATA,
-    "ml":            ML_DATA,
-    "ctm_lp":        CTM_LP,
-    "validation":    VALID,
-    "rf":            RF_DATA,
-}, separators=(',',':'))
+    # ── STEP 5: Serialise and cache the complete backend payload ─────────────
+    st.session_state.backend_json = json.dumps({
+        "dens_precomp":   dens_precomp,
+        "junctions":      JN,
+        "od_matrix":      OD.tolist(),
+        "od_totals":      q_demand.tolist(),
+        "pareto":         PARETO_DATA,
+        "mc_sensitivity": MC_SENSITIVITY,
+        "scoot_all":      SCOOT_ALL,
+        "rl":             RL_DATA,
+        "ml":             ML_DATA,
+        "ctm_lp":         CTM_LP,
+        "validation":     VALID,
+        "rf":             RF_DATA,
+    }, separators=(',', ':'))
+
+# Retrieve the stable cached payload (same values on every Streamlit re-run)
+BACKEND_JSON = st.session_state.backend_json
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HTML / JS FRONTEND
