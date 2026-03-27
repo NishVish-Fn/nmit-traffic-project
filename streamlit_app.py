@@ -2845,7 +2845,7 @@ details.csec summary:hover{background:#0a1828}
       </div>
     </div>
   </div>
-  <div id="imod-bottom" id="imod-bot"></div>
+  <div id="imod-bottom"></div>
 </div>
 
 <div id="statusbar">
