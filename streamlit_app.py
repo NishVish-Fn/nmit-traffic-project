@@ -5505,54 +5505,71 @@ function makeRoadVehicle(canvas, idx){
 }
 
 function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
-  // ── Speed model: canvas intersection view ≈ 80m across  ──────────────────
-  // At 30 km/h a car crosses the canvas (~80m) in ~9.6s → looks real.
-  // normSpeed/s = kmh * (1000/3600) / 80  = kmh / 288
-  // We work in normalised coords [0..1] = one full canvas length.
-  var CANVAS_METRES = 80.0;  // visual scale: canvas ≈ 80m of real road
+  // ── Canvas scale: intersection view ≈ 80m across ─────────────────────────
+  var CANVAS_METRES = 80.0;
   var isNS = (v.dir === 'N' || v.dir === 'S');
 
-  // ── Signal state for this direction ──────────────────────────────────────
-  var sigState = sig.evp ? 'green'
-               : isNS   ? (sig.nsState || sig.state)
-                         : (sig.ewState || 'red');
-  var isRed = (sigState === 'red' || sigState === 'yellow');
-
-  // ── Stop line: intersection box starts at ~0.38 normalised ───────────────
-  var STOP = 0.38;
-  var distToStop = STOP - v.pos;
-  var atStop   = isRed && distToStop >= -0.01 && distToStop < 0.025;
-  var stopping = isRed && distToStop >   0.025 && distToStop < 0.20;
-
-  // ── Free-flow speed in km/h (slider S.wave scales it 0.4x–2.4x) ─────────
-  // S.wave default 25 → scale 1.0; range 10–60 → scale 0.4–2.4
-  var waveScale = S.wave / 25.0;
-  var freeKmh   = v.baseKmh * waveScale;
-
-  // Congestion: mild reduction only (never below 25% on green)
-  var congFactor = Math.max(0.25, 1.0 - cong * 0.5);
-
-  var tgtKmh;
-  if (atStop) {
-    tgtKmh = 0;
-  } else if (stopping) {
-    var ramp = Math.max(0.05, distToStop / 0.20);
-    tgtKmh = freeKmh * congFactor * ramp;
+  // ── Signal state for this vehicle's travel direction ─────────────────────
+  // EVP always green. NS vehicles check nsState. EW vehicles check ewState.
+  var sigState;
+  if (sig.evp) {
+    sigState = 'green';
+  } else if (isNS) {
+    sigState = sig.nsState || sig.state;
   } else {
-    tgtKmh = freeKmh * congFactor;
+    sigState = sig.ewState || 'red';
+  }
+  var mustStop = (sigState === 'red' || sigState === 'yellow');
+
+  // ── Stop line position ────────────────────────────────────────────────────
+  // Vehicles travel 0 → 1. Intersection box ≈ 0.38–0.62.
+  // Hard stop wall at STOP_LINE. Vehicle must NEVER cross it while red.
+  var STOP_LINE  = 0.385;   // where the front of car must halt
+  var SLOW_START = 0.22;    // start braking this far before stop line
+
+  // ── Speed calculation ─────────────────────────────────────────────────────
+  var waveScale  = S.wave / 25.0;
+  var freeKmh    = v.baseKmh * waveScale;
+  var congFactor = Math.max(0.25, 1.0 - cong * 0.5);
+  var freeNorm   = freeKmh * (1000.0 / 3600.0) / CANVAS_METRES * S.speed;
+
+  var tgtNorm;
+  if (mustStop && v.pos < STOP_LINE) {
+    // Vehicle hasn't reached stop line yet
+    var dist = STOP_LINE - v.pos;
+    if (dist < 0.015) {
+      // Right at the line — full stop, clamp position
+      tgtNorm = 0;
+      v.pos   = STOP_LINE - 0.001;   // hard wall: never cross
+    } else if (dist < SLOW_START) {
+      // Deceleration zone: linear ramp from full speed → 0
+      tgtNorm = freeNorm * congFactor * (dist / SLOW_START);
+    } else {
+      tgtNorm = freeNorm * congFactor;
+    }
+  } else if (mustStop && v.pos >= STOP_LINE) {
+    // Already past stop line (was green, now turned red mid-crossing) — keep going to clear box
+    tgtNorm = freeNorm * congFactor * 0.5;
+  } else {
+    // Green — full speed (with congestion factor)
+    tgtNorm = freeNorm * congFactor;
   }
 
-  // Convert km/h → normalised progress per second
-  var tgtNorm = tgtKmh * (1000.0 / 3600.0) / CANVAS_METRES * S.speed;
-  v.targetSpeedPxS = tgtNorm;  // reused field, now stores norm/s
-
   // ── Smooth accel / decel ──────────────────────────────────────────────────
-  var accelRate = tgtNorm > v.curSpeedPxS ? 0.8 : 3.0;  // norm/s² (fast brake, slow accel)
+  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 4.0;  // slow accel, fast brake
   var diff = tgtNorm - v.curSpeedPxS;
   v.curSpeedPxS += Math.sign(diff) * Math.min(Math.abs(diff), accelRate * dt);
+  if (v.curSpeedPxS < 0) v.curSpeedPxS = 0;
 
-  v.pos += v.curSpeedPxS * dt;
+  // ── Move — but never cross stop line while red ────────────────────────────
+  var newPos = v.pos + v.curSpeedPxS * dt;
+  if (mustStop && v.pos < STOP_LINE && newPos >= STOP_LINE) {
+    newPos = STOP_LINE - 0.001;   // absolute hard wall
+    v.curSpeedPxS = 0;
+  }
+  v.pos = newPos;
 
+  // ── Wrap: exit screen → re-enter from start ───────────────────────────────
   if (v.pos > 1.05) {
     v.pos = 0;
     v.laneIdx = Math.floor(Math.random() * v.lanesPerSide);
