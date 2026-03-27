@@ -3207,10 +3207,16 @@ Particle.prototype.update = function(dt) {
     // Emergency vehicles ignore signals and congestion — run at full target speed
     if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
     // Smooth acceleration/deceleration — use faster brake rate when stopping for red
-    var lerpRate = (stop && distEnd < BRAKE_ZONE * 0.5) ? 0.35 : 0.10;
+    var lerpRate = (stop && distEnd < BRAKE_ZONE * 0.5) ? 0.45 : 0.10;
     this.spd+=(this.tspd-this.spd)*lerpRate;
+    // ── PRE-MOVE HARD WALL: zero speed right now if already at the wall ──────
+    if(atRed && !this.isE){
+      if(this.dir===1  && this.prog >= 1 - STOP_WALL){ this.spd=0; this.tspd=0; }
+      if(this.dir===-1 && this.prog <= STOP_WALL)     { this.spd=0; this.tspd=0; }
+    }
     this.prog+=this.spd*this.dir*S.speed;
-    // ── HARD WALL: never let vehicle cross the stop line while red ────────────
+    // ── POST-MOVE HARD WALL: clamp position — vehicle CANNOT cross stop line ─
+    // This must run BEFORE the prog>=1 wrap so cars never teleport through junctions.
     if(atRed && !this.isE){
       if(this.dir===1 && this.prog > 1 - STOP_WALL){
         this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; this.state = 'stopped';
@@ -3223,9 +3229,9 @@ Particle.prototype.update = function(dt) {
       this.trail.unshift({lat:p.lat,lng:p.lng});
       if(this.trail.length>10) this.trail.pop();
     }
-    if(this.prog>=1 || this.prog<=0){
-      this.prog=this.prog>=1?0:1;
-      var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
+    // Only wrap to next edge when NOT blocked by a red light
+    if(!atRed && (this.prog>=1 || this.prog<=0)){
+      this.prog=this.prog>=1?0:1;      var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
       var conn=[];
       for(var i=0;i<ED.length;i++){
         if(i!==this.ei&&(ED[i][0]===ej||ED[i][1]===ej)) conn.push(i);
