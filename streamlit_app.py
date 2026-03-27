@@ -5150,9 +5150,21 @@ function startRoadAnimation(idx){
   canvas.height = (parent.offsetHeight > 0 ? parent.offsetHeight : 520);
   var ctx = canvas.getContext('2d');
 
-  // Spawn small road vehicles for the road canvas
+  // Spawn road vehicles — equal split across all 4 directions, staggered along road
   _roadVehicles = [];
-  for(var i = 0; i < 30; i++) _roadVehicles.push(makeRoadVehicle(canvas, idx));
+  var spawnDirs = ['N','S','E','W'];
+  var perDir = 8;  // 8 per direction = 32 total, avoids overcrowding
+  for(var di = 0; di < spawnDirs.length; di++){
+    for(var vi = 0; vi < perDir; vi++){
+      // Spread starting positions evenly along the arm (0..1), avoid the intersection box (0.35-0.55)
+      var rawPos = vi / perDir;
+      if(rawPos > 0.30 && rawPos < 0.55) rawPos = rawPos < 0.425 ? 0.25 : 0.60;
+      var veh = makeRoadVehicle(canvas, idx);
+      veh.dir = spawnDirs[di];
+      veh.pos = rawPos;
+      _roadVehicles.push(veh);
+    }
+  }
   _roadLastT = performance.now();
 
   function drawRoadScene(ts){
@@ -5201,52 +5213,85 @@ function startRoadAnimation(idx){
       }
     });
 
-    // ─── Road surfaces (4 arms + box) ──────────────────────────
-    var armW = 70; // road arm width
+    // ─── Road surfaces — proper one-way lane geometry ──────────
+    // armW scales with canvas so roads look proportional at any size
+    var armW = Math.min(W, H) * 0.20;
     var congMul = DMUL[S.dens-1];
     var cong = Math.min(j.cong * congMul, 0.98);
+    var laneCount = Math.max(2, j.lanes || 3);
+    var lanesPerSide = Math.ceil(laneCount / 2);
+    var laneW = (armW / 2) / lanesPerSide;
     var roadCol = cong>0.85?'#1a0808':cong>0.65?'#180e04':cong>0.45?'#0e1104':'#061208';
 
-    // North arm
     ctx.fillStyle = roadCol;
-    ctx.fillRect(cx-armW/2, 0, armW, cy-armW/2);
-    // South arm
-    ctx.fillRect(cx-armW/2, cy+armW/2, armW, H-cy-armW/2);
-    // East arm
-    ctx.fillRect(cx+armW/2, cy-armW/2, W-cx-armW/2, armW);
-    // West arm
-    ctx.fillRect(0, cy-armW/2, cx-armW/2, armW);
-    // Intersection box
-    ctx.fillRect(cx-armW/2, cy-armW/2, armW, armW);
+    ctx.fillRect(cx-armW/2, 0,          armW,        cy-armW/2);   // N arm
+    ctx.fillRect(cx-armW/2, cy+armW/2,  armW,        H);           // S arm
+    ctx.fillRect(0,         cy-armW/2,  cx-armW/2,   armW);        // W arm
+    ctx.fillRect(cx+armW/2, cy-armW/2,  W,           armW);        // E arm
+    ctx.fillRect(cx-armW/2, cy-armW/2,  armW,        armW);        // box
 
-    // Road edges (kerb lines)
-    ctx.strokeStyle = '#ffffff18';
-    ctx.lineWidth = 1;
-    [[cx-armW/2, 0, cx-armW/2, cy-armW/2],[cx+armW/2, 0, cx+armW/2, cy-armW/2],
-     [cx-armW/2,cy+armW/2,cx-armW/2,H],[cx+armW/2,cy+armW/2,cx+armW/2,H],
-     [0,cy-armW/2,cx-armW/2,cy-armW/2],[W,cy-armW/2,cx+armW/2,cy-armW/2],
-     [0,cy+armW/2,cx-armW/2,cy+armW/2],[W,cy+armW/2,cx+armW/2,cy+armW/2]
-    ].forEach(function(l){
-      ctx.beginPath(); ctx.moveTo(l[0],l[1]); ctx.lineTo(l[2],l[3]); ctx.stroke();
-    });
+    // ── Centre divider — solid double-yellow (no crossing) ─────
+    ctx.strokeStyle = '#ffd70066';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    [[cx-1,0,cx-1,cy-armW/2],[cx+1,0,cx+1,cy-armW/2],
+     [cx-1,cy+armW/2,cx-1,H],[cx+1,cy+armW/2,cx+1,H],
+     [0,cy-1,cx-armW/2,cy-1],[0,cy+1,cx-armW/2,cy+1],
+     [cx+armW/2,cy-1,W,cy-1],[cx+armW/2,cy+1,W,cy+1]
+    ].forEach(function(l){ctx.beginPath();ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3]);ctx.stroke();});
 
-    // Lane markings (dashed centre lines)
+    // ── Dashed lane dividers within each half ──────────────────
     ctx.setLineDash([10, 8]);
     ctx.strokeStyle = '#ffffff22';
     ctx.lineWidth = 1;
-    // N-S centre
-    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, cy-armW/2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, cy+armW/2); ctx.lineTo(cx, H); ctx.stroke();
-    // E-W centre
-    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(cx-armW/2, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx+armW/2, cy); ctx.lineTo(W, cy); ctx.stroke();
+    for (var li = 1; li < lanesPerSide; li++) {
+      var lxL = cx - li * laneW,  lxR = cx + li * laneW;
+      var lyT = cy - li * laneW,  lyB = cy + li * laneW;
+      ctx.beginPath(); ctx.moveTo(lxL, 0);          ctx.lineTo(lxL, cy-armW/2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lxR, 0);          ctx.lineTo(lxR, cy-armW/2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lxL, cy+armW/2);  ctx.lineTo(lxL, H);         ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lxR, cy+armW/2);  ctx.lineTo(lxR, H);         ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,          lyT); ctx.lineTo(cx-armW/2, lyT); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,          lyB); ctx.lineTo(cx-armW/2, lyB); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+armW/2,  lyT); ctx.lineTo(W, lyT);         ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+armW/2,  lyB); ctx.lineTo(W, lyB);         ctx.stroke();
+    }
     ctx.setLineDash([]);
 
-    // Stop lines — NS and EW are opposite phases
+    // ── Road kerb lines ────────────────────────────────────────
+    ctx.strokeStyle = '#ffffff22'; ctx.lineWidth = 1.5;
+    [[cx-armW/2,0,cx-armW/2,cy-armW/2],[cx+armW/2,0,cx+armW/2,cy-armW/2],
+     [cx-armW/2,cy+armW/2,cx-armW/2,H],[cx+armW/2,cy+armW/2,cx+armW/2,H],
+     [0,cy-armW/2,cx-armW/2,cy-armW/2],[W,cy-armW/2,cx+armW/2,cy-armW/2],
+     [0,cy+armW/2,cx-armW/2,cy+armW/2],[W,cy+armW/2,cx+armW/2,cy+armW/2]
+    ].forEach(function(l){ctx.beginPath();ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3]);ctx.stroke();});
+
+    // ── Direction arrows (one-way indicators) ─────────────────
+    function drawArrow(ax, ay, angle){
+      ctx.save(); ctx.translate(ax,ay); ctx.rotate(angle);
+      ctx.fillStyle='#ffffff1a';
+      ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(4,3); ctx.lineTo(0,0); ctx.lineTo(-4,3);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    var q1 = 0.28; // position along arm (0=junction edge, 1=canvas edge)
+    // N arm: northbound LEFT half, southbound RIGHT half
+    drawArrow(cx - laneW*0.5, H*(1-q1), -Math.PI/2);   // N going up
+    drawArrow(cx + laneW*0.5, H*(1-q1),  Math.PI/2);   // S going down
+    // S arm mirrors
+    drawArrow(cx - laneW*0.5, cy+armW/2 + (H-cy-armW/2)*q1, -Math.PI/2);
+    drawArrow(cx + laneW*0.5, cy+armW/2 + (H-cy-armW/2)*q1,  Math.PI/2);
+    // W arm: westbound UPPER half, eastbound LOWER half
+    drawArrow(W*(1-q1), cy - laneW*0.5, Math.PI);      // W going left
+    drawArrow(W*(1-q1), cy + laneW*0.5, 0);            // E going right
+    // E arm mirrors
+    drawArrow(cx+armW/2 + (W-cx-armW/2)*q1, cy - laneW*0.5, Math.PI);
+    drawArrow(cx+armW/2 + (W-cx-armW/2)*q1, cy + laneW*0.5, 0);
+
+    // ── Stop lines (coloured by signal phase) ─────────────────
     var nsState = sig.evp ? sig.nsState : (sig.nsState || sig.state);
     var ewState = sig.evp ? sig.ewState : (sig.ewState || 'red');
-    var slNS = nsState === 'red' ? '#ff224488' : nsState === 'yellow' ? '#ffd70066' : '#00ff8833';
-    var slEW = ewState === 'red' ? '#ff224488' : ewState === 'yellow' ? '#ffd70066' : '#00ff8833';
+    var slNS = nsState==='red'?'#ff224499':nsState==='yellow'?'#ffd70077':'#00ff8833';
+    var slEW = ewState==='red'?'#ff224499':ewState==='yellow'?'#ffd70077':'#00ff8833';
     ctx.lineWidth = 4;
     ctx.strokeStyle = slNS;
     ctx.beginPath(); ctx.moveTo(cx-armW/2, cy-armW/2-4); ctx.lineTo(cx+armW/2, cy-armW/2-4); ctx.stroke();
@@ -5255,51 +5300,49 @@ function startRoadAnimation(idx){
     ctx.beginPath(); ctx.moveTo(cx-armW/2-4, cy-armW/2); ctx.lineTo(cx-armW/2-4, cy+armW/2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx+armW/2+4, cy-armW/2); ctx.lineTo(cx+armW/2+4, cy+armW/2); ctx.stroke();
 
-    // Zebra crossings
-    ctx.fillStyle = '#ffffff08';
-    for(var zi = 0; zi < 5; zi++){
-      var zoff = (zi/4)*(armW-10)+5;
-      ctx.fillRect(cx-armW/2+zoff-4, cy-armW/2-22, 6, 16);
-      ctx.fillRect(cx-armW/2+zoff-4, cy+armW/2+6,  6, 16);
-      ctx.fillRect(cx-armW/2-22, cy-armW/2+zoff-4, 16, 6);
-      ctx.fillRect(cx+armW/2+6,  cy-armW/2+zoff-4, 16, 6);
+    // ── Zebra crossings ────────────────────────────────────────
+    ctx.fillStyle = '#ffffff0a';
+    for(var zi = 0; zi < 6; zi++){
+      var zoff = (zi/5)*(armW-8)+4;
+      ctx.fillRect(cx-armW/2+zoff-3, cy-armW/2-18, 5, 13);
+      ctx.fillRect(cx-armW/2+zoff-3, cy+armW/2+5,  5, 13);
+      ctx.fillRect(cx-armW/2-18, cy-armW/2+zoff-3, 13, 5);
+      ctx.fillRect(cx+armW/2+5,  cy-armW/2+zoff-3, 13, 5);
     }
 
-    // ─── Signal heads (4 corners) — NS and EW show opposite phases ──
-    // NE corner (cx+armW/2+6, cy-armW/2-38) → controls North arm → NS phase
-    // NW corner (cx-armW/2-34, cy-armW/2-38) → controls West arm → EW phase
-    // SE corner (cx+armW/2+6, cy+armW/2+6) → controls East arm → EW phase
-    // SW corner (cx-armW/2-34, cy+armW/2+6) → controls South arm → NS phase
+    // ─── Signal heads (4 corners) — NS poles & EW poles separately ──
+    // Poles are close to the kerb, sized relative to armW
+    var sh = 36, sw = 22;  // signal housing h, w
     var nsStateDraw = sig.nsState || sig.state;
     var ewStateDraw = sig.ewState || 'red';
     var corners = [
-      {pos:[cx+armW/2+6, cy-armW/2-38], phase: nsStateDraw},  // NE → NS
-      {pos:[cx-armW/2-34, cy-armW/2-38], phase: ewStateDraw}, // NW → EW
-      {pos:[cx+armW/2+6, cy+armW/2+6], phase: ewStateDraw},   // SE → EW
-      {pos:[cx-armW/2-34, cy+armW/2+6], phase: nsStateDraw}   // SW → NS
+      {pos:[cx+armW/2+5,  cy-armW/2-sh-4], phase: nsStateDraw, lbl:'N-S'},
+      {pos:[cx-armW/2-sw-5, cy-armW/2-sh-4], phase: ewStateDraw, lbl:'E-W'},
+      {pos:[cx+armW/2+5,  cy+armW/2+4],    phase: ewStateDraw, lbl:'E-W'},
+      {pos:[cx-armW/2-sw-5, cy+armW/2+4],  phase: nsStateDraw, lbl:'N-S'}
     ];
     corners.forEach(function(corner){
       var c = corner.pos, ph = corner.phase;
-      // Signal housing
-      ctx.fillStyle = '#0a1008';
-      ctx.strokeStyle = '#1a2a14';
-      ctx.lineWidth = 1;
-      roundRect(ctx, c[0], c[1], 26, 38, 4);
-      ctx.fill(); ctx.stroke();
-      // Lamps: red / yellow / green
-      var lpos = [{y:c[1]+6,st:'red'},{y:c[1]+16,st:'yellow'},{y:c[1]+26,st:'green'}];
-      lpos.forEach(function(lp2){
-        var active = (lp2.st==='red'   && ph==='red') ||
-                     (lp2.st==='yellow'&& ph==='yellow') ||
-                     (lp2.st==='green' && ph==='green');
-        var lampcol = lp2.st==='red'?'#ff2244':lp2.st==='yellow'?'#ffd700':'#00ff88';
-        ctx.beginPath();
-        ctx.arc(c[0]+13, lp2.y+5, 5, 0, Math.PI*2);
-        ctx.fillStyle = active ? lampcol : '#0a1828';
-        if(active){ ctx.shadowBlur = 12; ctx.shadowColor = lampcol; }
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      });
+      // Pole stick
+      ctx.strokeStyle='#1a2a14'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(c[0]+sw/2, c[1]+sh); ctx.lineTo(c[0]+sw/2, c[1]+sh+10); ctx.stroke();
+      // Housing
+      ctx.fillStyle='#0a1008'; ctx.strokeStyle='#1a2a14'; ctx.lineWidth=1;
+      roundRect(ctx, c[0], c[1], sw, sh, 3); ctx.fill(); ctx.stroke();
+      // Label
+      ctx.font='5px monospace'; ctx.textAlign='center'; ctx.fillStyle='#ffffff22';
+      ctx.fillText(corner.lbl, c[0]+sw/2, c[1]+sh-3); ctx.textAlign='left';
+      // Lamps
+      var lampY = [c[1]+4, c[1]+14, c[1]+24];
+      var lampSt= ['red','yellow','green'];
+      for(var li=0;li<3;li++){
+        var active=(lampSt[li]===ph);
+        var lc=lampSt[li]==='red'?'#ff2244':lampSt[li]==='yellow'?'#ffd700':'#00ff88';
+        ctx.beginPath(); ctx.arc(c[0]+sw/2, lampY[li]+4, 5, 0, Math.PI*2);
+        ctx.fillStyle = active ? lc : '#0a1828';
+        if(active){ ctx.shadowBlur=14; ctx.shadowColor=lc; }
+        ctx.fill(); ctx.shadowBlur=0;
+      }
     });
 
     // ─── Congestion heat overlay ─────────────────────────────
@@ -5399,63 +5442,197 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ROAD CANVAS VEHICLE SYSTEM — Real-world one-way lane model
+// ─────────────────────────────────────────────────────────────────────────────
+// Road geometry (top-down view, armW = total road width):
+//   Centre divider splits road into two HALVES:
+//     Left half  (x: cx-armW/2 → cx) : vehicles going AWAY from viewer
+//     Right half (x: cx → cx+armW/2) : vehicles coming TOWARD viewer
+//   For N arm: travelling NORTH (away, top of screen) → LEFT half of N arm
+//              travelling SOUTH (toward, down)         → RIGHT half of N arm
+//   Each half has laneCount/2 lanes (rounded up), each laneW wide.
+//   Vehicles pick one lane within their half, stay in it.
+//
+// Speed calibration:
+//   Real canvas spans ~200m of road (armW ≈ 15m, canvas 800px wide ≈ 400m total)
+//   We set 1 canvas-unit = canvasSize px = real metres, so:
+//   speed in px/s = realKmh * 1000/3600 * (canvasPx / realMetres)
+//   We calibrate: canvas width W ≈ 400m → speed_px_per_s = kmh * W / (400 * 3.6)
+//   This gives ~30km/h ≈ W/48 px/s at default settings.
+
 function makeRoadVehicle(canvas, idx){
+  var j = JN[idx] || JN[0];
+  var laneCount = Math.max(2, j.lanes || 3);
+  // Each direction gets its own half of the road.
+  // dir: N = moving northward (upward on screen, entering from bottom)
+  //      S = moving southward (downward, entering from top)
+  //      E = moving eastward (rightward, entering from left)
+  //      W = moving westward (leftward, entering from right)
   var dirs = ['N','S','E','W'];
-  var dir  = dirs[Math.floor(Math.random()*dirs.length)];
-  // Stagger starting positions; avoid spawning inside the stop zone
-  var startPos = Math.random();
-  if(startPos > 0.36 && startPos < 0.50) startPos = Math.random() < 0.5 ? 0.28 : 0.52;
-  return {dir: dir, pos: startPos, lane: Math.random()>0.5?1:-1,
-    speed: 0.018 + Math.random()*0.018, state:'moving',
-    col: Math.random()<0.08?'#ff2244':'#00ccff',
-    len: 8+Math.random()*4, wid: 4+Math.random()*2};
+  var dir  = dirs[Math.floor(Math.random() * dirs.length)];
+  // Lane index within the correct half: 0 = innermost (next to centre divider)
+  var lanesPerSide = Math.ceil(laneCount / 2);
+  var laneIdx = Math.floor(Math.random() * lanesPerSide);
+  // Stagger start positions along their arm; keep clear of stop zone (0.38-0.52)
+  var pos = Math.random();
+  if (pos > 0.33 && pos < 0.54) pos = pos < 0.435 ? 0.28 : 0.58;
+
+  // Real speed: base free-flow for this junction, px/s calculated in update()
+  var avgCong = j.cong;
+  var baseKmh;
+  if (avgCong >= 0.65)      baseKmh = 10 + Math.random() * 8;   // 10-18 km/h ORR critical
+  else if (avgCong >= 0.50) baseKmh = 18 + Math.random() * 10;  // 18-28 km/h moderate
+  else if (avgCong >= 0.40) baseKmh = 22 + Math.random() * 10;  // 22-32 km/h inner ring
+  else                      baseKmh = 28 + Math.random() * 12;  // 28-40 km/h sub-arterial
+
+  // Vehicle appearance
+  var rnd = Math.random();
+  var col = rnd < 0.06 ? '#ff2244' : rnd < 0.18 ? '#ffd700' : rnd < 0.35 ? '#00ff88' : '#00ccff';
+  var len = 10 + Math.random() * 6;
+  var wid = 5  + Math.random() * 2;
+
+  return {
+    dir: dir, pos: pos, laneIdx: laneIdx, lanesPerSide: lanesPerSide,
+    baseKmh: baseKmh, col: col, len: len, wid: wid,
+    state: 'moving',
+    // smooth speed interpolation
+    curSpeedPxS: 0,
+    targetSpeedPxS: 0
+  };
 }
 
 function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
-  // stopLine: normalised pos (0=road start, 1=road end) where vehicle halts on red.
-  // Intersection box spans ~0.43-0.57, so stop just before it.
-  var stopLine = 0.43;
-  var nsState = sig.nsState || sig.state;
-  var ewState = sig.ewState || 'red';
-  var isNSdir = (v.dir === 'N' || v.dir === 'S');
-  var relevantState = sig.evp ? (isNSdir ? (sig.nsState||nsState) : (sig.ewState||ewState))
-                               : (isNSdir ? nsState : ewState);
-  var isRed = (relevantState === 'red');
-  // Hard stop at line
-  var atStop = isRed && v.pos >= stopLine - 0.03 && v.pos < stopLine + 0.02;
-  // Gradual slow-down approaching red
-  var approaching = isRed && v.pos >= stopLine - 0.16 && v.pos < stopLine - 0.03;
-  var speedMul;
-  if(atStop)           speedMul = 0;
-  else if(approaching) speedMul = Math.max(0.06, (stopLine - 0.03 - v.pos) / 0.13);
-  else                 speedMul = 1.0;
-  // Congestion reduces speed by at most 30% — never freezes vehicles on green
-  speedMul *= (1 - cong * 0.30);
-  v.pos += v.speed * speedMul * dt * 30;
-  if(v.pos > 1.05) v.pos = 0;
+  // ── Compute pixel-per-second speed from real km/h ──────────────────────────
+  // Canvas represents ~300m of road (each arm ≈ 150m one-way).
+  // W px = 300m  →  1m = W/300 px  →  1 km/h = 1000/3600 m/s = W/(300*3.6) px/s
+  var realMetres = 300.0;
+  var pxPerM  = (v.dir === 'N' || v.dir === 'S') ? H / realMetres : W / realMetres;
+  var pxPerKmh = pxPerM * 1000.0 / 3600.0;
+
+  // ── Determine signal state for this vehicle's direction ───────────────────
+  var isNS = (v.dir === 'N' || v.dir === 'S');
+  var sigState = sig.evp ? 'green'
+               : isNS   ? (sig.nsState || sig.state)
+                         : (sig.ewState || 'red');
+
+  // ── Stop line logic ────────────────────────────────────────────────────────
+  // Intersection box centre at pos≈0.5; stop line just before it at pos≈0.40
+  var STOP = 0.40;
+  var isRed  = (sigState === 'red' || sigState === 'yellow');
+  // Queue behind stop: if red AND approaching the stop line
+  var distToStop = STOP - v.pos;  // positive = not yet at stop
+  var stopping   = isRed && distToStop > -0.02 && distToStop < 0.18;
+  var atStop     = isRed && distToStop >= -0.01 && distToStop < 0.03;
+
+  // ── Target speed ───────────────────────────────────────────────────────────
+  var freeKmh = v.baseKmh * S.wave / 25.0;  // slider scales free-flow speed
+  // Congestion factor: reduces speed proportionally (never below 15% on green)
+  var congFactor = Math.max(0.15, 1.0 - cong * 0.65);
+  var tgtKmh;
+  if (atStop) {
+    tgtKmh = 0;
+  } else if (stopping) {
+    // Smooth deceleration: ramp from full to 0 over 0.18 normalised distance
+    var ramp = Math.max(0, distToStop / 0.18);
+    tgtKmh = freeKmh * congFactor * ramp;
+  } else {
+    tgtKmh = freeKmh * congFactor;
+  }
+  v.targetSpeedPxS = tgtKmh * pxPerKmh * S.speed;
+
+  // ── Smooth acceleration / deceleration ────────────────────────────────────
+  // Decel much faster than accel (realistic braking vs pull-away)
+  var accelRate = v.targetSpeedPxS > v.curSpeedPxS ? 60 : 180;  // px/s²
+  var diff = v.targetSpeedPxS - v.curSpeedPxS;
+  v.curSpeedPxS += Math.sign(diff) * Math.min(Math.abs(diff), accelRate * dt);
+
+  // ── Move in normalised coordinates ────────────────────────────────────────
+  // Convert px/s back to normalised progress/s
+  var axisLen = isNS ? H : W;
+  var normSpeedPerS = v.curSpeedPxS / axisLen;
+  v.pos += normSpeedPerS * dt;
+
+  // Wrap around: vehicle exits top/right, re-enters from bottom/left
+  if (v.pos > 1.05) {
+    v.pos = 0;
+    // Randomise lane on re-entry
+    v.laneIdx = Math.floor(Math.random() * v.lanesPerSide);
+  }
 }
 
 function drawRoadVehicle(ctx, v){
   var canvas = document.getElementById('road-canvas');
-  if(!canvas) return;
-  var W = canvas.width, H = canvas.height;
-  var cx = W/2, cy = H/2, half = 35;
-  var x, y, rot;
+  if (!canvas) return;
+  var W  = canvas.width,  H  = canvas.height;
+  var cx = W / 2,         cy = H / 2;
+  // armW from parent — recalculate same as drawRoadScene
+  var armW = Math.min(W, H) * 0.20;
+  var lanesPerSide = v.lanesPerSide || 1;
+  var laneW = (armW / 2) / lanesPerSide;
+
+  // ── Perpendicular offset from road centre ──────────────────────────────────
+  // N going UP   → left half  (negative x from cx)  → lanes are cx-laneW/2, cx-3laneW/2 …
+  // S going DOWN → right half (positive x from cx)  → lanes are cx+laneW/2, cx+3laneW/2 …
+  // E going RIGHT→ lower half (positive y from cy)  → lanes are cy+laneW/2, cy+3laneW/2 …
+  // W going LEFT → upper half (negative y from cy)  → lanes are cy-laneW/2, cy-3laneW/2 …
+  // laneIdx=0 is innermost (nearest centre divider)
+  var laneOff = (v.laneIdx + 0.5) * laneW;  // centre of this lane from road centreline
+
   var t = v.pos;
-  var laneOff = v.lane * 12;
-  if(v.dir==='N'){ x = cx + laneOff; y = H - t*H; rot = 0; }
-  else if(v.dir==='S'){ x = cx - laneOff; y = t*H; rot = Math.PI; }
-  else if(v.dir==='E'){ x = t*W; y = cy + laneOff; rot = Math.PI/2; }
-  else { x = W - t*W; y = cy - laneOff; rot = -Math.PI/2; }
+  var x, y, rot;
+
+  if (v.dir === 'N') {
+    // Moving north (up screen), left half: x = cx - laneOff
+    x = cx - laneOff;
+    y = H - t * H;           // enters from bottom, exits at top
+    rot = 0;                  // nose pointing up (0 = pointing right → rotated -90 later)
+  } else if (v.dir === 'S') {
+    // Moving south (down screen), right half: x = cx + laneOff
+    x = cx + laneOff;
+    y = t * H;                // enters from top, exits at bottom
+    rot = Math.PI;
+  } else if (v.dir === 'E') {
+    // Moving east (right screen), lower half: y = cy + laneOff
+    x = t * W;                // enters from left, exits at right
+    y = cy + laneOff;
+    rot = Math.PI / 2;
+  } else {
+    // Moving west (left screen), upper half: y = cy - laneOff
+    x = W - t * W;            // enters from right, exits at left
+    y = cy - laneOff;
+    rot = -Math.PI / 2;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rot);
-  ctx.fillStyle = v.col + 'cc';
-  ctx.fillRect(-v.wid/2, -v.len/2, v.wid, v.len);
-  // Headlights
-  ctx.fillStyle = '#ffffff88';
-  ctx.fillRect(-v.wid/2, v.len/2-2, v.wid/2-1, 1.5);
-  ctx.fillRect(1, v.len/2-2, v.wid/2-1, 1.5);
+
+  // Car body (rect, nose at +y direction before rotation)
+  var stopped = v.curSpeedPxS < 0.5;
+  ctx.fillStyle = stopped ? v.col + '88' : v.col + 'dd';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(-v.wid / 2, -v.len / 2, v.wid, v.len, 2);
+  } else {
+    ctx.rect(-v.wid / 2, -v.len / 2, v.wid, v.len);
+  }
+  ctx.fill();
+
+  // Windshield tint
+  ctx.fillStyle = '#00000044';
+  ctx.fillRect(-v.wid / 2 + 1, -v.len / 2 + 1, v.wid - 2, v.len * 0.35);
+
+  // Headlights (front = +len/2)
+  ctx.fillStyle = '#ffffffcc';
+  ctx.fillRect(-v.wid / 2 + 0.5,  v.len / 2 - 2.5, v.wid / 2 - 1, 2);
+  ctx.fillRect(0.5,               v.len / 2 - 2.5, v.wid / 2 - 1, 2);
+
+  // Tail lights (rear = -len/2) — red glow when stopped
+  ctx.fillStyle = stopped ? '#ff3300cc' : '#ff220055';
+  ctx.fillRect(-v.wid / 2 + 0.5, -v.len / 2 + 0.5, v.wid / 2 - 1, 2);
+  ctx.fillRect(0.5,               -v.len / 2 + 0.5, v.wid / 2 - 1, 2);
+
   ctx.restore();
 }
 
