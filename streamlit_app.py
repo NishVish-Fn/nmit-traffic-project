@@ -3572,7 +3572,28 @@ function updateSignals(dt){
       var ov=document.getElementById('evpo');
       if(ov){ov.classList.add('on');setTimeout(function(){var o=document.getElementById('evpo');if(o)o.classList.remove('on');},600);}
     }
-    if(sig.evp){sig.state='green';sig.nsState='green';sig.ewState='green';sig.eff=1;sig.gDur=S.cycle*.95;continue;}
+    if(sig.evp){
+      // EVP: determine which direction the emergency vehicle is coming from
+      // Find the approaching emergency vehicle to this junction
+      var evpIsNS = true;  // default
+      for(var pi2=0;pi2<particles.length;pi2++){
+        var pev=particles[pi2];
+        if(!pev.isE) continue;
+        var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
+        var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
+        var evD2=pev.dir===1?1-pev.prog:pev.prog;
+        if(evEndJ===i&&evD2<0.3){
+          var ja2=JN[evStartJ],jb2=JN[i];
+          evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
+          break;
+        }
+      }
+      // Green for EVP direction only, red for cross-traffic
+      sig.nsState = evpIsNS ? 'green' : 'red';
+      sig.ewState = evpIsNS ? 'red'   : 'green';
+      sig.state   = sig.nsState;
+      sig.eff=1; sig.gDur=S.cycle*.95; continue;
+    }
 
     // LP-optimal green time (from Python scipy solver)
     var gDur=S.cycle*.5;
@@ -5202,11 +5223,16 @@ function startRoadAnimation(idx){
     ctx.beginPath(); ctx.moveTo(cx+armW/2, cy); ctx.lineTo(W, cy); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Stop lines
-    var slCol = sig.state === 'red' ? '#ff224488' : '#ffffff22';
-    ctx.strokeStyle = slCol; ctx.lineWidth = 4;
+    // Stop lines — NS and EW are opposite phases
+    var nsState = sig.evp ? sig.nsState : (sig.nsState || sig.state);
+    var ewState = sig.evp ? sig.ewState : (sig.ewState || 'red');
+    var slNS = nsState === 'red' ? '#ff224488' : nsState === 'yellow' ? '#ffd70066' : '#00ff8833';
+    var slEW = ewState === 'red' ? '#ff224488' : ewState === 'yellow' ? '#ffd70066' : '#00ff8833';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = slNS;
     ctx.beginPath(); ctx.moveTo(cx-armW/2, cy-armW/2-4); ctx.lineTo(cx+armW/2, cy-armW/2-4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx-armW/2, cy+armW/2+4); ctx.lineTo(cx+armW/2, cy+armW/2+4); ctx.stroke();
+    ctx.strokeStyle = slEW;
     ctx.beginPath(); ctx.moveTo(cx-armW/2-4, cy-armW/2); ctx.lineTo(cx-armW/2-4, cy+armW/2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx+armW/2+4, cy-armW/2); ctx.lineTo(cx+armW/2+4, cy+armW/2); ctx.stroke();
 
@@ -5220,29 +5246,33 @@ function startRoadAnimation(idx){
       ctx.fillRect(cx+armW/2+6,  cy-armW/2+zoff-4, 16, 6);
     }
 
-    // ─── Signal heads (4 corners) ─────────────────────────────
-    var sigState = sig.evp ? 'evp' : sig.state;
-    var sigGlow  = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
-    if(sig.evp) sigGlow = '#ff2244';
+    // ─── Signal heads (4 corners) — NS and EW show opposite phases ──
+    // NE corner (cx+armW/2+6, cy-armW/2-38) → controls North arm → NS phase
+    // NW corner (cx-armW/2-34, cy-armW/2-38) → controls West arm → EW phase
+    // SE corner (cx+armW/2+6, cy+armW/2+6) → controls East arm → EW phase
+    // SW corner (cx-armW/2-34, cy+armW/2+6) → controls South arm → NS phase
+    var nsStateDraw = sig.nsState || sig.state;
+    var ewStateDraw = sig.ewState || 'red';
     var corners = [
-      [cx+armW/2+6, cy-armW/2-38],
-      [cx-armW/2-34, cy-armW/2-38],
-      [cx+armW/2+6, cy+armW/2+6],
-      [cx-armW/2-34, cy+armW/2+6]
+      {pos:[cx+armW/2+6, cy-armW/2-38], phase: nsStateDraw},  // NE → NS
+      {pos:[cx-armW/2-34, cy-armW/2-38], phase: ewStateDraw}, // NW → EW
+      {pos:[cx+armW/2+6, cy+armW/2+6], phase: ewStateDraw},   // SE → EW
+      {pos:[cx-armW/2-34, cy+armW/2+6], phase: nsStateDraw}   // SW → NS
     ];
-    corners.forEach(function(c){
+    corners.forEach(function(corner){
+      var c = corner.pos, ph = corner.phase;
       // Signal housing
       ctx.fillStyle = '#0a1008';
       ctx.strokeStyle = '#1a2a14';
       ctx.lineWidth = 1;
       roundRect(ctx, c[0], c[1], 26, 38, 4);
       ctx.fill(); ctx.stroke();
-      // Lamps
+      // Lamps: red / yellow / green
       var lpos = [{y:c[1]+6,st:'red'},{y:c[1]+16,st:'yellow'},{y:c[1]+26,st:'green'}];
       lpos.forEach(function(lp2){
-        var active = (lp2.st==='red'&&sig.state==='red') ||
-                     (lp2.st==='yellow'&&sig.state==='yellow') ||
-                     (lp2.st==='green'&&(sig.state==='green'||sig.evp));
+        var active = (lp2.st==='red'   && ph==='red') ||
+                     (lp2.st==='yellow'&& ph==='yellow') ||
+                     (lp2.st==='green' && ph==='green');
         var lampcol = lp2.st==='red'?'#ff2244':lp2.st==='yellow'?'#ffd700':'#00ff88';
         ctx.beginPath();
         ctx.arc(c[0]+13, lp2.y+5, 5, 0, Math.PI*2);
@@ -5280,20 +5310,39 @@ function startRoadAnimation(idx){
     ctx.fillText(Math.round(j.cong*100)+'% CONGESTION  |  '+
       (lp&&lp.delay?lp.delay[idx].toFixed(0):'-')+'s DELAY  |  LOS '+(lp&&lp.los?lp.los[idx]:'-'), cx, cy+armW/2+66);
 
-    // Signal timer overlaid at top of road view
-    var sColor = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
-    var sRemain = sig.state==='green' ? Math.max(0,sig.gDur-sig.phase) :
-                  sig.state==='yellow'? Math.max(0,sig.gDur+sig.cycle*0.07-sig.phase) :
-                  Math.max(0,sig.cycle-sig.phase);
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 28px Orbitron, monospace';
-    ctx.fillStyle = sColor;
-    ctx.shadowBlur = 20; ctx.shadowColor = sColor;
-    ctx.fillText(sRemain.toFixed(0), cx, 52);
+    // Signal timer overlaid at top of road view — show NS and EW separately
+    var nsDrawState = sig.nsState || sig.state;
+    var ewDrawState = sig.ewState || 'red';
+    var nsColor = sig.evp ? '#ff2244' : nsDrawState==='green'?'#00ff88':nsDrawState==='yellow'?'#ffd700':'#ff2244';
+    var ewColor = sig.evp ? '#ff2244' : ewDrawState==='green'?'#00ff88':ewDrawState==='yellow'?'#ffd700':'#ff2244';
+    var nsRemain = nsDrawState==='green' ? Math.max(0,sig.gDur-sig.phase) :
+                   nsDrawState==='yellow'? Math.max(0,sig.gDur+sig.cycle*0.07-sig.phase) :
+                   Math.max(0,sig.cycle-sig.phase);
+    var ewGreenStart = sig.gDur + sig.cycle*0.07;
+    var ewGreenEnd   = sig.cycle - sig.cycle*0.07;
+    var ewRemain = ewDrawState==='green' ? Math.max(0,ewGreenEnd-sig.phase) :
+                   ewDrawState==='yellow'? Math.max(0,sig.cycle-sig.phase) :
+                   Math.max(0,ewGreenStart-sig.phase);
+    // NS label (left)
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 20px Orbitron, monospace';
+    ctx.fillStyle = nsColor;
+    ctx.shadowBlur = 16; ctx.shadowColor = nsColor;
+    ctx.fillText(nsRemain.toFixed(0), 14, 38);
     ctx.shadowBlur = 0;
-    ctx.font = '9px Share Tech Mono, monospace';
-    ctx.fillStyle = sColor;
-    ctx.fillText((sig.evp?'EVP PRIORITY':sig.state.toUpperCase())+' — '+sRemain.toFixed(0)+'s REMAINING', cx, 68);
+    ctx.font = '8px Share Tech Mono, monospace';
+    ctx.fillText('N-S: '+(sig.evp?'EVP':nsDrawState.toUpperCase()), 14, 52);
+    // EW label (right)
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 20px Orbitron, monospace';
+    ctx.fillStyle = ewColor;
+    ctx.shadowBlur = 16; ctx.shadowColor = ewColor;
+    ctx.fillText(ewRemain.toFixed(0), W-14, 38);
+    ctx.shadowBlur = 0;
+    ctx.font = '8px Share Tech Mono, monospace';
+    ctx.fillStyle = ewColor;
+    ctx.fillText((sig.evp?'EVP':ewDrawState.toUpperCase())+' :E-W', W-14, 52);
+    ctx.textAlign = 'left';
 
     // North/South/East/West labels
     ctx.font = '8px Share Tech Mono, monospace';
@@ -5338,8 +5387,12 @@ function makeRoadVehicle(canvas, idx){
 function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
   var half = armW/2;
   var stopLine = 0.55; // normalised progress where vehicle stops at red
-  var isRed = sig.state === 'red' && !sig.evp;
-  var inBox  = v.pos > stopLine && v.pos < 0.7;
+  // Each direction checks the relevant signal phase
+  var nsState = sig.nsState || sig.state;
+  var ewState = sig.ewState || 'red';
+  var isNSdir = (v.dir === 'N' || v.dir === 'S');
+  var relevantState = sig.evp ? (isNSdir ? sig.nsState : sig.ewState) : (isNSdir ? nsState : ewState);
+  var isRed = relevantState === 'red';
   var atStop = isRed && v.pos > stopLine - 0.05 && v.pos < stopLine + 0.03;
   var speedMul = atStop ? 0 : isRed && v.pos > stopLine - 0.15 ? 0.2 : 1.0;
   speedMul *= (1 - cong * 0.6);
