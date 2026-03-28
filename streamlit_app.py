@@ -416,11 +416,12 @@ def robertson_platoon_dispersion(density_factor=1.0):
         cong_avg = (ja["cong"] + jb["cong"]) / 2 * density_factor
         v_eff   = max(5.0, v_f * (1 - cong_avg))   # km/h
         t0      = (dist / v_eff) * 3600             # seconds
-        # Robertson dispersion factor
-        F = 1.0 / (1 + BETA * t0)
-        # Progression factor φ: ratio of vehicles arriving on green
-        # Simplified: φ = 1 - F (high dispersion → lower platoon integrity)
-        phi = max(0.1, 1.0 - F)
+        t0_min  = t0 / 60.0                          # minutes (Robertson β=0.8 calibrated for minutes)
+        # Robertson dispersion factor — β=0.8 is per Robertson (1969) TRRL LR253,
+        # calibrated with t0 in MINUTES. Using t0 in seconds gives F≈0 for all links.
+        F = 1.0 / (1 + BETA * t0_min)
+        # Progression factor φ = F (high F = tight platoon = good progression).
+        phi = max(0.1, F)
         # Effective delay correction: well-progressed platoon reduces delay by factor φ
         delay_correction = 1.0 - 0.5 * phi   # ∈ [0.5, 1.0]
         results.append({
@@ -452,8 +453,10 @@ def ctm_analysis(density_factor=1.0, n_cells=5):
     """
     v_f  = 60.0        # free-flow speed km/h
     k_j  = 120.0       # jam density veh/km/lane
-    q_c  = v_f*k_j/4   # capacity flow veh/hr/lane (Greenshields)
-    w    = v_f         # backward wave speed (equal to v_f for triangular FD)
+    q_c  = v_f*k_j/4   # capacity flow veh/hr/lane (Greenshields capacity point)
+    # Triangular FD backward wave speed: w = q_c / (k_j - k_c) = (v_f*k_j/4)/(k_j/2) = v_f/2
+    # Previously w=v_f was wrong (that would be free-flow speed, not backward wave)
+    w    = v_f / 2.0   # backward congestion wave speed (triangular FD, Daganzo 1994)
 
     edges = [
         [0,7],[0,8],[0,4],[0,6],
@@ -487,8 +490,11 @@ def ctm_analysis(density_factor=1.0, n_cells=5):
         # Bottleneck: cell with minimum q_cells / capacity
         bottleneck_cell = int(np.argmin(q_cells)) if len(q_cells) > 0 else 0
         # LOS per HCM 6th edition (density thresholds for urban streets)
-        los = 'A' if k_avg < 11 else 'B' if k_avg < 18 else 'C' if k_avg < 26 else \
-              'D' if k_avg < 35 else 'E' if k_avg < 45 else 'F'
+        # HCM 6th ed. freeway density LOS thresholds converted to veh/km/ln
+        # (HCM uses pc/mi/ln: A≤11, B≤18, C≤26, D≤35, E≤45 → multiply by 0.621 for veh/km)
+        # Thresholds in veh/km: A<6.8, B<11.2, C<16.2, D<21.7, E<28.0
+        los = 'A' if k_avg < 6.8 else 'B' if k_avg < 11.2 else 'C' if k_avg < 16.2 else \
+              'D' if k_avg < 21.7 else 'E' if k_avg < 28.0 else 'F'
         results.append({
             "edge":            e,
             "k_cells":         [round(x, 2) for x in k_cells.tolist()],
@@ -845,9 +851,11 @@ def rl_q_learning_controller(density_factor=1.0, n_episodes=500, C=90):
             ep_delays.append(delay)
             g_rl[i] = g_new
             # Store in replay buffer
-            if len(replay_buf) >= REPLAY_CAP:
-                replay_buf.pop(0)
-            replay_buf.append((i, state, action, reward, next_state))
+            # Circular buffer: overwrite oldest entry instead of O(n) pop(0)
+            if len(replay_buf) < REPLAY_CAP:
+                replay_buf.append((i, state, action, reward, next_state))
+            else:
+                replay_buf[ep % REPLAY_CAP] = (i, state, action, reward, next_state)
             # Mini-batch double Q update
             if len(replay_buf) >= MINI_BATCH:
                 idxs = np.random.choice(len(replay_buf), MINI_BATCH, replace=False)
@@ -927,7 +935,11 @@ def ml_demand_forecast():
     es_corr = np.zeros(96); es_corr[0] = resid[0]
     for t in range(1, 96):
         es_corr[t] = ALPHA_ES * resid[t] + (1-ALPHA_ES) * es_corr[t-1]
-    y_fore_adj = y_fore + es_corr
+    # Propagate last ES correction value into forecast horizon (correct ES projection)
+    # Previously used in-sample es_corr directly on forecast — now correctly uses
+    # the final smoothed level as a constant correction for the forecast period.
+    last_es = float(es_corr[-1])
+    y_fore_adj = y_fore + last_es
     rmse = float(np.sqrt(np.mean((y_obs - y_fit)**2)))
     mape = float(np.mean(np.abs((y_obs - y_fit) / np.maximum(y_obs, 0.01))) * 100)
     peak_indices = np.argsort(y_fore_adj)[-3:]
