@@ -1345,7 +1345,18 @@ def validation_metrics(lp_result):
 #     ONCE per browser session — reopening the panel will NOT re-randomise stats.
 # ─────────────────────────────────────────────────────────────────────────────
 
-if "backend_json" not in st.session_state:
+# Data version hash — changing JN or OD automatically invalidates the cache.
+# This ensures updated 2024/2025 data is always reflected without a server restart.
+import hashlib as _hashlib
+_DATA_VERSION = _hashlib.md5(
+    (str([(j["cong"],j["daily"],j["peak"]) for j in JN]) + str(OD.sum())).encode()
+).hexdigest()[:8]
+
+if st.session_state.get("backend_json_version") != _DATA_VERSION or "backend_json" not in st.session_state:
+    # Clear stale cache so all computations re-run with updated data
+    for _k in ["backend_json", "backend_json_version", "lp_result", "lwr_result",
+               "compute_count", "last_C", "last_dens"]:
+        st.session_state.pop(_k, None)
     # ── STEP 0: Fourier+ES forecast FIRST — density_scale_factor feeds LP ──
     ML_DATA   = ml_demand_forecast()
     _ML_DF    = float(ML_DATA.get("density_scale_factor", 1.0))
@@ -1397,6 +1408,7 @@ if "backend_json" not in st.session_state:
         "validation":     VALID,
         "rf":             RF_DATA,
     }, separators=(',', ':'))
+    st.session_state.backend_json_version = _DATA_VERSION
 
 # Retrieve the stable cached payload (same values on every Streamlit re-run)
 BACKEND_JSON = st.session_state.backend_json
