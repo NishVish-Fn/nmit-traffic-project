@@ -4345,10 +4345,27 @@ function cycleAlgo(){aidx=(aidx+1)%ALIST.length;setAlgo(ALIST[aidx]);}
 function setAlgoSel(v){setAlgo(v);}
 function togglePause(){S.paused=!S.paused;var b=g('btn-pause');if(b)b.textContent=S.paused?'▶ RESUME':'⏸ PAUSE';}
 function massEVP(){
-  for(var i=0;i<SIG.length;i++) SIG[i].evp=true;
-  S.evpTotal+=SIG.length;
+  // Fix: stagger EVP per junction (750ms apart) instead of activating all
+  // simultaneously — simultaneous mass-EVP sets sig.state='red' on every
+  // intersection at once, freezing the entire network.
   var ov=g('evpo');if(ov)ov.classList.add('on');
-  setTimeout(function(){for(var i=0;i<SIG.length;i++)SIG[i].evp=false;var o=g('evpo');if(o)o.classList.remove('on');},6000);
+  var total=SIG.length;
+  var clearTimeouts=[];
+  for(var i=0;i<total;i++){
+    (function(idx){
+      var onT=setTimeout(function(){
+        SIG[idx].evp=true;
+        S.evpTotal++;
+      }, idx*750);
+      var offT=setTimeout(function(){
+        SIG[idx].evp=false;
+        if(idx===total-1){
+          var o=g('evpo');if(o)o.classList.remove('on');
+        }
+      }, idx*750+4000);
+      clearTimeouts.push(onT,offT);
+    })(i);
+  }
 }
 function setDens(v){
   S.dens=parseInt(v);
