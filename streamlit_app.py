@@ -5279,10 +5279,17 @@ function startRoadAnimation(idx){
       // CRITICAL: Never spawn between 0.33 and 1.05 to avoid starting inside
       // or past the intersection box — spawned cars must always approach from behind.
       // Safe zone: 0.0 → 0.33 (approaching from entrance side only).
-      var rawPos = (vi / perDir) * 0.33;  // spread 0..0.33 (all behind stop line)
+      // Assign lane-aware staggered positions so no two cars in the same lane overlap.
+      var laneCount2    = Math.max(2, (JN[idx] && JN[idx].lanes) || 3);
+      var lanesPerSide2 = Math.ceil(laneCount2 / 2);
+      var assignedLane  = vi % lanesPerSide2;
+      var carsPerLane   = Math.ceil(perDir / lanesPerSide2);
+      var posInLane     = Math.floor(vi / lanesPerSide2);
+      var rawPos        = (posInLane / carsPerLane) * 0.28 + 0.01;
       var veh = makeRoadVehicle(canvas, idx);
-      veh.dir = spawnDirs[di];
-      veh.pos = rawPos;
+      veh.dir     = spawnDirs[di];
+      veh.laneIdx = assignedLane;
+      veh.pos     = rawPos;
       veh.curSpeedPxS = 0;  // start stationary so brake logic takes over
       _roadVehicles.push(veh);
     }
@@ -5690,6 +5697,24 @@ function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
     tgtNorm = freeNorm * congFactor;
   }
 
+  // ── CAR-FOLLOWING: enforce minimum gap to vehicle ahead in same lane ─────────
+  // "Ahead" = same dir + same laneIdx + larger pos. Gap in normalised pos units.
+  var MIN_GAP = (v.len * 2.2) / Math.max(W, H, 1);
+  var leaderPos = mustStop ? STOP_LINE : 1.1;
+  if (typeof _roadVehicles !== 'undefined') {
+    for (var _fi = 0; _fi < _roadVehicles.length; _fi++) {
+      var _fv = _roadVehicles[_fi];
+      if (_fv === v) continue;
+      if (_fv.dir !== v.dir || _fv.laneIdx !== v.laneIdx) continue;
+      if (_fv.pos > v.pos && _fv.pos < leaderPos) leaderPos = _fv.pos;
+    }
+  }
+  var gap = leaderPos - v.pos;
+  if (gap < MIN_GAP) {
+    tgtNorm = tgtNorm * Math.max(0, (gap / MIN_GAP) - 0.05);
+    if (gap <= MIN_GAP * 0.35) { tgtNorm = 0; v.curSpeedPxS = 0; }
+  }
+
   // Smooth accel / decel (brake fast)
   var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 5.0;
   var diff = tgtNorm - v.curSpeedPxS;
@@ -5699,7 +5724,12 @@ function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
   // Move — with absolute hard wall at stop line
   var newPos = v.pos + v.curSpeedPxS * dt;
   if (mustStop && v.pos < STOP_LINE && newPos >= STOP_LINE) {
-    newPos = STOP_LINE - 0.003;  // absolute wall
+    newPos = STOP_LINE - 0.003;
+    v.curSpeedPxS = 0;
+  }
+  // Hard clamp: never overlap the leader
+  if (newPos > leaderPos - MIN_GAP * 0.35) {
+    newPos = Math.min(newPos, leaderPos - MIN_GAP * 0.35);
     v.curSpeedPxS = 0;
   }
   v.pos = newPos;
