@@ -3217,9 +3217,10 @@ Particle.prototype.update = function(dt) {
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
 
-    // Use pre-computed edge orientation — deterministic per edge
-    var isNS = ED_ISNS[this.ei];
-    var relevantState = isNS ? sig.nsState : sig.ewState;
+    // ── SIGNAL CHECK: use the junction's primary state (sig.state) ──────────
+    // All non-emergency cars stop on red/yellow regardless of approach direction.
+    // The NS/EW split is cosmetic only — every car queues at the same signal.
+    var relevantState = sig.state;  // 'red', 'yellow', or 'green'
 
     // ── STOP WALL: hard boundary cars must not cross on red/yellow ────────────
     // 0.15 = 15% from destination junction (well before intersection centre)
@@ -3333,9 +3334,7 @@ Particle.prototype.update = function(dt) {
         // Check new edge signal — if red, start slow for brake logic to catch
         var newEndId = this.dir===1 ? ED[this.ei][1] : ED[this.ei][0];
         var newSig = SIG[newEndId];
-        var newIsNS = ED_ISNS[this.ei];
-        var newRelState = newIsNS ? newSig.nsState : newSig.ewState;
-        if(!this.isE && (newRelState === 'red' || newRelState === 'yellow')){
+        if(!this.isE && (newSig.state === 'red' || newSig.state === 'yellow')){
           this.spd = this.bspd * 0.25;
           this.tspd = this.bspd * 0.25;
         }
