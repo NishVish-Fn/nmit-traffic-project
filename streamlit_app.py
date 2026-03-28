@@ -3859,7 +3859,7 @@ function updateSignals(dt){
         }
         sig.nsState = evpIsNS ? 'green' : 'red';
         sig.ewState = evpIsNS ? 'red'   : 'green';
-        sig.state   = 'green';  // EVP approach arm always green for UI — cross cars stopped via relevantState per-edge
+        sig.state   = evpIsNS ? 'green' : 'red';
         sig.eff=1; sig.gDur=S.cycle*.95; continue;
       }
     }
@@ -6290,7 +6290,7 @@ function evpTrigger() {
   var isNS = (_evpDir === 'N' || _evpDir === 'S');
   sig.nsState = isNS ? 'green' : 'red';
   sig.ewState = isNS ? 'red'   : 'green';
-  sig.state   = 'green';  // EVP: always green so UI lamps/panels show correctly immediately
+  sig.state   = isNS ? 'green' : 'red';
   sig.phase   = 0;       // restart phase from green
 
   // ── Spawn ambulances approaching from the chosen direction ───────────────
