@@ -3342,7 +3342,8 @@ Particle.prototype.update = function(dt) {
     // ── SIGNAL CHECK: use the junction's primary state (sig.state) ──────────
     // All non-emergency cars stop on red/yellow regardless of approach direction.
     // The NS/EW split is cosmetic only — every car queues at the same signal.
-    var relevantState = sig.state;  // 'red', 'yellow', or 'green'
+    var edgeIsNS = ED_ISNS[this.ei];
+    var relevantState = edgeIsNS ? (sig.nsState || sig.state) : (sig.ewState || sig.state);
 
     // ── STOP WALL: hard boundary cars must not cross on red/yellow ────────────
     // 0.15 = 15% from destination junction (well before intersection centre)
@@ -3859,7 +3860,7 @@ function updateSignals(dt){
         }
         sig.nsState = evpIsNS ? 'green' : 'red';
         sig.ewState = evpIsNS ? 'red'   : 'green';
-        sig.state   = 'red';
+        sig.state   = evpIsNS ? 'green' : 'red';  // approach arm = green so UI lamps/panels show correctly
         sig.eff=1; sig.gDur=S.cycle*.95; continue;
       }
     }
