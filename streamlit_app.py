@@ -3710,7 +3710,9 @@ function updateSignals(dt){
       // Green for EVP direction only, red for cross-traffic
       sig.nsState = evpIsNS ? 'green' : 'red';
       sig.ewState = evpIsNS ? 'red'   : 'green';
-      sig.state   = sig.nsState;
+      // CRITICAL: sig.state must be 'red' so ALL regular cars stop during EVP.
+      // Only the emergency vehicle (isE=true) ignores signals and passes through.
+      sig.state   = 'red';
       sig.eff=1; sig.gDur=S.cycle*.95; continue;
     }
 
