@@ -3087,6 +3087,10 @@ for (var k in GD) { for (var i=0;i<GL;i++) GD[k].push(0); }
 // Helper: compute NS/EW states from phase
 function computeSigStates(phase, gDur, cycle) {
   var yDur = cycle * 0.07;
+  // Guard: gDur must leave room for EW phase (at least yDur green + yDur yellow each side).
+  // If gDur is too large (e.g. from EVP 0.95×cycle), EW green zone collapses → signal freezes.
+  var maxGDur = cycle - 2 * yDur - 1;  // at minimum 1s of EW green
+  gDur = Math.min(gDur, maxGDur);
   var ewStart = gDur + yDur;
   var ewEnd   = cycle - yDur;
   var ns, ew;
@@ -3682,10 +3686,13 @@ function updateSignals(dt){
 
   for(var i=0;i<SIG.length;i++){
     var sig=SIG[i];
+    // Always sync sig.cycle FIRST so the modulo below uses the current cycle length.
+    // Previously sig.cycle was only updated further down the loop body, causing
+    // the modulo to use a stale value on the frame S.cycle changed.
+    sig.cycle = S.cycle;
     // Wall-clock accurate: advance phase by real elapsed sim-seconds per frame
-    // _sigDtSec is computed from performance.now() delta → exact second countdown
     sig.phase += _sigDtSec;
-    // Hard clamp: phase MUST stay in [0, cycle) — catches any edge case drift
+    // Hard clamp: phase MUST stay in [0, cycle)
     sig.phase = ((sig.phase % sig.cycle) + sig.cycle) % sig.cycle;
 
     var nearEvp=false;
@@ -3703,8 +3710,6 @@ function updateSignals(dt){
       var ov=document.getElementById('evpo');
       if(ov){ov.classList.add('on');setTimeout(function(){var o=document.getElementById('evpo');if(o)o.classList.remove('on');},600);}
     }
-    // Keep cycle current even during EVP so phase modulo never drifts
-    sig.cycle = S.cycle;
     if(!sig.evp && wasEvp){
       // EVP just ended — snap phase back into the green window so the
       // signal resumes cycling immediately instead of staying frozen on red.
@@ -3753,7 +3758,7 @@ function updateSignals(dt){
     }
     // fixed timer: gDur stays at cycle*.5
 
-    sig.gDur=gDur; sig.cycle=S.cycle;
+    sig.gDur=gDur;  // sig.cycle already synced at top of loop
     // ── REAL-WORLD 4-SIGNAL LOGIC ─────────────────────────────────────────────
     // Uses computeSigStates() — NS and EW are always opposite phases
     var _st = computeSigStates(sig.phase, gDur, S.cycle);
@@ -5488,8 +5493,11 @@ function startRoadAnimation(idx){
         var lc=lampSt[li]==='red'?'#ff2244':lampSt[li]==='yellow'?'#ffd700':'#00ff88';
         ctx.beginPath(); ctx.arc(c[0]+sw/2, lampY[li]+4, 5, 0, Math.PI*2);
         ctx.fillStyle = active ? lc : '#0a1828';
-        if(active){ ctx.shadowBlur=14; ctx.shadowColor=lc; }
-        ctx.fill(); ctx.shadowBlur=0;
+        // Reset shadowBlur before every lamp to prevent state leak between lamps
+        ctx.shadowBlur = active ? 14 : 0;
+        if(active) ctx.shadowColor = lc;
+        ctx.fill();
+        ctx.shadowBlur = 0;
       }
     });
 
