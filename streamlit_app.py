@@ -3827,27 +3827,35 @@ function updateSignals(dt){
       sig.phase = 0;
     }
     if(sig.evp){
-      // EVP: determine which direction the emergency vehicle is coming from
-      var evpIsNS = true;  // default
-      for(var pi2=0;pi2<particles.length;pi2++){
-        var pev=particles[pi2];
-        if(!pev.isE) continue;
-        var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
-        var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
-        var evD2=pev.dir===1?1-pev.prog:pev.prog;
-        if(evEndJ===i&&evD2<0.3){
-          var ja2=JN[evStartJ],jb2=JN[i];
-          evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
-          break;
+      // Safety cap: never lock more than 3 junctions in EVP simultaneously.
+      // Count how many OTHER junctions are already in EVP this frame.
+      // If we're already at the cap, release this junction back to normal cycling.
+      var evpCount = 0;
+      for(var ec=0; ec<SIG.length; ec++){ if(ec!==i && SIG[ec].evp) evpCount++; }
+      if(evpCount >= 3){
+        sig.evp = false;
+        sig.phase = 0;
+        // fall through to normal LP cycling below
+      } else {
+        // EVP: determine approach direction from the nearest emergency vehicle
+        var evpIsNS = true;
+        for(var pi2=0;pi2<particles.length;pi2++){
+          var pev=particles[pi2];
+          if(!pev.isE) continue;
+          var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
+          var evD2=pev.dir===1?1-pev.prog:pev.prog;
+          if(evEndJ===i&&evD2<0.3){
+            var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
+            var ja2=JN[evStartJ],jb2=JN[i];
+            evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
+            break;
+          }
         }
+        sig.nsState = evpIsNS ? 'green' : 'red';
+        sig.ewState = evpIsNS ? 'red'   : 'green';
+        sig.state   = 'red';
+        sig.eff=1; sig.gDur=S.cycle*.95; continue;
       }
-      // Green for EVP direction only, red for cross-traffic
-      sig.nsState = evpIsNS ? 'green' : 'red';
-      sig.ewState = evpIsNS ? 'red'   : 'green';
-      // CRITICAL: sig.state must be 'red' so ALL regular cars stop during EVP.
-      // Only the emergency vehicle (isE=true) ignores signals and passes through.
-      sig.state   = 'red';
-      sig.eff=1; sig.gDur=S.cycle*.95; continue;
     }
 
     // LP-optimal green time (from Python scipy solver)
@@ -4357,27 +4365,45 @@ function cycleAlgo(){aidx=(aidx+1)%ALIST.length;setAlgo(ALIST[aidx]);}
 function setAlgoSel(v){setAlgo(v);}
 function togglePause(){S.paused=!S.paused;var b=g('btn-pause');if(b)b.textContent=S.paused?'▶ RESUME':'⏸ PAUSE';}
 function massEVP(){
-  // Fix: stagger EVP per junction (750ms apart) instead of activating all
-  // simultaneously — simultaneous mass-EVP sets sig.state='red' on every
-  // intersection at once, freezing the entire network.
+  // Mass EVP: spawn one ambulance per junction using the proximity system.
+  // DO NOT touch sig.evp directly — that bypasses updateSignals and deadlocks
+  // the network. Instead spawn isE=true particles near each junction and let
+  // updateSignals() detect them via nearEvp proximity check (d2 < 0.3).
+  // The overlay is cosmetic only.
   var ov=g('evpo');if(ov)ov.classList.add('on');
-  var total=SIG.length;
-  var clearTimeouts=[];
-  for(var i=0;i<total;i++){
-    (function(idx){
-      var onT=setTimeout(function(){
-        SIG[idx].evp=true;
-        S.evpTotal++;
-      }, idx*750);
-      var offT=setTimeout(function(){
-        SIG[idx].evp=false;
-        if(idx===total-1){
-          var o=g('evpo');if(o)o.classList.remove('on');
-        }
-      }, idx*750+4000);
-      clearTimeouts.push(onT,offT);
-    })(i);
+
+  for(var jIdx=0; jIdx<JN.length; jIdx++){
+    // Find any edge that connects to this junction
+    var edgesForJ = [];
+    for(var ei=0; ei<ED.length; ei++){
+      if(ED[ei][0]===jIdx) edgesForJ.push({ei:ei, dir:1,  arrivalProg:0.75});
+      else if(ED[ei][1]===jIdx) edgesForJ.push({ei:ei, dir:-1, arrivalProg:0.25});
+    }
+    if(edgesForJ.length===0) continue;
+    var ae = edgesForJ[jIdx % edgesForJ.length];
+
+    var amb = new Particle(true);
+    amb.ei   = ae.ei;
+    amb.dir  = ae.dir;
+    // Place ambulance 20-28% from the junction so d2 < 0.3 triggers nearEvp
+    amb.prog = ae.dir===1 ? (0.72 + jIdx*0.01) : (0.28 - jIdx*0.01);
+    amb.prog = Math.max(0.05, Math.min(0.95, amb.prog));
+    amb.state = 'moving';
+    amb.wt    = 0;
+    amb.targetKmh = 44 + Math.random()*8;
+    amb._refreshSpeed();
+    amb.spd  = amb.bspd;
+    amb.tspd = amb.bspd;
+    particles.push(amb);
+    S.evpTotal++;
   }
+
+  // Remove the mass-EVP ambulances after 8 seconds so network recovers
+  setTimeout(function(){
+    // Remove only isE particles that haven't yet left on their own
+    particles = particles.filter(function(p){ return !p.isE; });
+    var o=g('evpo'); if(o) o.classList.remove('on');
+  }, 8000);
 }
 function setDens(v){
   S.dens=parseInt(v);
