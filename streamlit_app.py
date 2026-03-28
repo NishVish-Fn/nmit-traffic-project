@@ -183,7 +183,14 @@ def run_lp(C=90, density_factor=1.0, evp_mask=None, rf_weight_adj=None):
         if evp:
             w_maj[i] *= 250.0  # EVP preemption → force maximum green
 
-    c_obj = w_min - w_maj
+    # Normalised relative objective: c_obj[i] = (w_min[i] - w_maj[i]) / w_maj[i]
+    # FIX: Without normalisation all c_obj[i] < 0, so the LP only cuts the single
+    # least-penalised junction while pushing every other to g_max.  Dividing by
+    # w_maj maps each coefficient into [-1, 0], making the marginal cost of green
+    # proportional to relative congestion — heavily loaded junctions have c_obj ≈ -1
+    # while lightly loaded junctions have c_obj closer to 0, producing proper
+    # proportional green allocation across the network.
+    c_obj = (w_min - w_maj) / np.maximum(w_maj, 0.01)
 
     # ── RF-GUIDED LP WEIGHT ADJUSTMENT (Novel contribution) ─────────────────
     # rf_weight_adj[i] = 1 + alpha*(d_rf_i - d_mean)/d_mean  (alpha=0.25)
@@ -221,7 +228,14 @@ def run_lp(C=90, density_factor=1.0, evp_mask=None, rf_weight_adj=None):
     # Source: HCM 6th ed. Equation 19-5 through 19-8
 
     lambda_i = g_maj / C
-    x_i      = np.minimum(y_maj / np.maximum(lambda_i, 1e-6), 0.999)
+    # FIX: x_i must be the measured degree of saturation = v/c = c_maj (HCM §19-2).
+    # The previous formula y_maj/lambda_i = c_maj/(g/C) over-inflates x when the LP
+    # forces a lightly-loaded junction to g_min (e.g. Yelahanka: g=13.7s → lambda=0.152
+    # → x = 0.44/0.152 = 2.9, clamped to 0.999 → d2 explodes to 59s for the LEAST
+    # congested junction, producing nonsensical LOS-F where LOS-A is correct).
+    # Using c_maj directly reflects the actual field-measured v/c ratio and avoids
+    # this LP-green-time-induced saturation artifact.
+    x_i      = np.minimum(c_maj, 0.99)
     q_s      = q_maj / 3600.0   # PCU/s
 
     # d1: Uniform delay (Webster 1958, Akcelik PF correction)
@@ -260,7 +274,8 @@ def run_lp(C=90, density_factor=1.0, evp_mask=None, rf_weight_adj=None):
 
     # ── HCM 6th Ed. Delay for MINOR phase ───────────────────────────────────
     lambda_m = g_min_phase / C
-    x_m      = np.minimum(y_min / np.maximum(lambda_m, 1e-6), 0.999)
+    # FIX: same as major phase — use measured v/c (c_min) directly.
+    x_m      = np.minimum(c_min, 0.99)
     d1m      = C * (1 - lambda_m)**2 / np.maximum(2 * (1 - np.minimum(x_m,1.0) * lambda_m), 0.001)
     PFm      = np.clip((1 - P_platoon) / np.maximum(1 - lambda_m, 0.01), 0.5, 2.0)
     cap_m    = S_min * lambda_m / 3600.0
@@ -1083,8 +1098,11 @@ def rf_delay_predictor():
         cap_s = Sm * lam * ln / 3600.0
         d2t = (xc-1) + np.sqrt(max((xc-1)**2 + 8*0.5*xc/max(cap_s*900,1), 0))
         d2  = 900 * 0.25 * d2t
-        # d3 initial queue (simple Qb approximation)
-        Qb = max(0, xc - 0.95) * Sm * lam * ln
+        # d3 initial queue (HCM 6th Ed. §19-8)
+        # FIX: Qb must be in vehicles per analysis period (veh/period), not PCU/hr.
+        # Multiply capacity by T_hr=0.25 to convert from PCU/hr → veh in 15-min period.
+        # Without T_hr, Qb is 4× too large → d3 is 4× overestimated in training data.
+        Qb = max(0, xc - 0.95) * Sm * lam * ln * 0.25
         d3  = min(Qb * C / max(2 * Sm * lam * ln, 1), 15.0)
         delays.append(min(d1 + d2 + d3, 300.0))
 
@@ -1147,7 +1165,7 @@ def rf_delay_predictor():
         cap_s=Sm*lam*ln/3600.0
         d2t=(xc-1)+np.sqrt(max((xc-1)**2+8*0.5*xc/max(cap_s*900,1),0))
         d2=900*0.25*d2t
-        Qb=max(0,xc-0.95)*Sm*lam*ln
+        Qb=max(0,xc-0.95)*Sm*lam*ln*0.25  # FIX: multiply by T_hr=0.25 (veh/period)
         d3=min(Qb*C/max(2*Sm*lam*ln,1),15.0)
         yt.append(min(d1+d2+d3,300.0))
     yt   = np.array(yt)
