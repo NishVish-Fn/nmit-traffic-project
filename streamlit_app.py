@@ -5351,9 +5351,10 @@ function renderIntxModal(idx){
   });
   document.getElementById('imod-approaches').innerHTML = approachHtml;
 
-  // Signal housing
-  var lamps = sig.state === 'green' ? ['off','off','on-g'] :
-              sig.state === 'yellow'? ['off','on-y','off'] : ['on-r','off','off'];
+  // Signal housing - during EVP use nsState (approach arm) for lamp
+  var _lampState = sig.evp ? (sig.nsState || sig.state) : sig.state;
+  var lamps = _lampState === 'green' ? ['off','off','on-g'] :
+              _lampState === 'yellow'? ['off','on-y','off'] : ['on-r','off','off'];
   var sigHtml = '<div class="sig-housing">'+
     '<div class="sig-lamp '+lamps[0]+'"></div>'+
     '<div class="sig-lamp '+lamps[1]+'"></div>'+
@@ -5361,7 +5362,7 @@ function renderIntxModal(idx){
   '</div>'+
   '<div style="margin-left:8px;flex:1">'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570;margin-bottom:4px">'+
-      'Phase: <span style="color:'+congColor+'">'+sig.state.toUpperCase()+'</span></div>'+
+      'Phase: <span style="color:'+congColor+'">'+(sig.evp?(sig.nsState||sig.state).toUpperCase():sig.state.toUpperCase())+'</span></div>'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
       'Cycle: <span style="color:var(--cyan)">'+sig.cycle.toFixed(0)+'s</span></div>'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
@@ -6277,7 +6278,7 @@ function evpTrigger() {
   var isNS = (_evpDir === 'N' || _evpDir === 'S');
   sig.nsState = isNS ? 'green' : 'red';
   sig.ewState = isNS ? 'red'   : 'green';
-  sig.state   = 'red';   // stops regular cars on cross street
+  sig.state   = isNS ? 'green' : 'red';  // approach arm green so UI shows correctly immediately
   sig.phase   = 0;       // restart phase from green
 
   // ── Spawn ambulances approaching from the chosen direction ───────────────
