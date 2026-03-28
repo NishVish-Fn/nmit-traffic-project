@@ -6235,6 +6235,51 @@ function evpTrigger() {
   sig.state   = 'red';   // stops regular cars on cross street
   sig.phase   = 0;       // restart phase from green
 
+  // ── Spawn ambulances approaching from the chosen direction ───────────────
+  // Find edges that terminate AT idx junction from the correct approach axis.
+  // dir=1 means particle travels from ED[ei][0]→ED[ei][1], arriving at ED[ei][1].
+  // dir=-1 means particle travels from ED[ei][1]→ED[ei][0], arriving at ED[ei][0].
+  var approachEdges = [];
+  for(var ei=0; ei<ED.length; ei++){
+    var e = ED[ei];
+    var isNSedge = ED_ISNS[ei];
+    // Only pick edges whose orientation matches the chosen approach direction
+    if(isNS !== isNSedge) continue;
+    if(e[1] === idx){ approachEdges.push({ei:ei, dir:1});  }  // arrives via dir=1
+    if(e[0] === idx){ approachEdges.push({ei:ei, dir:-1}); }  // arrives via dir=-1
+  }
+  // Fallback: any edge touching idx if orientation filter yields nothing
+  if(approachEdges.length === 0){
+    for(var ei=0; ei<ED.length; ei++){
+      var e=ED[ei];
+      if(e[0]===idx) approachEdges.push({ei:ei,dir:-1});
+      else if(e[1]===idx) approachEdges.push({ei:ei,dir:1});
+    }
+  }
+
+  // Spawn 4 ambulances, spread across available approach edges, starting ~20-50% away
+  var numAmb = Math.min(4, Math.max(1, approachEdges.length * 2));
+  for(var k=0; k<numAmb; k++){
+    var ae = approachEdges[k % approachEdges.length];
+    var amb = new Particle(true);
+    amb.ei  = ae.ei;
+    amb.dir = ae.dir;
+    // prog: distance from destination — 0.15-0.45 so they're already en-route
+    amb.prog = 0.15 + Math.random() * 0.30;
+    // stagger them so they don't arrive simultaneously
+    amb.prog += k * 0.07;
+    if(amb.prog > 0.55) amb.prog = 0.15 + Math.random() * 0.10;
+    amb.state = 'moving';
+    amb.wt    = 0;
+    // Force a high approach speed
+    amb.targetKmh = 42 + Math.random() * 10;
+    amb._refreshSpeed();
+    amb.spd  = amb.bspd;
+    amb.tspd = amb.bspd;
+    particles.push(amb);
+  }
+  S.evpTotal += numAmb;
+
   var btn = document.getElementById('evp-trigger-btn');
   if(btn) btn.className = 'evp-btn trigger active';
   var badge = document.getElementById('imod-evp-badge');
