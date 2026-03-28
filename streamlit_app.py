@@ -3859,7 +3859,7 @@ function updateSignals(dt){
         }
         sig.nsState = evpIsNS ? 'green' : 'red';
         sig.ewState = evpIsNS ? 'red'   : 'green';
-        sig.state   = evpIsNS ? 'green' : 'red';  // approach arm = green so UI lamps/panels show correctly
+        sig.state   = 'green';  // EVP approach arm always green for UI — cross cars stopped via relevantState per-edge
         sig.eff=1; sig.gDur=S.cycle*.95; continue;
       }
     }
@@ -5771,10 +5771,12 @@ function startRoadAnimation(idx){
     ctx.textAlign = 'left';
 
     // Update live signal display in left panel
-    var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
-                : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+    // During EVP use the approach arm state (whichever is green) not sig.state
+    var _sigDisp = sig.evp ? (sig.nsState==='green'||sig.ewState==='green' ? 'green' : sig.state) : sig.state;
+    var sRemain = _sigDisp==='green'  ? Math.max(0, sig.gDur - sig.phase)
+                : _sigDisp==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
                 : Math.max(0, sig.cycle - sig.phase);
-    var sColor  = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    var sColor  = _sigDisp==='green'?'#00ff88':_sigDisp==='yellow'?'#ffd700':'#ff2244';
     updateIntxSignalPanel(idx, sig, sRemain, sColor);
 
     _roadAnimId = requestAnimationFrame(drawRoadScene);
@@ -6288,7 +6290,7 @@ function evpTrigger() {
   var isNS = (_evpDir === 'N' || _evpDir === 'S');
   sig.nsState = isNS ? 'green' : 'red';
   sig.ewState = isNS ? 'red'   : 'green';
-  sig.state   = isNS ? 'green' : 'red';  // approach arm green so UI shows correctly immediately
+  sig.state   = 'green';  // EVP: always green so UI lamps/panels show correctly immediately
   sig.phase   = 0;       // restart phase from green
 
   // ── Spawn ambulances approaching from the chosen direction ───────────────
