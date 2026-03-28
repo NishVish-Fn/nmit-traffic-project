@@ -5352,7 +5352,7 @@ function renderIntxModal(idx){
   document.getElementById('imod-approaches').innerHTML = approachHtml;
 
   // Signal housing - during EVP use nsState (approach arm) for lamp
-  var _lampState = sig.evp ? (sig.nsState || sig.state) : sig.state;
+  var _lampState = sig.evp ? (sig.nsState==='green'?'green':sig.ewState==='green'?'green':sig.state) : sig.state;
   var lamps = _lampState === 'green' ? ['off','off','on-g'] :
               _lampState === 'yellow'? ['off','on-y','off'] : ['on-r','off','off'];
   var sigHtml = '<div class="sig-housing">'+
@@ -5362,7 +5362,7 @@ function renderIntxModal(idx){
   '</div>'+
   '<div style="margin-left:8px;flex:1">'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570;margin-bottom:4px">'+
-      'Phase: <span style="color:'+congColor+'">'+(sig.evp?(sig.nsState||sig.state).toUpperCase():sig.state.toUpperCase())+'</span></div>'+
+      'Phase: <span style="color:'+congColor+'">'+(sig.evp?((sig.nsState==='green'||sig.ewState==='green')?'GREEN':sig.state).toUpperCase():sig.state.toUpperCase())+'</span></div>'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
       'Cycle: <span style="color:var(--cyan)">'+sig.cycle.toFixed(0)+'s</span></div>'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
@@ -6062,9 +6062,10 @@ function updateIntxSignalPanel(idx, sig, remain, sColor){
   if(housingEl && housingEl.firstChild){
     var lamps = housingEl.firstChild.querySelectorAll('.sig-lamp');
     if(lamps.length === 3){
-      lamps[0].className = 'sig-lamp ' + (sig.state==='red'?'on-r':'off');
-      lamps[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
-      lamps[2].className = 'sig-lamp ' + (sig.state==='green'?'on-g':'off');
+      var _ls1 = sig.evp ? (sig.nsState==='green'||sig.ewState==='green'?'green':sig.state) : sig.state;
+      lamps[0].className = 'sig-lamp ' + (_ls1==='red'?'on-r':'off');
+      lamps[1].className = 'sig-lamp ' + (_ls1==='yellow'?'on-y':'off');
+      lamps[2].className = 'sig-lamp ' + (_ls1==='green'?'on-g':'off');
     }
   }
 }
@@ -6180,9 +6181,10 @@ function liveUpdateIntxStats(idx){
   if(housingEl && housingEl.firstChild){
     var lamps2 = housingEl.firstChild.querySelectorAll('.sig-lamp');
     if(lamps2.length === 3){
-      lamps2[0].className = 'sig-lamp ' + (sig.state==='red'?'on-r':'off');
-      lamps2[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
-      lamps2[2].className = 'sig-lamp ' + (sig.state==='green'?'on-g':'off');
+      var _ls2 = sig.evp ? (sig.nsState==='green'||sig.ewState==='green'?'green':sig.state) : sig.state;
+      lamps2[0].className = 'sig-lamp ' + (_ls2==='red'?'on-r':'off');
+      lamps2[1].className = 'sig-lamp ' + (_ls2==='yellow'?'on-y':'off');
+      lamps2[2].className = 'sig-lamp ' + (_ls2==='green'?'on-g':'off');
     }
   }
 
@@ -6190,10 +6192,11 @@ function liveUpdateIntxStats(idx){
   var timerEl = document.getElementById('imod-signal-timer');
   var labelEl = document.getElementById('imod-signal-label');
   var fillEl  = document.getElementById('imod-phase-fill');
-  var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
-              : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+  var _ss = sig.evp ? (sig.nsState==='green'||sig.ewState==='green'?'green':sig.state) : sig.state;
+  var sRemain = _ss==='green'  ? Math.max(0, sig.gDur - sig.phase)
+              : _ss==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
               : Math.max(0, sig.cycle - sig.phase);
-  var sColor  = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+  var sColor  = _ss==='green'?'#00ff88':_ss==='yellow'?'#ffd700':'#ff2244';
   if(timerEl){
     timerEl.textContent = sRemain.toFixed(1) + 's';
     timerEl.style.color = sColor;
