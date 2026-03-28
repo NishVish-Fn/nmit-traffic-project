@@ -6336,6 +6336,23 @@ function evpTrigger() {
   if(badge){ badge.textContent='ACTIVE'; badge.className='evp-badge'; }
 
   evpRenderMath();
+
+  // Force lamp green immediately — bypass all async update paths
+  var _housing = document.getElementById('imod-signal-display');
+  if(_housing && _housing.firstChild){
+    var _lps = _housing.firstChild.querySelectorAll('.sig-lamp');
+    if(_lps.length===3){
+      _lps[0].className='sig-lamp off';
+      _lps[1].className='sig-lamp off';
+      _lps[2].className='sig-lamp on-g';
+    }
+  }
+  var _tmrEl = document.getElementById('imod-signal-timer');
+  if(_tmrEl){ _tmrEl.style.color='#00ff88'; _tmrEl.style.textShadow='0 0 20px #00ff88cc'; }
+  var _lblEl = document.getElementById('imod-signal-label');
+  if(_lblEl){ _lblEl.textContent='EVP PRIORITY PHASE'; _lblEl.style.color='#00ff88'; }
+  var _filEl = document.getElementById('imod-phase-fill');
+  if(_filEl){ _filEl.style.background='#00ff88'; _filEl.style.boxShadow='0 0 6px #00ff8888'; }
 }
 
 function evpClear() {
