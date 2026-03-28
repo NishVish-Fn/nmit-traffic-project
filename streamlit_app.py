@@ -3160,20 +3160,30 @@ Particle.prototype.update = function(dt) {
     var af = S.algo==='fixed' ? 1.25 : 1.0;
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
-    var startId = this.dir===1 ? e[0] : e[1];
-    var jA = JN[startId], jB = JN[endId];
-    var dLat = Math.abs(jB.lat - jA.lat);
-    var dLng = Math.abs(jB.lng - jA.lng);
-    var isNS = dLat >= dLng;
+    // Compute isNS from the actual approach vector near the destination junction.
+    // Sample two points close to the destination end of the path so we get the
+    // true bearing the car is travelling when it arrives at the junction, rather
+    // than the coarse junction-to-junction bearing which can be misleading on
+    // diagonal or curved edges.
+    var path = getEdgePath(this.ei);
+    var tEnd   = this.dir===1 ? 1.0 : 0.0;
+    var tBack  = this.dir===1 ? Math.max(0.0, tEnd - 0.12) : Math.min(1.0, tEnd + 0.12);
+    var ptEnd  = samplePath(path, tEnd);
+    var ptBack = samplePath(path, tBack);
+    var approachDLat = Math.abs(ptEnd.lat - ptBack.lat);
+    var approachDLng = Math.abs(ptEnd.lng - ptBack.lng);
+    // Scale lng delta by cos(lat) so degrees are comparable in both axes
+    var approachDLngScaled = approachDLng * Math.cos(ptEnd.lat * Math.PI / 180);
+    var isNS = approachDLat >= approachDLngScaled;
     // During EVP, nsState/ewState are already set correctly (green for EVP direction,
     // red for cross-traffic). Emergency vehicles (isE) always ignore signals.
     var relevantState = isNS ? sig.nsState : sig.ewState;
 
-    // STOP_WALL: hard stop boundary measured as fraction of edge from junction.
-    // 0.18 = 18% of edge from junction — keeps cars clearly outside the intersection circle.
-    // BRAKE_ZONE: start decelerating at 40% from junction.
-    var STOP_WALL  = 0.18;
-    var BRAKE_ZONE = 0.40;
+    // STOP_WALL: hard stop boundary as fraction of edge from junction.
+    // Increased to 0.22 so cars visibly stop before the intersection box.
+    // BRAKE_ZONE: start decelerating at 0.45 from junction for smooth ramp.
+    var STOP_WALL  = 0.22;
+    var BRAKE_ZONE = 0.45;
     var atRed = (!this.isE && (relevantState === 'red' || relevantState === 'yellow'));
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
     var waveScale = S.wave / 40.0;
