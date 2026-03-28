@@ -558,8 +558,8 @@ def multi_objective_pareto(C=90, density_factor=1.0, n_eps=10):
 
     def solve_eps(eps_val):
         """Minimise f1 (delay), with f2 (emissions) ≤ eps_val."""
-        # Delay objective: min Σ (w_min - w_maj) * g_i  (equiv to Webster LP)
-        c_obj = w_min - w_maj
+        # FIX: normalise objective same as run_lp for consistent proportional allocation
+        c_obj = (w_min - w_maj) / np.maximum(w_maj, 0.01)
         # Budget constraint
         A_ub = np.ones((1, n))
         b_ub = np.array([n * G_total * 0.82])
@@ -574,7 +574,8 @@ def multi_objective_pareto(C=90, density_factor=1.0, n_eps=10):
         return res
 
     # First compute unconstrained emission range
-    res_min_delay = linprog(w_min - w_maj,
+    # FIX: use normalised c_obj consistent with run_lp
+    res_min_delay = linprog((w_min - w_maj) / np.maximum(w_maj, 0.01),
                              A_ub=np.ones((1, n)), b_ub=np.array([n * G_total * 0.82]),
                              bounds=[(g_min_b, g_max_b)]*n, method='highs')
     if not res_min_delay.success:
@@ -591,9 +592,10 @@ def multi_objective_pareto(C=90, density_factor=1.0, n_eps=10):
         res_k = solve_eps(eps_k)
         if res_k.success:
             g_k   = res_k.x
-            # Webster delay computation for this solution
+            # FIX: x_k = c_maj (measured v/c) — same fix as run_lp to prevent
+            # d2 explosion when any g_k is pushed to g_min by the emission constraint
             lambda_k = g_k / C
-            x_k      = np.minimum(y_maj / np.maximum(lambda_k, 1e-6), 0.999)
+            x_k      = np.minimum(c_maj, 0.99)
             q_s_k    = q_maj / 3600.0
             d_k      = C * (1 - lambda_k)**2 / np.maximum(2*(1-lambda_k*x_k), 0.001) + \
                        x_k**2 / np.maximum(2*q_s_k*(1-x_k), 0.001)
@@ -640,7 +642,8 @@ def monte_carlo_sensitivity(C=90, density_factor=1.0, n_samples=200, sigma_pct=0
         w_n     = y_min / np.maximum(1 - y_min, 0.05)
         L       = 7.0
         G_total = C - L
-        c_obj   = w_n - w_m
+        # FIX: normalise c_obj for proportional green allocation (same as run_lp)
+        c_obj   = (w_n - w_m) / np.maximum(w_m, 0.01)
         A_ub    = np.ones((1, n))
         b_ub    = np.array([n * G_total * 0.82])
         bounds  = [(10.0, G_total - 10.0)] * n
@@ -648,7 +651,8 @@ def monte_carlo_sensitivity(C=90, density_factor=1.0, n_samples=200, sigma_pct=0
         if res.success:
             g      = res.x
             lam    = g / C
-            x_     = np.minimum(y_maj / np.maximum(lam, 1e-6), 0.999)
+            # FIX: x_ = c_maj_p (measured v/c) — prevents d2 explosion for low-green junctions
+            x_     = np.minimum(c_maj_p, 0.99)
             q_s    = c_maj_p * S_maj / 3600.0
             d      = C*(1-lam)**2 / np.maximum(2*(1-lam*x_), 0.001) + x_**2 / np.maximum(2*q_s*(1-x_), 0.001)
             objs.append(float(-res.fun))
@@ -823,6 +827,7 @@ def rl_q_learning_controller(density_factor=1.0, n_episodes=500, C=90):
     REPLAY_CAP = 1000
     replay_buf = []
     MINI_BATCH  = 32
+    _replay_ptr = [0]  # mutable global write pointer — increments per entry, not per episode
 
     def get_state(i, g_i, density, ep_frac):
         ph = _JN_PHASES[i]
@@ -837,7 +842,10 @@ def rl_q_learning_controller(density_factor=1.0, n_episodes=500, C=90):
         c_m = min(ph[2] * density, 0.97)
         S_m = float(ph[0])
         lam_new = np.clip(g_new / C, 0.01, 0.99)
-        x_new = min(c_m / max(lam_new, 1e-6), 0.999)
+        # FIX: x_new = c_m (measured v/c) — using c_m/lam_new inflates x when
+        # g_new is small (e.g. after a −15s action near g_min), sending x→0.999
+        # and generating an artificially large delay penalty that corrupts Q-values.
+        x_new = min(c_m, 0.97)
         cap_s = c_m * S_m / 3600.0
         d1 = C * (1-lam_new)**2 / max(2*(1-lam_new*x_new), 0.001)
         d2t = (x_new-1) + np.sqrt(max((x_new-1)**2 + 8*0.5*x_new/max(cap_s*900,1), 0))
@@ -866,11 +874,14 @@ def rl_q_learning_controller(density_factor=1.0, n_episodes=500, C=90):
             ep_delays.append(delay)
             g_rl[i] = g_new
             # Store in replay buffer
-            # Circular buffer: overwrite oldest entry instead of O(n) pop(0)
+            # FIX: true circular buffer — advance write pointer by 1 per ENTRY
+            # (not per episode). Using ep%REPLAY_CAP froze slots 500..999 forever
+            # since ep only goes 0..499, meaning 584 slots were never overwritten.
             if len(replay_buf) < REPLAY_CAP:
                 replay_buf.append((i, state, action, reward, next_state))
             else:
-                replay_buf[ep % REPLAY_CAP] = (i, state, action, reward, next_state)
+                replay_buf[_replay_ptr[0]] = (i, state, action, reward, next_state)
+            _replay_ptr[0] = (_replay_ptr[0] + 1) % REPLAY_CAP
             # Mini-batch double Q update
             if len(replay_buf) >= MINI_BATCH:
                 idxs = np.random.choice(len(replay_buf), MINI_BATCH, replace=False)
@@ -889,7 +900,9 @@ def rl_q_learning_controller(density_factor=1.0, n_episodes=500, C=90):
 
     g_rl_c = np.clip(g_rl, g_min_b, g_max_b)
     lam_rl = g_rl_c / C
-    x_rl = np.minimum(np.array([min(ph[2]*density_factor,0.97) for ph in _JN_PHASES]) / np.maximum(lam_rl, 1e-6), 0.999)
+    # FIX: x_rl = c_maj (measured v/c) — same fix as run_lp; c_maj/lam_rl inflates
+    # x for junctions where RL converged to a low green time, exploding reported delay.
+    x_rl = np.minimum(np.array([min(ph[2]*density_factor, 0.97) for ph in _JN_PHASES]), 0.99)
     q_s_rl = np.array([min(ph[2]*density_factor,0.97)*ph[0]/3600 for ph in _JN_PHASES])
     d1_rl = C*(1-lam_rl)**2 / np.maximum(2*(1-lam_rl*x_rl), 0.001)
     d2t_rl = (x_rl-1)+np.sqrt(np.maximum((x_rl-1)**2+8*0.5*x_rl/np.maximum(q_s_rl*900,1), 0))
@@ -996,7 +1009,8 @@ def ctm_lp_coupled(density_factor=1.0, C=90):
     c_min = np.minimum(np.array([p[3] for p in _JN_PHASES]) * density_factor, 0.97)
     w_maj = c_maj / np.maximum(1 - c_maj, 0.03)
     w_min = c_min / np.maximum(1 - c_min, 0.03)
-    c_obj = w_min - w_maj
+    # FIX: normalise c_obj for consistent proportional allocation with run_lp
+    c_obj = (w_min - w_maj) / np.maximum(w_maj, 0.01)
     EDGES = [[0,7],[0,8],[0,4],[0,6],[1,9],[1,11],[1,3],[2,3],[2,5],[2,6],[2,7],
              [3,5],[3,11],[4,8],[4,10],[6,7],[6,2],[6,11],[7,10],[7,8],[8,10],[9,11],[9,1],[10,8],[11,6]]
     A_rows = [np.ones(n)]; b_rows = [n * G_total * 0.82]; n_coupled = 0
@@ -1008,7 +1022,8 @@ def ctm_lp_coupled(density_factor=1.0, C=90):
     res = linprog(c_obj, A_ub=np.vstack(A_rows), b_ub=np.array(b_rows),
                   bounds=[(g_min_b, g_max_b)]*n, method='highs')
     g_c = res.x if res.success else np.clip(c_maj/(c_maj+c_min)*G_total, g_min_b, g_max_b)
-    lam_c = g_c / C; x_c = np.minimum(c_maj / np.maximum(lam_c, 1e-6), 0.999)
+    # FIX: x_c = c_maj (measured v/c) — same as run_lp fix
+    lam_c = g_c / C; x_c = np.minimum(c_maj, 0.99)
     q_sc = c_maj * np.array([p[0] for p in _JN_PHASES], dtype=float) / 3600.0
     d1_c = C*(1-lam_c)**2 / np.maximum(2*(1-lam_c*x_c), 0.001)
     d2t_c = (x_c-1)+np.sqrt(np.maximum((x_c-1)**2+8*0.5*x_c/np.maximum(q_sc*900,1), 0))
