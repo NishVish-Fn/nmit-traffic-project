@@ -3798,7 +3798,12 @@ function updateSignals(dt){
       if(ej===i&&d2<.3){nearEvp=true;break;}
     }
     var wasEvp=sig.evp;
-    sig.evp=nearEvp&&S.algo!=='fixed';
+    // Modal-triggered EVP (_evpActive + _evpJctIdx===i) takes priority and must NOT
+    // be overwritten by particle-proximity — that race freezes the signal on red.
+    var modalEvp = (_evpActive && _evpJctIdx === i);
+    if(!modalEvp){
+      sig.evp=nearEvp&&S.algo!=='fixed';
+    }
     if(sig.evp&&!wasEvp){
       S.evpTotal++;
       var ov=document.getElementById('evpo');
@@ -6225,8 +6230,11 @@ function evpClear() {
   _evpActive = false;
   if(_evpJctIdx >= 0) {
     var sig = SIG[_evpJctIdx];
-    sig.evp  = false;
-    sig.phase = 0;  // resume from green
+    sig.evp     = false;
+    sig.state   = 'green';   // force immediate green so cars can move again
+    sig.nsState = 'green';
+    sig.ewState = 'red';
+    sig.phase   = 0;         // restart cycle from beginning (green phase)
   }
   _evpJctIdx = -1;
   var btn = document.getElementById('evp-trigger-btn');
@@ -6434,13 +6442,15 @@ function evpRenderMath() {
 function evpLiveUpdate() {
   if(_evpActive && _curIntxIdx >= 0) {
     evpRenderMath();
-    // Keep sig.evp pinned while triggered from modal
+    // Signal state is managed by updateSignals() via modalEvp flag.
+    // Just ensure sig.evp stays true and directional states are correct.
     var sig = SIG[_curIntxIdx];
-    if(sig && !sig.evp) {
-      sig.evp = true;
+    if(sig) {
       var isNS = (_evpDir === 'N' || _evpDir === 'S');
+      sig.evp     = true;
       sig.nsState = isNS ? 'green' : 'red';
       sig.ewState = isNS ? 'red'   : 'green';
+      // sig.state = 'red' so regular cars stop; emergency vehicles ignore signals.
       sig.state   = 'red';
     }
   }
