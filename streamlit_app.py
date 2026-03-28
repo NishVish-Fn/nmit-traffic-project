@@ -5631,10 +5631,10 @@ function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
   var isNS = (v.dir === 'N' || v.dir === 'S');
 
   // Signal state for this vehicle's direction
+  // During EVP, nsState/ewState are already set correctly (EVP direction=green, cross=red).
+  // Do NOT give all vehicles green — use the directional state so cross-traffic still stops.
   var sigState;
-  if (sig.evp) {
-    sigState = 'green';
-  } else if (isNS) {
+  if (isNS) {
     sigState = sig.nsState || sig.state;
   } else {
     sigState = sig.ewState || 'red';
