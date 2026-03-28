@@ -6502,20 +6502,26 @@ function evpRenderMath() {
 
 // Keep EVP math live while active (called from liveUpdateIntxStats)
 function evpLiveUpdate() {
-  if(_evpActive && _curIntxIdx >= 0) {
-    evpRenderMath();
-    // Signal state is managed by updateSignals() via modalEvp flag.
-    // Just ensure sig.evp stays true and directional states are correct.
-    var sig = SIG[_curIntxIdx];
-    if(sig) {
-      var isNS = (_evpDir === 'N' || _evpDir === 'S');
-      sig.evp     = true;
-      sig.nsState = isNS ? 'green' : 'red';
-      sig.ewState = isNS ? 'red'   : 'green';
-      // sig.state = 'red' so regular cars stop; emergency vehicles ignore signals.
-      sig.state   = 'red';
-    }
+  if(!_evpActive || _curIntxIdx < 0) return;
+
+  // Auto-clear once all spawned ambulances have passed through the junction.
+  var idx = _evpJctIdx >= 0 ? _evpJctIdx : _curIntxIdx;
+  var anyNearby = false;
+  for(var pi=0; pi<particles.length; pi++){
+    var p = particles[pi];
+    if(!p.isE) continue;
+    var destJ = p.dir===1 ? ED[p.ei][1] : ED[p.ei][0];
+    var distToJ = p.dir===1 ? (1-p.prog) : p.prog;
+    if(destJ === idx && distToJ < 0.85){ anyNearby = true; break; }
   }
+  if(!anyNearby){
+    evpClear();
+    return;
+  }
+
+  // Only update the math panel — do NOT touch sig.state here.
+  // updateSignals() owns all signal state; overriding it here caused the freeze.
+  evpRenderMath();
 }
 
 window.evpSetDir = evpSetDir;
