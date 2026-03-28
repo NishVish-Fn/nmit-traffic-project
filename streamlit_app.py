@@ -3228,8 +3228,10 @@ Particle.prototype.update = function(dt) {
       if(this.trail.length>10) this.trail.pop();
     }
 
-    // ── WRAP to next edge — only when NOT held at red ─────────────────────────
-    if(!atRed && (this.prog>=1 || this.prog<=0)){
+    // ── WRAP to next edge ────────────────────────────────────────────────────
+    // The hard clamps above guarantee atRed cars can never reach prog>=1 or <=0.
+    // So reaching here with out-of-bounds prog means the car legally crossed green.
+    if(this.prog>=1 || this.prog<=0){
       this.prog=this.prog>=1?0:1;
       var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
       var conn=[];
@@ -3245,7 +3247,7 @@ Particle.prototype.update = function(dt) {
         }
         this.ei=best; this.dir=ED[best][0]===ej?1:-1;
         this.prog=this.dir===1?0:1;
-        this._refreshSpeed();  // recalculate bspd for new edge length
+        this._refreshSpeed();
         if(ej===this.destJ) this.destJ=this._pickDest(ej);
       } else {
         this.dir*=-1;
