@@ -4011,8 +4011,18 @@ function updateMetrics(){
     baseDelay=80; avgLam=0.45; avgX=0.75; baseLpObj=0;
   }
 
+  // Fixed-timer baseline: use BBMP/KRDCL 2022 field-measured delays directly
+  // These are the real pre-optimisation delays (avg ~68 s/veh across 12 junctions,
+  // peaking at 118.3 s/veh at Silk Board per BBMP TEC 2022 survey).
+  var fixedBaselineDelay = 68.0;  // default fallback
+  if(BACKEND.validation && BACKEND.validation.details && BACKEND.validation.details.length > 0){
+    var _fsum = 0;
+    for(var _fi=0; _fi<BACKEND.validation.details.length; _fi++) _fsum += BACKEND.validation.details[_fi].measured;
+    fixedBaselineDelay = _fsum / BACKEND.validation.details.length;
+  }
+
   // Algorithm modifier: optimal LP reduces delay vs fixed-timer baseline
-  var algoDelayMul = S.algo==='fixed'   ? 1.35 :
+  var algoDelayMul = S.algo==='fixed'   ? (fixedBaselineDelay / Math.max(baseDelay, 1)) :
                      S.algo==='lp'      ? (1 - warm*0.20) :
                      S.algo==='optimal' ? (1 - warm*0.35) :
                      S.algo==='webster' ? (1 - warm*0.15) :
@@ -4027,7 +4037,13 @@ function updateMetrics(){
   var stopFrac = norm.length>0 ? (stopped + slow*0.5)/norm.length : 0;
   var particleDelayMul = 1 + stopFrac * 0.8;
 
-  var avgDelay = Math.min(baseDelay * algoDelayMul * cycleDelayMul * particleDelayMul, 300);
+  // For fixed-timer mode: use BBMP field-measured avg delay directly as the base
+  var avgDelay;
+  if(S.algo==='fixed'){
+    avgDelay = Math.min(fixedBaselineDelay * cycleDelayMul * particleDelayMul, 300);
+  } else {
+    avgDelay = Math.min(baseDelay * algoDelayMul * cycleDelayMul * particleDelayMul, 300);
+  }
 
   // v/c ratio: scales with density and degrades with poor algorithm
   var vcBase = avgX;
@@ -4163,7 +4179,9 @@ function updateMetrics(){
     var x2=x2num!==null?x2num.toFixed(3):'-';
     var xColor=x2num!==null?(x2num>.9?'#ff2244':x2num>.7?'#ff8c00':'#00ff88'):'#5a7590';
     var dRaw=lp&&lp.delay?lp.delay[i]:null;
-    var dScaled=dRaw!==null?Math.min(dRaw*algoDelayMul*cycleDelayMul,300):null;
+    // For fixed-timer mode, use actual BBMP field-measured delays (ground truth)
+    var _fieldDelay = (S.algo==='fixed' && BACKEND.validation && BACKEND.validation.details && BACKEND.validation.details[i]) ? BACKEND.validation.details[i].measured : null;
+    var dScaled=_fieldDelay!==null ? Math.min(_fieldDelay*cycleDelayMul,300) : (dRaw!==null?Math.min(dRaw*algoDelayMul*cycleDelayMul,300):null);
     var d2=dScaled!==null?dScaled.toFixed(0):'-';
     var dColor=dScaled!==null?(dScaled>120?'#ff2244':dScaled>80?'#ff8c00':dScaled>35?'#ffd700':'#00ff88'):'#5a7590';
     var gLp=lp&&lp.g?lp.g[i].toFixed(0):s2.gDur.toFixed(0);
@@ -5025,7 +5043,8 @@ function loop(ts){
       var spRT2=g('sigpanel-rt');
       if(spRT2&&spRT2.children.length===SIG.length){
         var lp2=CUR.lp;
-        var algoMul2=S.algo==='fixed'?1.35:S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20):S.algo==='optimal'?(1-Math.min(S.booted/500,1)*0.35):S.algo==='webster'?(1-Math.min(S.booted/500,1)*0.15):1.0;
+        var _fixedMul2=(BACKEND.validation&&BACKEND.validation.details&&BACKEND.validation.details.length>0)?(BACKEND.validation.details.reduce(function(a,d){return a+d.measured;},0)/BACKEND.validation.details.length)/Math.max(CUR.lp&&CUR.lp.delay?CUR.lp.delay.reduce(function(a,b){return a+b;},0)/CUR.lp.delay.length:28,1):2.4;
+        var algoMul2=S.algo==='fixed'?_fixedMul2:S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20):S.algo==='optimal'?(1-Math.min(S.booted/500,1)*0.35):S.algo==='webster'?(1-Math.min(S.booted/500,1)*0.15):1.0;
         var C_opt2=lp2&&lp2.C_opt?lp2.C_opt:90;
         var cyd2=1+Math.abs(S.cycle-C_opt2)/C_opt2*0.6;
         var losC2={'A':'#00ff88','B':'#00e070','C':'#ffd700','D':'#ff8c00','E':'#ff2244','F':'#ff0033'};
@@ -6000,8 +6019,9 @@ function liveUpdateIntxStats(idx){
   var congColor  = j.cong > 0.65 ? '#ff2244' : j.cong > 0.45 ? '#ff8c00' : '#00ff88';
   var losColors  = {'A':'#00ff88','B':'#00cc66','C':'#ffd700','D':'#ff8c00','E':'#ff4422','F':'#ff0033'};
 
-  // Derive live values
-  var algoMul = S.algo==='fixed'?1.35 : S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20)
+  // Derive live values — fixed timer uses BBMP field-measured delay as baseline
+  var _fixedMulM=(BACKEND.validation&&BACKEND.validation.details&&BACKEND.validation.details.length>0)?(BACKEND.validation.details.reduce(function(a,d){return a+d.measured;},0)/BACKEND.validation.details.length)/Math.max(lp&&lp.delay?lp.delay.reduce(function(a,b){return a+b;},0)/lp.delay.length:28,1):2.4;
+  var algoMul = S.algo==='fixed'?_fixedMulM : S.algo==='lp'?(1-Math.min(S.booted/500,1)*0.20)
               : S.algo==='optimal'?(1-Math.min(S.booted/500,1)*0.35)
               : S.algo==='webster'?(1-Math.min(S.booted/500,1)*0.15) : 1.0;
   var C_optL  = lp && lp.C_opt ? lp.C_opt : 90;
