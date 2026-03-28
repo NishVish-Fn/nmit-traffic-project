@@ -3837,29 +3837,25 @@ function updateSignals(dt){
         sig.phase = 0;
         // fall through to normal LP cycling below
       } else {
-        // EVP: determine approach direction
-        // Modal EVP uses the user-chosen _evpDir directly (N/S = NS axis, E/W = EW axis)
+        // EVP: use modal _evpDir if triggered from modal, else particle proximity
         var evpIsNS = true;
         if(_evpActive && _evpJctIdx === i) {
           evpIsNS = (_evpDir === 'N' || _evpDir === 'S');
-        } else {
-          // Particle-proximity fallback for auto-EVP (non-modal)
-          for(var pi2=0;pi2<particles.length;pi2++){
-            var pev=particles[pi2];
-            if(!pev.isE) continue;
-            var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
-            var evD2=pev.dir===1?1-pev.prog:pev.prog;
-            if(evEndJ===i&&evD2<0.3){
-              var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
-              var ja2=JN[evStartJ],jb2=JN[i];
-              evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
-              break;
-            }
+        } else { for(var pi2=0;pi2<particles.length;pi2++){
+          var pev=particles[pi2];
+          if(!pev.isE) continue;
+          var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
+          var evD2=pev.dir===1?1-pev.prog:pev.prog;
+          if(evEndJ===i&&evD2<0.3){
+            var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
+            var ja2=JN[evStartJ],jb2=JN[i];
+            evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
+            break;
           }
-        }
+        } }
         sig.nsState = evpIsNS ? 'green' : 'red';
         sig.ewState = evpIsNS ? 'red'   : 'green';
-        sig.state   = evpIsNS ? 'green' : 'red';
+        sig.state   = 'green'; // always green so UI lamp shows correctly
         sig.eff=1; sig.gDur=S.cycle*.95; continue;
       }
     }
@@ -5235,7 +5231,6 @@ function setIntxTab(idx, clickedTab){
 function openIntx(idx, tab){
   // Clear EVP if switching junctions
   if(_evpActive && _evpJctIdx !== idx) evpClear();
-  // Only reset direction if EVP is not already active for this junction
   if(!_evpActive || _evpJctIdx !== idx) _evpDir = 'N';
   setIntxTab(idx, tab);
   _curIntxIdx = idx;
@@ -5351,10 +5346,10 @@ function renderIntxModal(idx){
   });
   document.getElementById('imod-approaches').innerHTML = approachHtml;
 
-  // Signal housing - during EVP use nsState (approach arm) for lamp
-  var _lampState = sig.evp ? (sig.nsState==='green'?'green':sig.ewState==='green'?'green':sig.state) : sig.state;
-  var lamps = _lampState === 'green' ? ['off','off','on-g'] :
-              _lampState === 'yellow'? ['off','on-y','off'] : ['on-r','off','off'];
+  // Signal housing
+  var _ls = sig.evp ? 'green' : sig.state;
+  var lamps = _ls === 'green' ? ['off','off','on-g'] :
+              _ls === 'yellow'? ['off','on-y','off'] : ['on-r','off','off'];
   var sigHtml = '<div class="sig-housing">'+
     '<div class="sig-lamp '+lamps[0]+'"></div>'+
     '<div class="sig-lamp '+lamps[1]+'"></div>'+
@@ -5362,7 +5357,7 @@ function renderIntxModal(idx){
   '</div>'+
   '<div style="margin-left:8px;flex:1">'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570;margin-bottom:4px">'+
-      'Phase: <span style="color:'+congColor+'">'+(sig.evp?((sig.nsState==='green'||sig.ewState==='green')?'GREEN':sig.state).toUpperCase():sig.state.toUpperCase())+'</span></div>'+
+      'Phase: <span style="color:'+congColor+'">'+(sig.evp?'GREEN':sig.state.toUpperCase())+'</span></div>'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
       'Cycle: <span style="color:var(--cyan)">'+sig.cycle.toFixed(0)+'s</span></div>'+
     '<div style="font-family:Share Tech Mono,monospace;font-size:.44rem;color:#3a5570">'+
@@ -5376,7 +5371,7 @@ function renderIntxModal(idx){
   var initRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
                  : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
                  : Math.max(0, sig.cycle - sig.phase);
-  var initColor = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+  var initColor = sig.evp?'#00ff88':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
   var _tmr = document.getElementById('imod-signal-timer');
   var _lbl = document.getElementById('imod-signal-label');
   var _fil = document.getElementById('imod-phase-fill');
@@ -5771,12 +5766,10 @@ function startRoadAnimation(idx){
     ctx.textAlign = 'left';
 
     // Update live signal display in left panel
-    // During EVP use the approach arm state (whichever is green) not sig.state
-    var _sigDisp = sig.evp ? (sig.nsState==='green'||sig.ewState==='green' ? 'green' : sig.state) : sig.state;
-    var sRemain = _sigDisp==='green'  ? Math.max(0, sig.gDur - sig.phase)
-                : _sigDisp==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+    var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
+                : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
                 : Math.max(0, sig.cycle - sig.phase);
-    var sColor  = _sigDisp==='green'?'#00ff88':_sigDisp==='yellow'?'#ffd700':'#ff2244';
+    var sColor  = sig.evp?'#00ff88':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
     updateIntxSignalPanel(idx, sig, sRemain, sColor);
 
     _roadAnimId = requestAnimationFrame(drawRoadScene);
@@ -6064,10 +6057,10 @@ function updateIntxSignalPanel(idx, sig, remain, sColor){
   if(housingEl && housingEl.firstChild){
     var lamps = housingEl.firstChild.querySelectorAll('.sig-lamp');
     if(lamps.length === 3){
-      var _ls1 = sig.evp ? (sig.nsState==='green'||sig.ewState==='green'?'green':sig.state) : sig.state;
-      lamps[0].className = 'sig-lamp ' + (_ls1==='red'?'on-r':'off');
-      lamps[1].className = 'sig-lamp ' + (_ls1==='yellow'?'on-y':'off');
-      lamps[2].className = 'sig-lamp ' + (_ls1==='green'?'on-g':'off');
+      var _lstate = sig.evp ? 'green' : sig.state;
+      lamps[0].className = 'sig-lamp ' + (_lstate==='red'?'on-r':'off');
+      lamps[1].className = 'sig-lamp ' + (_lstate==='yellow'?'on-y':'off');
+      lamps[2].className = 'sig-lamp ' + (_lstate==='green'?'on-g':'off');
     }
   }
 }
@@ -6183,10 +6176,10 @@ function liveUpdateIntxStats(idx){
   if(housingEl && housingEl.firstChild){
     var lamps2 = housingEl.firstChild.querySelectorAll('.sig-lamp');
     if(lamps2.length === 3){
-      var _ls2 = sig.evp ? (sig.nsState==='green'||sig.ewState==='green'?'green':sig.state) : sig.state;
-      lamps2[0].className = 'sig-lamp ' + (_ls2==='red'?'on-r':'off');
-      lamps2[1].className = 'sig-lamp ' + (_ls2==='yellow'?'on-y':'off');
-      lamps2[2].className = 'sig-lamp ' + (_ls2==='green'?'on-g':'off');
+      var _lstate2 = sig.evp ? 'green' : sig.state;
+      lamps2[0].className = 'sig-lamp ' + (_lstate2==='red'?'on-r':'off');
+      lamps2[1].className = 'sig-lamp ' + (_lstate2==='yellow'?'on-y':'off');
+      lamps2[2].className = 'sig-lamp ' + (_lstate2==='green'?'on-g':'off');
     }
   }
 
@@ -6194,11 +6187,10 @@ function liveUpdateIntxStats(idx){
   var timerEl = document.getElementById('imod-signal-timer');
   var labelEl = document.getElementById('imod-signal-label');
   var fillEl  = document.getElementById('imod-phase-fill');
-  var _ss = sig.evp ? (sig.nsState==='green'||sig.ewState==='green'?'green':sig.state) : sig.state;
-  var sRemain = _ss==='green'  ? Math.max(0, sig.gDur - sig.phase)
-              : _ss==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
+  var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
+              : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
               : Math.max(0, sig.cycle - sig.phase);
-  var sColor  = _ss==='green'?'#00ff88':_ss==='yellow'?'#ffd700':'#ff2244';
+  var sColor  = sig.evp?'#00ff88':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
   if(timerEl){
     timerEl.textContent = sRemain.toFixed(1) + 's';
     timerEl.style.color = sColor;
@@ -6272,13 +6264,9 @@ function evpSetDir(dir) {
 function evpTrigger() {
   var idx = _curIntxIdx;
   if(idx < 0) return;
-
-  // If already active for this junction, clear existing ambulances before re-triggering
-  // (prevents particle bloat and state corruption on repeated presses)
   if(_evpActive && _evpJctIdx === idx) {
     particles = particles.filter(function(p){ return !p.isE; });
   }
-
   _evpActive = true;
   _evpJctIdx = idx;
 
@@ -6290,7 +6278,7 @@ function evpTrigger() {
   var isNS = (_evpDir === 'N' || _evpDir === 'S');
   sig.nsState = isNS ? 'green' : 'red';
   sig.ewState = isNS ? 'red'   : 'green';
-  sig.state   = isNS ? 'green' : 'red';
+  sig.state   = 'green'; // approach arm green so UI shows correctly
   sig.phase   = 0;       // restart phase from green
 
   // ── Spawn ambulances approaching from the chosen direction ───────────────
