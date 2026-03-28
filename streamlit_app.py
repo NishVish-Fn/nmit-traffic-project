@@ -3160,30 +3160,20 @@ Particle.prototype.update = function(dt) {
     var af = S.algo==='fixed' ? 1.25 : 1.0;
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
-    // Compute isNS from the actual approach vector near the destination junction.
-    // Sample two points close to the destination end of the path so we get the
-    // true bearing the car is travelling when it arrives at the junction, rather
-    // than the coarse junction-to-junction bearing which can be misleading on
-    // diagonal or curved edges.
-    var path = getEdgePath(this.ei);
-    var tEnd   = this.dir===1 ? 1.0 : 0.0;
-    var tBack  = this.dir===1 ? Math.max(0.0, tEnd - 0.12) : Math.min(1.0, tEnd + 0.12);
-    var ptEnd  = samplePath(path, tEnd);
-    var ptBack = samplePath(path, tBack);
-    var approachDLat = Math.abs(ptEnd.lat - ptBack.lat);
-    var approachDLng = Math.abs(ptEnd.lng - ptBack.lng);
-    // Scale lng delta by cos(lat) so degrees are comparable in both axes
-    var approachDLngScaled = approachDLng * Math.cos(ptEnd.lat * Math.PI / 180);
-    var isNS = approachDLat >= approachDLngScaled;
+    var startId = this.dir===1 ? e[0] : e[1];
+    var jA = JN[startId], jB = JN[endId];
+    var dLat = Math.abs(jB.lat - jA.lat);
+    var dLng = Math.abs(jB.lng - jA.lng);
+    var isNS = dLat >= dLng;
     // During EVP, nsState/ewState are already set correctly (green for EVP direction,
     // red for cross-traffic). Emergency vehicles (isE) always ignore signals.
     var relevantState = isNS ? sig.nsState : sig.ewState;
 
-    // STOP_WALL: hard stop boundary as fraction of edge from junction.
-    // Increased to 0.22 so cars visibly stop before the intersection box.
-    // BRAKE_ZONE: start decelerating at 0.45 from junction for smooth ramp.
-    var STOP_WALL  = 0.22;
-    var BRAKE_ZONE = 0.45;
+    // STOP_WALL: hard stop boundary measured as fraction of edge from junction.
+    // 0.18 = 18% of edge from junction — keeps cars clearly outside the intersection circle.
+    // BRAKE_ZONE: start decelerating at 40% from junction.
+    var STOP_WALL  = 0.18;
+    var BRAKE_ZONE = 0.40;
     var atRed = (!this.isE && (relevantState === 'red' || relevantState === 'yellow'));
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
     var waveScale = S.wave / 40.0;
@@ -5195,9 +5185,9 @@ function startRoadAnimation(idx){
   var perDir = 8;  // 8 per direction = 32 total, avoids overcrowding
   for(var di = 0; di < spawnDirs.length; di++){
     for(var vi = 0; vi < perDir; vi++){
-      // Spread starting positions evenly along the arm (0..1), avoid the intersection box (0.35-0.55)
-      var rawPos = vi / perDir;
-      if(rawPos > 0.30 && rawPos < 0.55) rawPos = rawPos < 0.425 ? 0.25 : 0.60;
+      // Spread starting positions evenly along the approach arm (0..0.30 only)
+      // so no car ever spawns inside or past the intersection box.
+      var rawPos = (vi / perDir) * 0.30;
       var veh = makeRoadVehicle(canvas, idx);
       veh.dir = spawnDirs[di];
       veh.pos = rawPos;
@@ -5513,9 +5503,9 @@ function makeRoadVehicle(canvas, idx){
   // Lane index within the correct half: 0 = innermost (next to centre divider)
   var lanesPerSide = Math.ceil(laneCount / 2);
   var laneIdx = Math.floor(Math.random() * lanesPerSide);
-  // Stagger start positions along their arm; keep clear of stop zone (0.38-0.52)
-  var pos = Math.random();
-  if (pos > 0.33 && pos < 0.54) pos = pos < 0.435 ? 0.28 : 0.58;
+  // Stagger start positions along their arm.
+  // Never spawn inside the intersection box (0.38-0.62) — clamp to approach side.
+  var pos = Math.random() * 0.32;  // always spawn on the approach arm (0..0.32)
 
   // Real speed: base free-flow for this junction, px/s calculated in update()
   var avgCong = j.cong;
@@ -5572,38 +5562,50 @@ function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
   var congFactor = Math.max(0.25, 1.0 - cong * 0.5);
   var freeNorm   = freeKmh * (1000.0 / 3600.0) / CANVAS_METRES * S.speed;
 
+  // BOX_CLEAR: far edge of intersection box. A vehicle that turned red
+  // while already inside the box must clear it — but one that hasn't
+  // entered yet must stop at STOP_LINE and wait for green.
+  var BOX_CLEAR = 0.62;
+
   var tgtNorm;
-  if (mustStop && v.pos < STOP_LINE) {
-    // Vehicle hasn't reached stop line yet
-    var dist = STOP_LINE - v.pos;
-    if (dist < 0.015) {
-      // Right at the line — full stop, clamp position
-      tgtNorm = 0;
-      v.pos   = STOP_LINE - 0.001;   // hard wall: never cross
-    } else if (dist < SLOW_START) {
-      // Deceleration zone: linear ramp from full speed → 0
-      tgtNorm = freeNorm * congFactor * (dist / SLOW_START);
-    } else {
+  if (mustStop) {
+    if (v.pos >= BOX_CLEAR) {
+      // Past the box entirely — treat as normal approach on far side; full speed
       tgtNorm = freeNorm * congFactor;
+    } else if (v.pos >= STOP_LINE) {
+      // Inside the intersection box on a red: was mid-crossing when signal changed.
+      // Keep moving at reduced speed to clear the box — do NOT freeze inside box.
+      tgtNorm = freeNorm * congFactor * 0.6;
+    } else {
+      // Approaching on red — brake to stop at STOP_LINE
+      var dist = STOP_LINE - v.pos;
+      if (dist < 0.012) {
+        // Right at the line — full stop, hard clamp
+        tgtNorm = 0;
+        v.pos   = STOP_LINE - 0.001;
+        v.curSpeedPxS = 0;
+      } else if (dist < SLOW_START) {
+        // Deceleration ramp
+        tgtNorm = freeNorm * congFactor * (dist / SLOW_START);
+      } else {
+        tgtNorm = freeNorm * congFactor;
+      }
     }
-  } else if (mustStop && v.pos >= STOP_LINE) {
-    // Already past stop line (was green, now turned red mid-crossing) — keep going to clear box
-    tgtNorm = freeNorm * congFactor * 0.5;
   } else {
-    // Green — full speed (with congestion factor)
+    // Green — full speed with congestion factor
     tgtNorm = freeNorm * congFactor;
   }
 
   // ── Smooth accel / decel ──────────────────────────────────────────────────
-  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 4.0;  // slow accel, fast brake
+  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 5.0;  // slow accel, fast brake
   var diff = tgtNorm - v.curSpeedPxS;
   v.curSpeedPxS += Math.sign(diff) * Math.min(Math.abs(diff), accelRate * dt);
   if (v.curSpeedPxS < 0) v.curSpeedPxS = 0;
 
-  // ── Move — but never cross stop line while red ────────────────────────────
+  // ── Move — hard wall: never cross stop line while red and not yet in box ──
   var newPos = v.pos + v.curSpeedPxS * dt;
   if (mustStop && v.pos < STOP_LINE && newPos >= STOP_LINE) {
-    newPos = STOP_LINE - 0.001;   // absolute hard wall
+    newPos = STOP_LINE - 0.001;
     v.curSpeedPxS = 0;
   }
   v.pos = newPos;
