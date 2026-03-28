@@ -3212,43 +3212,61 @@ Particle.prototype.update = function(dt) {
     var endId = this.dir===1 ? e[1] : e[0];
     var sig = SIG[endId];
     var junc = JN[endId];
-    // distEnd: 0=at destination junction, 1=at start of edge
-    var distEnd = this.dir===1 ? 1-this.prog : this.prog;
     var mul = DMUL[S.dens-1];
     var af = S.algo==='fixed' ? 1.25 : 1.0;
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
-    var startId = this.dir===1 ? e[0] : e[1];
-    var jA = JN[startId], jB = JN[endId];
-    // Use pre-computed edge orientation — deterministic, avoids per-frame float reclassification
+
+    // Use pre-computed edge orientation — deterministic per edge
     var isNS = ED_ISNS[this.ei];
-    // During EVP, nsState/ewState are already set correctly (green for EVP direction,
-    // red for cross-traffic). Emergency vehicles (isE) always ignore signals.
     var relevantState = isNS ? sig.nsState : sig.ewState;
 
-    // STOP_WALL: hard stop boundary measured as fraction of edge from junction.
-    // 0.18 = 18% of edge from junction — keeps cars clearly outside the intersection circle.
-    // BRAKE_ZONE: start decelerating at 40% from junction.
-    var STOP_WALL  = 0.18;
-    var BRAKE_ZONE = 0.40;
+    // ── STOP WALL: hard boundary cars must not cross on red/yellow ────────────
+    // 0.15 = 15% from destination junction (well before intersection centre)
+    var STOP_WALL  = 0.15;
+    var BRAKE_ZONE = 0.45;  // start braking at 45% from junction
+
+    // atRed: non-emergency vehicle facing red or yellow signal
     var atRed = (!this.isE && (relevantState === 'red' || relevantState === 'yellow'));
+
+    // ── UNCONDITIONAL PRE-MOVE CLAMP: snap to wall immediately if past it ─────
+    // This fires BEFORE any movement, guaranteeing no car is ever past the wall.
+    if (atRed) {
+      if (this.dir === 1  && this.prog >= 1 - STOP_WALL) {
+        this.prog = 1 - STOP_WALL - 0.001;
+        this.spd = 0; this.tspd = 0; this.state = 'stopped';
+        if(this.isE === false) this.wt += _sigDtSec;
+        return; // skip movement entirely this frame
+      }
+      if (this.dir === -1 && this.prog <= STOP_WALL) {
+        this.prog = STOP_WALL + 0.001;
+        this.spd = 0; this.tspd = 0; this.state = 'stopped';
+        if(this.isE === false) this.wt += _sigDtSec;
+        return; // skip movement entirely this frame
+      }
+    }
+
+    // distEnd: distance remaining to destination junction (0=at junction, 1=at far end)
+    var distEnd = this.dir===1 ? 1-this.prog : this.prog;
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
     var waveScale = S.wave / 40.0;
 
-    // ── INSTANT HARD CLAMP: if already past the wall, freeze immediately ────
-    if(atRed){
-      if(this.dir===1  && this.prog > 1 - STOP_WALL){ this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; }
-      if(this.dir===-1 && this.prog < STOP_WALL)    { this.prog = STOP_WALL;     this.spd = 0; this.tspd = 0; }
-      distEnd = this.dir===1 ? 1-this.prog : this.prog; // recompute after clamp
-    }
-
     // ── TARGET SPEED ─────────────────────────────────────────────────────────
-    if(atRed && distEnd <= BRAKE_ZONE){
-      // Graduated brake to zero: linear ramp from full speed at BRAKE_ZONE to 0 at STOP_WALL
-      var brakeFrac = Math.max(0, (distEnd - STOP_WALL) / (BRAKE_ZONE - STOP_WALL));
-      this.tspd = this.bspd * brakeFrac * waveScale;
-      this.state = (brakeFrac < 0.15) ? 'stopped' : 'slow';
-      if(this.state === 'stopped') this.wt += _sigDtSec;
+    if (atRed) {
+      if (distEnd <= BRAKE_ZONE) {
+        // Graduated brake: linear ramp from full speed at BRAKE_ZONE to 0 at STOP_WALL
+        var brakeFrac = Math.max(0, (distEnd - STOP_WALL) / (BRAKE_ZONE - STOP_WALL));
+        this.tspd = this.bspd * brakeFrac * waveScale;
+        this.state = (brakeFrac < 0.1) ? 'stopped' : 'slow';
+        if (this.state === 'stopped') this.wt += _sigDtSec;
+      } else {
+        // Far from junction: still approaching but slow down progressively
+        // This prevents arriving at full speed into the brake zone
+        var farFrac = Math.max(0.3, (distEnd - BRAKE_ZONE) / (1.0 - BRAKE_ZONE));
+        this.tspd = this.bspd * farFrac * waveScale;
+        this.state = 'slow';
+        this.wt = Math.max(0, this.wt - _sigDtSec * 0.05);
+      }
     } else if(cong>.85&&!this.isE){
       this.tspd=this.bspd*0.04*waveScale; this.state='stopped';
       this.wt=Math.max(0,this.wt-_sigDtSec*.05);
@@ -3266,19 +3284,25 @@ Particle.prototype.update = function(dt) {
     }
     if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
 
-    // Lerp speed — brake fast, accelerate slowly
-    var nearWall = atRed && distEnd < BRAKE_ZONE * 0.4;
-    var lerpRate = nearWall ? 0.5 : 0.10;
+    // Lerp speed — brake fast (lerpRate=0.35), accelerate slowly (0.08)
+    var nearWall = atRed && distEnd < BRAKE_ZONE * 0.5;
+    var lerpRate = nearWall ? 0.35 : (atRed ? 0.20 : 0.08);
     this.spd += (this.tspd - this.spd) * lerpRate;
     if(this.spd < 0) this.spd = 0;
 
     // ── MOVE ─────────────────────────────────────────────────────────────────
     this.prog += this.spd * this.dir * S.speed;
 
-    // ── POST-MOVE HARD CLAMP (catches any residual overshoot) ────────────────
-    if(atRed){
-      if(this.dir===1  && this.prog > 1 - STOP_WALL){ this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; this.state='stopped'; }
-      if(this.dir===-1 && this.prog < STOP_WALL)    { this.prog = STOP_WALL;     this.spd = 0; this.tspd = 0; this.state='stopped'; }
+    // ── POST-MOVE ABSOLUTE CLAMP — catches any residual overshoot ────────────
+    if (atRed) {
+      if (this.dir === 1  && this.prog >= 1 - STOP_WALL) {
+        this.prog = 1 - STOP_WALL - 0.001;
+        this.spd = 0; this.tspd = 0; this.state = 'stopped';
+      }
+      if (this.dir === -1 && this.prog <= STOP_WALL) {
+        this.prog = STOP_WALL + 0.001;
+        this.spd = 0; this.tspd = 0; this.state = 'stopped';
+      }
     }
 
     if(this.isE){
@@ -3287,9 +3311,8 @@ Particle.prototype.update = function(dt) {
       if(this.trail.length>10) this.trail.pop();
     }
 
-    // ── WRAP to next edge ────────────────────────────────────────────────────
-    // The hard clamps above guarantee atRed cars can never reach prog>=1 or <=0.
-    // So reaching here with out-of-bounds prog means the car legally crossed green.
+    // ── WRAP to next edge ─────────────────────────────────────────────────────
+    // Only reachable if atRed=false (clamps above prevent prog>=1 or <=0 on red)
     if(this.prog>=1 || this.prog<=0){
       this.prog=this.prog>=1?0:1;
       var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
@@ -3307,15 +3330,14 @@ Particle.prototype.update = function(dt) {
         this.ei=best; this.dir=ED[best][0]===ej?1:-1;
         this.prog=this.dir===1?0:1;
         this._refreshSpeed();
-        // ── Check if new destination has a red signal — if so start slow ──
+        // Check new edge signal — if red, start slow for brake logic to catch
         var newEndId = this.dir===1 ? ED[this.ei][1] : ED[this.ei][0];
         var newSig = SIG[newEndId];
         var newIsNS = ED_ISNS[this.ei];
         var newRelState = newIsNS ? newSig.nsState : newSig.ewState;
         if(!this.isE && (newRelState === 'red' || newRelState === 'yellow')){
-          // start slow so brake logic can smoothly bring car to halt
-          this.spd = this.bspd * 0.3;
-          this.tspd = this.bspd * 0.3;
+          this.spd = this.bspd * 0.25;
+          this.tspd = this.bspd * 0.25;
         }
         if(ej===this.destJ) this.destJ=this._pickDest(ej);
       } else {
@@ -5604,12 +5626,10 @@ function makeRoadVehicle(canvas, idx){
 }
 
 function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
-  // ── Canvas scale: intersection view ≈ 80m across ─────────────────────────
   var CANVAS_METRES = 80.0;
   var isNS = (v.dir === 'N' || v.dir === 'S');
 
-  // ── Signal state for this vehicle's travel direction ─────────────────────
-  // EVP always green. NS vehicles check nsState. EW vehicles check ewState.
+  // Signal state for this vehicle's direction
   var sigState;
   if (sig.evp) {
     sigState = 'green';
@@ -5620,71 +5640,73 @@ function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
   }
   var mustStop = (sigState === 'red' || sigState === 'yellow');
 
-  // ── Stop line position ────────────────────────────────────────────────────
-  // Vehicles travel 0 → 1. Intersection box ≈ 0.38–0.62.
-  // Hard stop wall at STOP_LINE. Vehicle must NEVER cross it while red.
-  var STOP_LINE  = 0.385;   // where the front of car must halt
-  var SLOW_START = 0.22;    // start braking this far before stop line
-  // Box exit: once a car is past this point it has cleared the intersection
-  var BOX_EXIT   = 0.62;
+  // ── Stop line: where the front of the car must halt ──────────────────────
+  // pos goes 0→1 from road entrance to road exit.
+  // The intersection box occupies pos≈0.38→0.62.
+  // ALL 4 directions enter from pos=0 and exit at pos=1,
+  // so the stop line is always at ≈0.38 (just before the box).
+  var STOP_LINE  = 0.38;
+  var SLOW_START = 0.25;   // begin decelerating this far before stop line
+  var BOX_EXIT   = 0.63;   // past this → car has cleared the box
 
-  // ── Speed calculation ─────────────────────────────────────────────────────
   var waveScale  = S.wave / 25.0;
   var freeKmh    = v.baseKmh * waveScale;
   var congFactor = Math.max(0.25, 1.0 - cong * 0.5);
   var freeNorm   = freeKmh * (1000.0 / 3600.0) / CANVAS_METRES * S.speed;
 
+  // ── ABSOLUTE CLAMP before any movement: freeze car at stop line ──────────
+  if (mustStop && v.pos < STOP_LINE && (STOP_LINE - v.pos) < 0.01) {
+    v.pos = STOP_LINE - 0.003;
+    v.curSpeedPxS = 0;
+    return;
+  }
+
   var tgtNorm;
   if (mustStop) {
     if (v.pos < STOP_LINE) {
-      // ── Approaching stop line ─────────────────────────────────────────────
       var dist = STOP_LINE - v.pos;
-      if (dist < 0.008) {
-        // Right at the line — full stop, hard-clamp position
+      if (dist < 0.01) {
+        // At the line — full stop and hard-clamp
         tgtNorm = 0;
-        v.pos   = STOP_LINE - 0.002;   // hard wall: never cross
+        v.pos = STOP_LINE - 0.003;
         v.curSpeedPxS = 0;
       } else if (dist < SLOW_START) {
-        // Deceleration zone: linear ramp from full speed → 0
+        // Deceleration zone — linear ramp to zero
         tgtNorm = freeNorm * congFactor * (dist / SLOW_START);
       } else {
-        tgtNorm = freeNorm * congFactor;
+        // Approaching but still far: slow down to 60% so we don't arrive too fast
+        tgtNorm = freeNorm * congFactor * 0.6;
       }
     } else if (v.pos < BOX_EXIT) {
-      // ── In the box but light is red (caught mid-crossing when green ended) ─
-      // Must keep moving to clear the box — stopping inside is dangerous.
-      // Speed at 60% normal to look cautious but clear quickly.
-      tgtNorm = freeNorm * congFactor * 0.6;
+      // Caught in box mid-crossing — clear through slowly
+      tgtNorm = freeNorm * congFactor * 0.5;
     } else {
-      // ── Past the box — stopped at far side, wait for green ───────────────
-      // Car has cleared the box; now it should stop on the far side.
+      // Past the box — stop on far side
       tgtNorm = 0;
       v.curSpeedPxS = 0;
     }
   } else {
-    // Green — full speed (with congestion factor)
     tgtNorm = freeNorm * congFactor;
   }
 
-  // ── Smooth accel / decel ──────────────────────────────────────────────────
-  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 4.0;  // slow accel, fast brake
+  // Smooth accel / decel (brake fast)
+  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 5.0;
   var diff = tgtNorm - v.curSpeedPxS;
   v.curSpeedPxS += Math.sign(diff) * Math.min(Math.abs(diff), accelRate * dt);
   if (v.curSpeedPxS < 0) v.curSpeedPxS = 0;
 
-  // ── Move — but NEVER cross stop line while red and approaching ────────────
+  // Move — with absolute hard wall at stop line
   var newPos = v.pos + v.curSpeedPxS * dt;
   if (mustStop && v.pos < STOP_LINE && newPos >= STOP_LINE) {
-    newPos = STOP_LINE - 0.002;   // absolute hard wall
+    newPos = STOP_LINE - 0.003;  // absolute wall
     v.curSpeedPxS = 0;
   }
   v.pos = newPos;
 
-  // ── Wrap: exit screen → re-enter from start ───────────────────────────────
+  // Wrap: exit → re-enter from start with zero speed
   if (v.pos > 1.05) {
     v.pos = 0;
     v.laneIdx = Math.floor(Math.random() * v.lanesPerSide);
-    // Reset speed so car doesn't blast off at full speed into a potential red
     v.curSpeedPxS = 0;
   }
 }
