@@ -6270,6 +6270,13 @@ function evpSetDir(dir) {
 function evpTrigger() {
   var idx = _curIntxIdx;
   if(idx < 0) return;
+
+  // If already active for this junction, clear existing ambulances before re-triggering
+  // (prevents particle bloat and state corruption on repeated presses)
+  if(_evpActive && _evpJctIdx === idx) {
+    particles = particles.filter(function(p){ return !p.isE; });
+  }
+
   _evpActive = true;
   _evpJctIdx = idx;
 
