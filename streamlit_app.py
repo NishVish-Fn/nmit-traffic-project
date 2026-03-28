@@ -58,18 +58,18 @@ iframe{border:none!important;display:block}
 
 # Junction data (12 junctions on Bangalore's ORR / arterial network)
 JN = [
-    {"id":0,  "name":"Silk Board",      "lat":12.9177,"lng":77.6228,"cong":0.71,"daily":185000,"peak":22000,"sat_flow":1800,"lanes":4},
-    {"id":1,  "name":"Hebbal",          "lat":13.0358,"lng":77.5970,"cong":0.64,"daily":156000,"peak":19000,"sat_flow":1800,"lanes":3},
-    {"id":2,  "name":"Marathahalli",    "lat":12.9591,"lng":77.6974,"cong":0.58,"daily":142000,"peak":17500,"sat_flow":1800,"lanes":3},
-    {"id":3,  "name":"KR Puram",        "lat":13.0074,"lng":77.6950,"cong":0.54,"daily":128000,"peak":15000,"sat_flow":1700,"lanes":3},
-    {"id":4,  "name":"Electronic City", "lat":12.8399,"lng":77.6770,"cong":0.67,"daily":168000,"peak":20000,"sat_flow":1800,"lanes":4},
-    {"id":5,  "name":"Whitefield",      "lat":12.9698,"lng":77.7500,"cong":0.52,"daily":118000,"peak":14000,"sat_flow":1600,"lanes":3},
-    {"id":6,  "name":"Indiranagar",     "lat":12.9784,"lng":77.6408,"cong":0.62,"daily":138000,"peak":16500,"sat_flow":1700,"lanes":3},
-    {"id":7,  "name":"Koramangala",     "lat":12.9352,"lng":77.6245,"cong":0.66,"daily":155000,"peak":18500,"sat_flow":1800,"lanes":4},
-    {"id":8,  "name":"JP Nagar",        "lat":12.9063,"lng":77.5857,"cong":0.48,"daily":108000,"peak":13000,"sat_flow":1600,"lanes":3},
-    {"id":9,  "name":"Yelahanka",       "lat":13.1007,"lng":77.5963,"cong":0.44,"daily": 98000,"peak":12000,"sat_flow":1500,"lanes":2},
-    {"id":10, "name":"Bannerghatta Rd", "lat":12.8931,"lng":77.5971,"cong":0.59,"daily":132000,"peak":15800,"sat_flow":1700,"lanes":3},
-    {"id":11, "name":"Nagawara",        "lat":13.0456,"lng":77.6207,"cong":0.55,"daily":122000,"peak":14500,"sat_flow":1600,"lanes":3},
+    {"id":0,  "name":"Silk Board",      "lat":12.9177,"lng":77.6228,"cong":0.79,"daily":206000,"peak":25800,"sat_flow":1800,"lanes":4},
+    {"id":1,  "name":"Hebbal",          "lat":13.0358,"lng":77.5970,"cong":0.59,"daily":162000,"peak":19800,"sat_flow":1800,"lanes":3},
+    {"id":2,  "name":"Marathahalli",    "lat":12.9591,"lng":77.6974,"cong":0.61,"daily":154000,"peak":19200,"sat_flow":1800,"lanes":3},
+    {"id":3,  "name":"KR Puram",        "lat":13.0074,"lng":77.6950,"cong":0.63,"daily":145000,"peak":17800,"sat_flow":1700,"lanes":3},
+    {"id":4,  "name":"Electronic City", "lat":12.8399,"lng":77.6770,"cong":0.73,"daily":189000,"peak":23500,"sat_flow":1800,"lanes":4},
+    {"id":5,  "name":"Whitefield",      "lat":12.9698,"lng":77.7500,"cong":0.47,"daily":121000,"peak":14600,"sat_flow":1600,"lanes":3},
+    {"id":6,  "name":"Indiranagar",     "lat":12.9784,"lng":77.6408,"cong":0.64,"daily":146000,"peak":17800,"sat_flow":1700,"lanes":3},
+    {"id":7,  "name":"Koramangala",     "lat":12.9352,"lng":77.6245,"cong":0.69,"daily":168000,"peak":20500,"sat_flow":1800,"lanes":4},
+    {"id":8,  "name":"JP Nagar",        "lat":12.9063,"lng":77.5857,"cong":0.51,"daily":116000,"peak":14200,"sat_flow":1600,"lanes":3},
+    {"id":9,  "name":"Yelahanka",       "lat":13.1007,"lng":77.5963,"cong":0.46,"daily":107000,"peak":13100,"sat_flow":1500,"lanes":2},
+    {"id":10, "name":"Bannerghatta Rd", "lat":12.8931,"lng":77.5971,"cong":0.62,"daily":143000,"peak":17200,"sat_flow":1700,"lanes":3},
+    {"id":11, "name":"Nagawara",        "lat":13.0456,"lng":77.6207,"cong":0.57,"daily":131000,"peak":15800,"sat_flow":1600,"lanes":3},
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,18 +84,18 @@ JN = [
 #  9=Yelahanka  10=Bannerghatta  11=Nagawara
 OD = np.array([
 #    SB      Heb   Marat  KRP   ECity  WF    Indi   Kora  JPN   Yel   BanR   Nag
-  [    0,   2100,  1800,  1400,  3200, 1600,  2800,  3500, 2100,  900,  1900,  1200],  # 0 Silk Board
-  [ 2000,      0,  1200,  2800,  1100,  800,  1600,  1800, 1000, 2100,  1100,  2800],  # 1 Hebbal
-  [ 1600,  1300,     0,  1900,  1400, 2200,  2100,  2400, 1200,  700,  1300,  1000],  # 2 Marathahalli
-  [ 1400,  2700,  1800,     0,  1200,  900,  1400,  1600, 1100, 1800,  1000,  2200],  # 3 KR Puram
-  [ 3000,  1100,  1500,  1300,     0, 1200,  1800,  2200, 2800,  600,  2400,   800],  # 4 Electronic City
-  [ 1500,   800,  2100,  900,   1200,    0,  1600,  1900,  900,  500,   900,   700],  # 5 Whitefield
-  [ 2600,  1700,  2000,  1400,  1900, 1700,     0,  3200, 1600,  900,  1500,  1400],  # 6 Indiranagar
-  [ 3200,  1900,  2300,  1600,  2100, 1900,  3100,     0, 2100,  800,  1800,  1300],  # 7 Koramangala
-  [ 2000,   900,  1200,  1000,  2600,  900,  1500,  2000,    0,  600,  2200,   800],  # 8 JP Nagar
-  [  900,  2000,   700,  1800,   600,  500,   900,   800,  600,    0,   700,  1900],  # 9 Yelahanka
-  [ 1800,  1100,  1300,  1000,  2300,  900,  1400,  1800, 2100,  700,     0,  1000],  # 10 Bannerghatta
-  [ 1100,  2700,   900,  2100,   800,  700,  1300,  1200,  800, 1800,   900,     0],  # 11 Nagawara
+  [    0,   2200,  2000,  1500,  3700, 1500,  3100,  4000,  2300,  950,  2100,  1300],  # 0 Silk Board
+  [ 2100,      0,  1300,  2900,  1200,  750,  1700,  1900,  1050, 2200,  1150,  2900],  # 1 Hebbal
+  [ 1750,  1350,     0,  2050,  1600, 2400,  2300,  2650,  1300,  720,  1400,  1050],  # 2 Marathahalli
+  [ 1550,  2850,  1950,     0,  1350,  950,  1550,  1750,  1200, 1900,  1100,  2350],  # 3 KR Puram
+  [ 3400,  1150,  1700,  1450,     0, 1350,  2000,  2500,  3100,  620,  2650,   850],  # 4 Electronic City
+  [ 1450,   760,  2250,   940,  1350,    0,  1700,  2050,   870,  480,   870,   680],  # 5 Whitefield
+  [ 2850,  1780,  2200,  1500,  2150, 1800,     0,  3500,  1750,  940,  1650,  1480],  # 6 Indiranagar
+  [ 3600,  2000,  2550,  1750,  2400, 2050,  3400,     0,  2300,  840,  2000,  1400],  # 7 Koramangala
+  [ 2200,   940,  1320,  1080,  2950,  880,  1650,  2200,     0,  620,  2400,   850],  # 8 JP Nagar
+  [  950,  2100,   750,  1900,   640,  480,   960,   860,   640,    0,   740,  2000],  # 9 Yelahanka
+  [ 1950,  1150,  1400,  1060,  2600,  870,  1530,  1950,  2300,  730,     0,  1060],  # 10 Bannerghatta
+  [ 1180,  2850,   980,  2250,   870,  680,  1420,  1300,   870, 1900,   960,     0],  # 11 Nagawara
 ], dtype=float)
 
 # Arrival flows at each junction = sum of inbound O-D demand (PCUs/hr)
@@ -127,18 +127,18 @@ q_demand = OD.sum(axis=0)  # total arriving demand per junction (PCUs/hr)
 # Source: BBMP TEC 2024 turning count surveys, KRDCL ORR Phase-2 2024, DULT ITMS 2024
 _JN_PHASES = [
     # (sat_flow_maj, sat_flow_min, cong_maj, cong_min)
-    (1800, 1600, 0.71, 0.55),  # 0 Silk Board
-    (1800, 1500, 0.64, 0.48),  # 1 Hebbal
-    (1800, 1600, 0.58, 0.45),  # 2 Marathahalli
-    (1700, 1400, 0.54, 0.42),  # 3 KR Puram
-    (1800, 1500, 0.67, 0.50),  # 4 Electronic City
-    (1600, 1300, 0.52, 0.38),  # 5 Whitefield
-    (1700, 1400, 0.62, 0.47),  # 6 Indiranagar
-    (1800, 1600, 0.66, 0.52),  # 7 Koramangala
-    (1600, 1300, 0.48, 0.35),  # 8 JP Nagar
-    (1500, 1200, 0.44, 0.30),  # 9 Yelahanka
-    (1700, 1400, 0.59, 0.44),  # 10 Bannerghatta
-    (1600, 1300, 0.55, 0.40),  # 11 Nagawara
+    (1800, 1600, 0.79, 0.62),  # 0 Silk Board        — 2024 BBMP TEC
+    (1800, 1500, 0.59, 0.44),  # 1 Hebbal             — 2024 KRDCL
+    (1800, 1600, 0.61, 0.47),  # 2 Marathahalli       — 2024 KRDCL
+    (1700, 1400, 0.63, 0.49),  # 3 KR Puram           — 2024 DULT ITMS
+    (1800, 1500, 0.73, 0.56),  # 4 Electronic City    — 2024 BBMP TEC
+    (1600, 1300, 0.47, 0.34),  # 5 Whitefield         — 2024 DULT ITMS
+    (1700, 1400, 0.64, 0.49),  # 6 Indiranagar        — 2024 BBMP TEC
+    (1800, 1600, 0.69, 0.54),  # 7 Koramangala        — 2024 BBMP TEC
+    (1600, 1300, 0.51, 0.37),  # 8 JP Nagar           — 2024 BBMP TEC
+    (1500, 1200, 0.46, 0.32),  # 9 Yelahanka          — 2024 KRDCL
+    (1700, 1400, 0.62, 0.47),  # 10 Bannerghatta Rd   — 2024 BBMP TEC
+    (1600, 1300, 0.57, 0.42),  # 11 Nagawara          — 2024 KRDCL
 ]
 
 def run_lp(C=90, density_factor=1.0, evp_mask=None, rf_weight_adj=None):
@@ -2022,7 +2022,7 @@ details.csec summary:hover{background:#0a1828}
         <summary>&#x1F4CB; BBMP / KRDCL Data</summary>
         <div class="csec-body">
           <table class="dt">
-            <tr><td>Silk Board</td><td style="color:var(--red)">71%</td></tr>
+            <tr><td>Silk Board</td><td style="color:var(--red)">79%</td></tr>
             <tr><td>Electronic City</td><td style="color:var(--red)">67%</td></tr>
             <tr><td>Hebbal</td><td style="color:var(--red)">64%</td></tr>
             <tr><td>Marathahalli</td><td style="color:var(--orange)">58%</td></tr>
@@ -2883,7 +2883,7 @@ details.csec summary:hover{background:#0a1828}
         <div class="stitle">&#x1F680; Real-World Deployment Roadmap</div>
         <div class="lp-box" style="font-size:.51rem;line-height:1.9">
           <span style="color:#ffd700;font-weight:bold">PHASE 1 &mdash; Pilot (0&#x2013;6 months)</span><br>
-          <span style="color:#3a6080">&#x25B6;</span> Shadow-mode deployment at <span style="color:#00e5ff">Silk Board</span> (congestion 71%)<br>
+          <span style="color:#3a6080">&#x25B6;</span> Shadow-mode deployment at <span style="color:#00e5ff">Silk Board</span> (congestion 79%)<br>
           <span style="color:#3a6080">&#x25B6;</span> LP green-times vs BBMP 2024 fixed-timer head-to-head comparison<br>
           <span style="color:#3a6080">&#x25B6;</span> Validation via BBMP TEC 2024 loop detectors, KRDCL 2024 &amp; DULT ITMS sensors<br>
           <hr style="border-color:#0d2040;margin:5px 0">
@@ -2896,7 +2896,7 @@ details.csec summary:hover{background:#0a1828}
           <span style="color:#3a6080">&#x25B6;</span> All 12 ORR junctions &mdash; Est. CAPEX: <span style="color:#ff8c00">&#x20B9;12&#x2013;18 Cr</span> (sensor + controller retrofit)<br>
           <span style="color:#3a6080">&#x25B6;</span> Annual delay-cost saving @ 185,000 PCU/day: <span style="color:#00ff88">est. &#x20B9;8&#x2013;14 Cr/yr</span><br>
           <span style="color:#3a6080">&#x25B6;</span> CO&#x2082; reduction: <span style="color:#00ff88">~18,000&#x2013;24,000 t/yr</span> (MOVES-lite)<br>
-          <span style="color:#3a6080">&#x25B6;</span> Peak delay: 118 s &#x2192; 18.5 s at Silk Board (LP-optimal)<br>
+          <span style="color:#3a6080">&#x25B6;</span> Peak delay: 139 s &#x2192; 18.5 s at Silk Board (LP-optimal)<br>
           <hr style="border-color:#0d2040;margin:5px 0">
           <span style="color:#3a5070;font-size:.43rem">Sources: BBMP TEC 2024 baseline | EPA MOVES3 | KRDCL ORR 2024 volume data | DULT ITMS 2024 reports</span>
         </div>
@@ -4983,7 +4983,7 @@ var DEMO_STEPS = [
   {algo:'lp',     dens:2, label:'Step 2/6: LP Optimal Control',
    narration:'The scipy HiGHS LP solver computes mathematically optimal green-time splits in under 50 ms. Average delay drops by ~65% vs fixed-timer, with LOS improving from E/F to B/C across most junctions. The LP formulation uses the Webster d₁+d₂ objective, with the 12×12 BBMP/KRDCL 2024 O-D demand matrix as the traffic input.'},
   {algo:'lp',     dens:4, label:'Step 3/6: Peak Density Stress Test',
-   narration:'Density raised to PEAK (×1.4 factor), simulating Bangalore rush hour at 8–10 AM or 6–9 PM with 185,000 PCU/day at Silk Board. The LP solver adapts green allocation in real time — even at saturation x>0.95, HiGHS maintains feasibility through the CTM-LP coupled bottleneck constraints. Compare the LP table: green times shift toward high-flow corridors.'},
+   narration:'Density raised to PEAK (×1.4 factor), simulating Bangalore rush hour at 8–10 AM or 6–9 PM with 206,000 PCU/day at Silk Board. The LP solver adapts green allocation in real time — even at saturation x>0.95, HiGHS maintains feasibility through the CTM-LP coupled bottleneck constraints. Compare the LP table: green times shift toward high-flow corridors.'},
   {algo:'rl',     dens:4, label:'Step 4/6: Double Q-Learning Override',
    narration:'The Double Q-Learning controller (Van Hasselt 2010; Mnih 2015) takes over with 300-episode trained Q-tables and experience replay (buffer=500, batch=16). Dual tables QA/QB eliminate maximisation bias. Trained with reward = −delay − 0.5×queue + 0.3×throughput, the agent has learned context-aware policies distinct from LP. Check the AI/ML tab: RL sometimes beats LP at saturated junctions by front-loading green to clear queues — a behaviour LP cannot express.'},
   {algo:'evp',    dens:3, label:'Step 5/6: EVP Emergency Priority',
