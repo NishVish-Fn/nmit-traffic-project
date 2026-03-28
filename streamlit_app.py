@@ -3165,14 +3165,16 @@ Particle.prototype.update = function(dt) {
     var dLat = Math.abs(jB.lat - jA.lat);
     var dLng = Math.abs(jB.lng - jA.lng);
     var isNS = dLat >= dLng;
-    var relevantState = sig.evp ? 'green' : (isNS ? sig.nsState : sig.ewState);
+    // During EVP, nsState/ewState are already set correctly (green for EVP direction,
+    // red for cross-traffic). Emergency vehicles (isE) always ignore signals.
+    var relevantState = isNS ? sig.nsState : sig.ewState;
 
     // STOP_WALL: hard stop boundary measured as fraction of edge from junction.
     // 0.18 = 18% of edge from junction — keeps cars clearly outside the intersection circle.
     // BRAKE_ZONE: start decelerating at 40% from junction.
     var STOP_WALL  = 0.18;
     var BRAKE_ZONE = 0.40;
-    var atRed = (!this.isE && (relevantState === 'red' || relevantState === 'yellow') && !sig.evp);
+    var atRed = (!this.isE && (relevantState === 'red' || relevantState === 'yellow'));
     var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
     var waveScale = S.wave / 40.0;
 
