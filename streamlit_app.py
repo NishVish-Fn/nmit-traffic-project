@@ -6257,22 +6257,26 @@ function evpTrigger() {
     }
   }
 
-  // Spawn 4 ambulances, spread across available approach edges, starting ~20-50% away
-  var numAmb = Math.min(4, Math.max(1, approachEdges.length * 2));
+  // Spawn 4 ambulances staggered along approach edges, heading toward idx junction.
+  // For dir=1:  prog goes 0→1, arrives at prog≥1. Spawn at prog = 0.15+k*0.12 (far→close).
+  // For dir=-1: prog goes 1→0, arrives at prog≤0. Spawn at prog = 0.85-k*0.12 (far→close).
+  var numAmb = Math.min(4, Math.max(2, approachEdges.length * 2));
   for(var k=0; k<numAmb; k++){
     var ae = approachEdges[k % approachEdges.length];
     var amb = new Particle(true);
     amb.ei  = ae.ei;
     amb.dir = ae.dir;
-    // prog: distance from destination — 0.15-0.45 so they're already en-route
-    amb.prog = 0.15 + Math.random() * 0.30;
-    // stagger them so they don't arrive simultaneously
-    amb.prog += k * 0.07;
-    if(amb.prog > 0.55) amb.prog = 0.15 + Math.random() * 0.10;
+    var offset = 0.15 + k * 0.12;  // stagger: first amb closest, last farthest
+    if(offset > 0.60) offset = 0.15 + (k % 3) * 0.10;
+    // prog must place ambulance BEHIND the junction (not already past it)
+    if(ae.dir === 1){
+      amb.prog = offset;           // dir=1: arrives when prog→1; small prog = far away
+    } else {
+      amb.prog = 1.0 - offset;     // dir=-1: arrives when prog→0; large prog = far away
+    }
     amb.state = 'moving';
     amb.wt    = 0;
-    // Force a high approach speed
-    amb.targetKmh = 42 + Math.random() * 10;
+    amb.targetKmh = 44 + Math.random() * 8;
     amb._refreshSpeed();
     amb.spd  = amb.bspd;
     amb.tspd = amb.bspd;
@@ -6289,16 +6293,20 @@ function evpTrigger() {
 }
 
 function evpClear() {
+  // Clear _evpActive FIRST so updateSignals() stops treating this junction as
+  // modalEvp on the very next frame — prevents a one-frame 'red' flash that
+  // was causing the signal to re-lock immediately after clearing.
+  var clearIdx = _evpJctIdx;
   _evpActive = false;
-  if(_evpJctIdx >= 0) {
-    var sig = SIG[_evpJctIdx];
+  _evpJctIdx = -1;
+  if(clearIdx >= 0) {
+    var sig = SIG[clearIdx];
     sig.evp     = false;
-    sig.state   = 'green';   // force immediate green so cars can move again
+    sig.state   = 'green';
     sig.nsState = 'green';
     sig.ewState = 'red';
-    sig.phase   = 0;         // restart cycle from beginning (green phase)
+    sig.phase   = 0;
   }
-  _evpJctIdx = -1;
   var btn = document.getElementById('evp-trigger-btn');
   if(btn) btn.className = 'evp-btn trigger';
   var badge = document.getElementById('imod-evp-badge');
@@ -6504,17 +6512,21 @@ function evpRenderMath() {
 function evpLiveUpdate() {
   if(!_evpActive || _curIntxIdx < 0) return;
 
-  // Auto-clear once all spawned ambulances have passed through the junction.
+  // Auto-clear: wait until at least one ambulance has REACHED the junction
+  // (prog wraps past 1 or below 0, meaning it passed through and moved to next edge).
+  // We track this by checking if any emergency particle still has this junction
+  // as its current destination AND hasn't passed the stop wall (distToJ < 0.92).
   var idx = _evpJctIdx >= 0 ? _evpJctIdx : _curIntxIdx;
-  var anyNearby = false;
+  var anyStillApproaching = false;
   for(var pi=0; pi<particles.length; pi++){
     var p = particles[pi];
     if(!p.isE) continue;
     var destJ = p.dir===1 ? ED[p.ei][1] : ED[p.ei][0];
     var distToJ = p.dir===1 ? (1-p.prog) : p.prog;
-    if(destJ === idx && distToJ < 0.85){ anyNearby = true; break; }
+    // Still approaching if heading to our junction and not yet through it
+    if(destJ === idx && distToJ > 0.02){ anyStillApproaching = true; break; }
   }
-  if(!anyNearby){
+  if(!anyStillApproaching){
     evpClear();
     return;
   }
