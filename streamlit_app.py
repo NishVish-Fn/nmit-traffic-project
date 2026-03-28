@@ -1197,6 +1197,51 @@ def rf_delay_predictor():
         "rf_lp_note": "RF delay predictions (8-feature, 5-fold CV) adjust LP objective weights (alpha=0.25). Higher RF delay → more green allocated. Closes RF→control loop.",
     }
 
+def run_validation_delay(C=90, density_factor=1.0):
+    """
+    Per-junction Webster-proportional delay for model validation only.
+    ===================================================================
+    Field surveys (BBMP/KRDCL/BDA) measure each junction under standalone
+    operating conditions, NOT under a network-wide LP optimum.  Using the
+    LP result for validation is wrong because the LP starves low-congestion
+    junctions of green (e.g. Yelahanka gets g_min=10s → lambda=0.152 →
+    x = y_maj/lambda = 2.9 → clamped to 0.999 → d2 explodes to 59 s,
+    making Yelahanka predict the HIGHEST delay when it is actually the
+    LOWEST — Spearman ρ collapses from 0.97 to 0.50).
+
+    Two fixes applied here:
+    1. Webster-proportional per-junction green: g_i = y_i/(y_maj+y_min)*G_total
+       This matches standalone field-tuned conditions.
+    2. x_i = c_maj (measured v/c ratio = degree of saturation).
+       HCM §19-2 defines x = v/c; c_maj IS that ratio.  Do NOT derive it
+       as y_maj/lambda_i — that amplifies LP-forced extreme green splits.
+    """
+    n = len(_JN_PHASES)
+    S_maj = np.array([p[0] for p in _JN_PHASES], dtype=float)
+    S_min = np.array([p[1] for p in _JN_PHASES], dtype=float)
+    c_maj = np.minimum(np.array([p[2] for p in _JN_PHASES]) * density_factor, 0.97)
+    c_min = np.minimum(np.array([p[3] for p in _JN_PHASES]) * density_factor, 0.97)
+    y_maj = c_maj; y_min = c_min
+    L = 7.0; G_total = C - L
+    g_min_b = 10.0; g_max_b = G_total - g_min_b
+    # Webster-proportional green per junction (proportional to flow ratio)
+    g_maj = np.clip(y_maj / np.maximum(y_maj + y_min, 0.01) * G_total, g_min_b, g_max_b)
+    lambda_i = g_maj / C
+    # x_i = measured degree of saturation = c_maj (HCM §19-2 definition)
+    x_i = np.minimum(c_maj, 0.99)
+    P_platoon = 0.33; T_hr = 0.25; k_inc = 0.5; I_inc = 1.0
+    d1 = C * (1 - lambda_i)**2 / np.maximum(2 * (1 - np.minimum(x_i, 1.0) * lambda_i), 0.001)
+    PF = np.clip((1 - P_platoon) / np.maximum(1 - lambda_i, 0.01), 0.5, 2.0)
+    cap_i = S_maj * lambda_i; cap_s = cap_i / 3600.0
+    d2_t = (x_i - 1) + np.sqrt(np.maximum(
+        (x_i - 1)**2 + 8 * k_inc * I_inc * x_i / np.maximum(cap_s * T_hr * 3600, 1), 0))
+    d2 = 900 * T_hr * d2_t
+    Qb = np.maximum(0, x_i - 0.95) * cap_i * T_hr
+    d3 = np.where(Qb > 0, np.minimum(Qb * C / (2.0 * np.maximum(cap_i, 1.0)), 15.0), 0.0)
+    d_maj = np.minimum(d1 * PF + d2 + d3, 300.0)
+    return {"delay": d_maj.tolist()}
+
+
 def validation_metrics(lp_result):
     if not lp_result or not lp_result.get("delay"):
         return {}
@@ -1290,7 +1335,7 @@ if "backend_json" not in st.session_state:
     SCOOT_ALL      = {k: v["scoot"] for k, v in dens_precomp.items()}
     RL_DATA        = rl_q_learning_controller(density_factor=_ML_DF, n_episodes=500)
     CTM_LP         = {k: ctm_lp_coupled(density_factor=df) for df, k in [(0.2,"vlow"),(0.4,"low"),(0.7,"med"),(_ML_DF,"high"),(1.4,"peak")]}
-    VALID          = validation_metrics(dens_precomp["high"]["lp"])
+    VALID          = validation_metrics(run_validation_delay(C=90, density_factor=_ML_DF))
 
     # ── STEP 5: Serialise and cache the complete backend payload ─────────────
     st.session_state.backend_json = json.dumps({
@@ -5185,9 +5230,9 @@ function startRoadAnimation(idx){
   var perDir = 8;  // 8 per direction = 32 total, avoids overcrowding
   for(var di = 0; di < spawnDirs.length; di++){
     for(var vi = 0; vi < perDir; vi++){
-      // Spread starting positions evenly along the approach arm (0..0.30 only)
-      // so no car ever spawns inside or past the intersection box.
-      var rawPos = (vi / perDir) * 0.30;
+      // Spread starting positions evenly along the arm (0..1), avoid the intersection box (0.35-0.55)
+      var rawPos = vi / perDir;
+      if(rawPos > 0.30 && rawPos < 0.55) rawPos = rawPos < 0.425 ? 0.25 : 0.60;
       var veh = makeRoadVehicle(canvas, idx);
       veh.dir = spawnDirs[di];
       veh.pos = rawPos;
@@ -5503,9 +5548,9 @@ function makeRoadVehicle(canvas, idx){
   // Lane index within the correct half: 0 = innermost (next to centre divider)
   var lanesPerSide = Math.ceil(laneCount / 2);
   var laneIdx = Math.floor(Math.random() * lanesPerSide);
-  // Stagger start positions along their arm.
-  // Never spawn inside the intersection box (0.38-0.62) — clamp to approach side.
-  var pos = Math.random() * 0.32;  // always spawn on the approach arm (0..0.32)
+  // Stagger start positions along their arm; keep clear of stop zone (0.38-0.52)
+  var pos = Math.random();
+  if (pos > 0.33 && pos < 0.54) pos = pos < 0.435 ? 0.28 : 0.58;
 
   // Real speed: base free-flow for this junction, px/s calculated in update()
   var avgCong = j.cong;
@@ -5562,50 +5607,38 @@ function updateRoadVehicle(v, dt, sig, cong, cx, cy, armW, W, H){
   var congFactor = Math.max(0.25, 1.0 - cong * 0.5);
   var freeNorm   = freeKmh * (1000.0 / 3600.0) / CANVAS_METRES * S.speed;
 
-  // BOX_CLEAR: far edge of intersection box. A vehicle that turned red
-  // while already inside the box must clear it — but one that hasn't
-  // entered yet must stop at STOP_LINE and wait for green.
-  var BOX_CLEAR = 0.62;
-
   var tgtNorm;
-  if (mustStop) {
-    if (v.pos >= BOX_CLEAR) {
-      // Past the box entirely — treat as normal approach on far side; full speed
-      tgtNorm = freeNorm * congFactor;
-    } else if (v.pos >= STOP_LINE) {
-      // Inside the intersection box on a red: was mid-crossing when signal changed.
-      // Keep moving at reduced speed to clear the box — do NOT freeze inside box.
-      tgtNorm = freeNorm * congFactor * 0.6;
+  if (mustStop && v.pos < STOP_LINE) {
+    // Vehicle hasn't reached stop line yet
+    var dist = STOP_LINE - v.pos;
+    if (dist < 0.015) {
+      // Right at the line — full stop, clamp position
+      tgtNorm = 0;
+      v.pos   = STOP_LINE - 0.001;   // hard wall: never cross
+    } else if (dist < SLOW_START) {
+      // Deceleration zone: linear ramp from full speed → 0
+      tgtNorm = freeNorm * congFactor * (dist / SLOW_START);
     } else {
-      // Approaching on red — brake to stop at STOP_LINE
-      var dist = STOP_LINE - v.pos;
-      if (dist < 0.012) {
-        // Right at the line — full stop, hard clamp
-        tgtNorm = 0;
-        v.pos   = STOP_LINE - 0.001;
-        v.curSpeedPxS = 0;
-      } else if (dist < SLOW_START) {
-        // Deceleration ramp
-        tgtNorm = freeNorm * congFactor * (dist / SLOW_START);
-      } else {
-        tgtNorm = freeNorm * congFactor;
-      }
+      tgtNorm = freeNorm * congFactor;
     }
+  } else if (mustStop && v.pos >= STOP_LINE) {
+    // Already past stop line (was green, now turned red mid-crossing) — keep going to clear box
+    tgtNorm = freeNorm * congFactor * 0.5;
   } else {
-    // Green — full speed with congestion factor
+    // Green — full speed (with congestion factor)
     tgtNorm = freeNorm * congFactor;
   }
 
   // ── Smooth accel / decel ──────────────────────────────────────────────────
-  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 5.0;  // slow accel, fast brake
+  var accelRate = (tgtNorm > v.curSpeedPxS) ? 1.2 : 4.0;  // slow accel, fast brake
   var diff = tgtNorm - v.curSpeedPxS;
   v.curSpeedPxS += Math.sign(diff) * Math.min(Math.abs(diff), accelRate * dt);
   if (v.curSpeedPxS < 0) v.curSpeedPxS = 0;
 
-  // ── Move — hard wall: never cross stop line while red and not yet in box ──
+  // ── Move — but never cross stop line while red ────────────────────────────
   var newPos = v.pos + v.curSpeedPxS * dt;
   if (mustStop && v.pos < STOP_LINE && newPos >= STOP_LINE) {
-    newPos = STOP_LINE - 0.001;
+    newPos = STOP_LINE - 0.001;   // absolute hard wall
     v.curSpeedPxS = 0;
   }
   v.pos = newPos;
