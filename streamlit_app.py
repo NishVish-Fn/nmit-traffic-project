@@ -3154,49 +3154,50 @@ Particle.prototype.update = function(dt) {
     var endId = this.dir===1 ? e[1] : e[0];
     var sig = SIG[endId];
     var junc = JN[endId];
+    // distEnd: 0=at destination junction, 1=at start of edge
     var distEnd = this.dir===1 ? 1-this.prog : this.prog;
     var mul = DMUL[S.dens-1];
     var af = S.algo==='fixed' ? 1.25 : 1.0;
     var warm = Math.min(S.booted/500,1);
     var ar = S.algo==='optimal'?warm*.45:S.algo==='lp'?warm*.3:S.algo==='webster'?warm*.25:0;
-    // Determine if this vehicle is traveling primarily N-S or E-W
-    // by comparing the lat vs lng displacement of the edge
     var startId = this.dir===1 ? e[0] : e[1];
     var jA = JN[startId], jB = JN[endId];
     var dLat = Math.abs(jB.lat - jA.lat);
     var dLng = Math.abs(jB.lng - jA.lng);
-    var isNS = dLat >= dLng;  // true = N-S traveler, false = E-W traveler
+    var isNS = dLat >= dLng;
     var relevantState = sig.evp ? 'green' : (isNS ? sig.nsState : sig.ewState);
-    // STOP_WALL: hard position boundary — vehicle front must not cross this while red.
-    // distEnd = distance remaining to the end junction (0 = at junction, 1 = far away).
-    // We hold vehicles at distEnd >= STOP_WALL (i.e. prog <= 1-STOP_WALL for dir=1).
-    var STOP_WALL  = 0.04;   // ~4% of edge length from junction centre — hard wall
-    var BRAKE_ZONE = 0.28;   // start braking this far out (wider than before)
-    var atRed = (!this.isE && relevantState === 'red' && !sig.evp);
-    var stop = (atRed && distEnd < BRAKE_ZONE);
-    var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
 
-    // Speed scale: S.wave represents free-flow speed in km/h (default 40)
-    // Vehicles scale their speed relative to this green-wave speed setting
+    // STOP_WALL: hard stop boundary measured as fraction of edge from junction.
+    // 0.18 = 18% of edge from junction — keeps cars clearly outside the intersection circle.
+    // BRAKE_ZONE: start decelerating at 40% from junction.
+    var STOP_WALL  = 0.18;
+    var BRAKE_ZONE = 0.40;
+    var atRed = (!this.isE && (relevantState === 'red' || relevantState === 'yellow') && !sig.evp);
+    var cong = Math.min(junc.cong*mul*af*(1-ar), 0.97);
     var waveScale = S.wave / 40.0;
 
-    if(stop){
-      // Graduated braking: linearly reduce target speed to 0 as vehicle approaches wall
+    // ── INSTANT HARD CLAMP: if already past the wall, freeze immediately ────
+    if(atRed){
+      if(this.dir===1  && this.prog > 1 - STOP_WALL){ this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; }
+      if(this.dir===-1 && this.prog < STOP_WALL)    { this.prog = STOP_WALL;     this.spd = 0; this.tspd = 0; }
+      distEnd = this.dir===1 ? 1-this.prog : this.prog; // recompute after clamp
+    }
+
+    // ── TARGET SPEED ─────────────────────────────────────────────────────────
+    if(atRed && distEnd <= BRAKE_ZONE){
+      // Graduated brake to zero: linear ramp from full speed at BRAKE_ZONE to 0 at STOP_WALL
       var brakeFrac = Math.max(0, (distEnd - STOP_WALL) / (BRAKE_ZONE - STOP_WALL));
       this.tspd = this.bspd * brakeFrac * waveScale;
-      this.state = distEnd < STOP_WALL + 0.04 ? 'stopped' : 'slow';
+      this.state = (brakeFrac < 0.15) ? 'stopped' : 'slow';
       if(this.state === 'stopped') this.wt += _sigDtSec;
     } else if(cong>.85&&!this.isE){
-      // Gridlock: near-zero movement, Bangalore-style total jam
       this.tspd=this.bspd*0.04*waveScale; this.state='stopped';
       this.wt=Math.max(0,this.wt-_sigDtSec*.05);
     } else if(cong>.65&&!this.isE){
-      // Heavy congestion: ORR/Silk Board characteristic crawl (4-8 km/h effective)
       var f=Math.max(0.06, 1-(cong-.65)*3.5);
       this.tspd=this.bspd*f*waveScale; this.state='slow';
       this.wt=Math.max(0,this.wt-_sigDtSec*.02);
     } else if(cong>.45&&!this.isE){
-      // Moderate: 40-60% speed reduction (typical Bangalore inner ring)
       var f2=Math.max(0.35, 1-(cong-.45)*2.0);
       this.tspd=this.bspd*f2*waveScale; this.state='slow';
       this.wt=Math.max(0,this.wt-_sigDtSec*.08);
@@ -3204,34 +3205,33 @@ Particle.prototype.update = function(dt) {
       this.tspd=this.bspd*waveScale; this.state='moving';
       this.wt=Math.max(0,this.wt-_sigDtSec*.3);
     }
-    // Emergency vehicles ignore signals and congestion — run at full target speed
     if(this.isE){this.tspd=this.bspd*waveScale; this.state='moving';}
-    // Smooth acceleration/deceleration — use faster brake rate when stopping for red
-    var lerpRate = (stop && distEnd < BRAKE_ZONE * 0.5) ? 0.45 : 0.10;
-    this.spd+=(this.tspd-this.spd)*lerpRate;
-    // ── PRE-MOVE HARD WALL: zero speed right now if already at the wall ──────
-    if(atRed && !this.isE){
-      if(this.dir===1  && this.prog >= 1 - STOP_WALL){ this.spd=0; this.tspd=0; }
-      if(this.dir===-1 && this.prog <= STOP_WALL)     { this.spd=0; this.tspd=0; }
+
+    // Lerp speed — brake fast, accelerate slowly
+    var nearWall = atRed && distEnd < BRAKE_ZONE * 0.4;
+    var lerpRate = nearWall ? 0.5 : 0.10;
+    this.spd += (this.tspd - this.spd) * lerpRate;
+    if(this.spd < 0) this.spd = 0;
+
+    // ── MOVE ─────────────────────────────────────────────────────────────────
+    this.prog += this.spd * this.dir * S.speed;
+
+    // ── POST-MOVE HARD CLAMP (catches any residual overshoot) ────────────────
+    if(atRed){
+      if(this.dir===1  && this.prog > 1 - STOP_WALL){ this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; this.state='stopped'; }
+      if(this.dir===-1 && this.prog < STOP_WALL)    { this.prog = STOP_WALL;     this.spd = 0; this.tspd = 0; this.state='stopped'; }
     }
-    this.prog+=this.spd*this.dir*S.speed;
-    // ── POST-MOVE HARD WALL: clamp position — vehicle CANNOT cross stop line ─
-    // This must run BEFORE the prog>=1 wrap so cars never teleport through junctions.
-    if(atRed && !this.isE){
-      if(this.dir===1 && this.prog > 1 - STOP_WALL){
-        this.prog = 1 - STOP_WALL; this.spd = 0; this.tspd = 0; this.state = 'stopped';
-      } else if(this.dir===-1 && this.prog < STOP_WALL){
-        this.prog = STOP_WALL;     this.spd = 0; this.tspd = 0; this.state = 'stopped';
-      }
-    }
+
     if(this.isE){
       var p=this.pos();
       this.trail.unshift({lat:p.lat,lng:p.lng});
       if(this.trail.length>10) this.trail.pop();
     }
-    // Only wrap to next edge when NOT blocked by a red light
+
+    // ── WRAP to next edge — only when NOT held at red ─────────────────────────
     if(!atRed && (this.prog>=1 || this.prog<=0)){
-      this.prog=this.prog>=1?0:1;      var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
+      this.prog=this.prog>=1?0:1;
+      var ej=this.dir===1?ED[this.ei][1]:ED[this.ei][0];
       var conn=[];
       for(var i=0;i<ED.length;i++){
         if(i!==this.ei&&(ED[i][0]===ej||ED[i][1]===ej)) conn.push(i);
