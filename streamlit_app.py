@@ -3581,8 +3581,7 @@ window.addEventListener('resize',resizeFC);
 function ll2px(lat,lng){try{var p=map.latLngToContainerPoint([lat,lng]);return {x:p.x,y:p.y};}catch(e){return{x:-100,y:-100};}}
 
 // Signal arm color helper — global scope, used in renderParticles
-function _sigArmColor(st, evp){
-  if(evp) return '#ff2244';
+function _sigArmColor(st){
   if(st === 'green')  return '#00ff88';
   if(st === 'yellow') return '#ffd700';
   return '#ff2244';
@@ -3599,8 +3598,8 @@ function renderParticles(){
     var R=8+(j.lanes||3)*1.5;
 
     // NS and EW are opposite phases — never both green
-    var colNS = _sigArmColor(sig.nsState || sig.state, sig.evp);
-    var colEW = _sigArmColor(sig.ewState || 'red',     sig.evp);
+    var colNS = _sigArmColor(sig.nsState || sig.state);
+    var colEW = _sigArmColor(sig.ewState || 'red');
 
     // 4 signal arms: N and S use NS phase color, E and W use EW phase color
     var arms=[
@@ -3618,7 +3617,7 @@ function renderParticles(){
       cx.shadowBlur=0; cx.restore();
     }
     // Junction glow ring — use NS color as primary
-    var glowCol = sig.evp?'#ff2244':colNS;
+    var glowCol = colNS;
     cx.save(); cx.beginPath();
     cx.arc(jpt.x,jpt.y,R+3,0,Math.PI*2);
     cx.fillStyle=glowCol+'12'; cx.fill(); cx.restore();
@@ -3899,7 +3898,7 @@ function updateSignals(dt){
 function updateJMkrs(){
   for(var i=0;i<JN.length;i++){
     var s=SIG[i];
-    var c=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
+    var c=s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
     try{jmkrs[i].setStyle({fillColor:c,color:s.evp?'#ff4466':'#ffffff'});}catch(e){}
   }
 }
@@ -4200,7 +4199,7 @@ function updateMetrics(){
   var pi=CUR.pi;
   for(var i=0;i<SIG.length;i++){
     var s2=SIG[i];
-    var stateColor=s2.evp?'#ff2244':s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
+    var stateColor=s2.state==='green'?'#00ff88':s2.state==='yellow'?'#ffd700':'#ff2244';
     var pct=Math.round(s2.phase/s2.cycle*100);
     var remain=s2.state==='green' ? Math.max(0,s2.gDur-s2.phase)
               :s2.state==='yellow'? Math.max(0,s2.gDur+s2.cycle*0.07-s2.phase)
@@ -4335,7 +4334,7 @@ function updateJunctionTimers(){
   var htmlCrit='',htmlMod='',htmlFree='';
   for(var i=0;i<JN.length;i++){
     var j=JN[i]; var s=SIG[i];
-    var col=s.evp?'#ff2244':s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
+    var col=s.state==='green'?'#00ff88':s.state==='yellow'?'#ffd700':'#ff2244';
     var _yDur3=s.cycle*0.07;
     var tl3;
     if(s.evp){ tl3='EVP PRI'; }
@@ -5122,7 +5121,7 @@ function loop(ts){
           var _rem=_s.state==='green' ? Math.max(0,_s.gDur-_s.phase)
                   :_s.state==='yellow'? Math.max(0,_s.gDur+_s.cycle*0.07-_s.phase)
                   : Math.max(0,_s.cycle-_s.phase);
-          var _col=_s.evp?'#ff2244':_s.state==='green'?'#00ff88':_s.state==='yellow'?'#ffd700':'#ff2244';
+          var _col=_s.state==='green'?'#00ff88':_s.state==='yellow'?'#ffd700':'#ff2244';
           var _lbl=_s.evp?'EVP!':_s.state.toUpperCase();
           var _pct=Math.round(_s.phase/_s.cycle*100);
           var _x2=lp2&&lp2.x?lp2.x[_i]:0;
@@ -5376,7 +5375,7 @@ function renderIntxModal(idx){
   var initRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
                  : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
                  : Math.max(0, sig.cycle - sig.phase);
-  var initColor = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+  var initColor = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
   var _tmr = document.getElementById('imod-signal-timer');
   var _lbl = document.getElementById('imod-signal-label');
   var _fil = document.getElementById('imod-phase-fill');
@@ -5730,8 +5729,8 @@ function startRoadAnimation(idx){
     // Signal timer overlaid at top of road view — show NS and EW separately
     var nsDrawState = sig.nsState || sig.state;
     var ewDrawState = sig.ewState || 'red';
-    var nsColor = sig.evp ? '#ff2244' : nsDrawState==='green'?'#00ff88':nsDrawState==='yellow'?'#ffd700':'#ff2244';
-    var ewColor = sig.evp ? '#ff2244' : ewDrawState==='green'?'#00ff88':ewDrawState==='yellow'?'#ffd700':'#ff2244';
+    var nsColor = nsDrawState==='green'?'#00ff88':nsDrawState==='yellow'?'#ffd700':'#ff2244';
+    var ewColor = ewDrawState==='green'?'#00ff88':ewDrawState==='yellow'?'#ffd700':'#ff2244';
     var nsRemain = nsDrawState==='green' ? Math.max(0,sig.gDur-sig.phase) :
                    nsDrawState==='yellow'? Math.max(0,sig.gDur+sig.cycle*0.07-sig.phase) :
                    Math.max(0,sig.cycle-sig.phase);
@@ -5774,7 +5773,7 @@ function startRoadAnimation(idx){
     var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
                 : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
                 : Math.max(0, sig.cycle - sig.phase);
-    var sColor  = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+    var sColor  = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
     updateIntxSignalPanel(idx, sig, sRemain, sColor);
 
     _roadAnimId = requestAnimationFrame(drawRoadScene);
@@ -6062,9 +6061,9 @@ function updateIntxSignalPanel(idx, sig, remain, sColor){
   if(housingEl && housingEl.firstChild){
     var lamps = housingEl.firstChild.querySelectorAll('.sig-lamp');
     if(lamps.length === 3){
-      lamps[0].className = 'sig-lamp ' + (sig.state==='red'||sig.evp?'on-r':'off');
+      lamps[0].className = 'sig-lamp ' + (sig.state==='red'?'on-r':'off');
       lamps[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
-      lamps[2].className = 'sig-lamp ' + (sig.state==='green'&&!sig.evp?'on-g':'off');
+      lamps[2].className = 'sig-lamp ' + (sig.state==='green'?'on-g':'off');
     }
   }
 }
@@ -6180,9 +6179,9 @@ function liveUpdateIntxStats(idx){
   if(housingEl && housingEl.firstChild){
     var lamps2 = housingEl.firstChild.querySelectorAll('.sig-lamp');
     if(lamps2.length === 3){
-      lamps2[0].className = 'sig-lamp ' + (sig.state==='red'||sig.evp?'on-r':'off');
+      lamps2[0].className = 'sig-lamp ' + (sig.state==='red'?'on-r':'off');
       lamps2[1].className = 'sig-lamp ' + (sig.state==='yellow'?'on-y':'off');
-      lamps2[2].className = 'sig-lamp ' + (sig.state==='green'&&!sig.evp?'on-g':'off');
+      lamps2[2].className = 'sig-lamp ' + (sig.state==='green'?'on-g':'off');
     }
   }
 
@@ -6193,7 +6192,7 @@ function liveUpdateIntxStats(idx){
   var sRemain = sig.state==='green'  ? Math.max(0, sig.gDur - sig.phase)
               : sig.state==='yellow' ? Math.max(0, sig.gDur + sig.cycle*0.07 - sig.phase)
               : Math.max(0, sig.cycle - sig.phase);
-  var sColor  = sig.evp?'#ff2244':sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
+  var sColor  = sig.state==='green'?'#00ff88':sig.state==='yellow'?'#ffd700':'#ff2244';
   if(timerEl){
     timerEl.textContent = sRemain.toFixed(1) + 's';
     timerEl.style.color = sColor;
