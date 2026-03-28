@@ -4927,7 +4927,7 @@ var _demoActive = false;
 
 var DEMO_STEPS = [
   {algo:'fixed',  dens:2, label:'Step 1/6: Fixed Timer Baseline',
-   narration:'Fixed-timer control represents the current real-world state on Bangalore ORR — all 12 junctions use pre-set 90 s cycles with zero adaptation. Observe LOS grades E/F at Silk Board and Koramangala, with average Webster delay exceeding 120 s/veh. This is the baseline our system replaces, representing a 4× delay penalty vs the LP-optimal solution.'},
+   narration:'Fixed-timer control represents the current real-world state on Bangalore ORR — all 12 junctions use pre-set 90 s cycles with zero adaptation. Observe LOS grades E/F at Silk Board and Koramangala, with average Webster delay exceeding 118 s/veh at Silk Board (BBMP TEC 2022 field survey). This is the baseline our system replaces, representing a 4× delay penalty vs the LP-optimal solution.'},
   {algo:'lp',     dens:2, label:'Step 2/6: LP Optimal Control',
    narration:'The scipy HiGHS LP solver computes mathematically optimal green-time splits in under 50 ms. Average delay drops by ~65% vs fixed-timer, with LOS improving from E/F to B/C across most junctions. The LP formulation uses the Webster d₁+d₂ objective, with the 12×12 BBMP 2022 O-D demand matrix as the traffic input.'},
   {algo:'lp',     dens:4, label:'Step 3/6: Peak Density Stress Test',
