@@ -1663,6 +1663,46 @@ canvas.gcanv{display:block;width:100%!important;height:62px!important}
 .q-car.red{background:#ff2244;border-color:#ff224444}
 /* Road canvas */
 #road-canvas{width:100%;flex:1;display:block}
+/* EVP Solver Panel */
+#imod-evp{background:#080010;border:1px solid #3a0020;border-radius:4px;padding:8px;margin-bottom:6px;
+  position:relative;overflow:hidden}
+#imod-evp::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#ff224408 0%,transparent 60%);pointer-events:none}
+.evp-title{font-family:'Orbitron',monospace;font-size:.46rem;font-weight:700;color:#ff2244;
+  letter-spacing:2px;text-transform:uppercase;padding-bottom:5px;margin-bottom:6px;
+  border-bottom:1px solid #3a0020;display:flex;align-items:center;gap:6px}
+.evp-badge{background:#ff2244;color:#fff;font-size:.36rem;padding:1px 5px;border-radius:2px;
+  letter-spacing:1px;animation:evpblink .8s infinite alternate}
+@keyframes evpblink{from{opacity:1}to{opacity:.4}}
+.evp-badge.off{background:#1a0010;color:#5a1030;animation:none}
+.evp-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap}
+.evp-label{font-family:'Share Tech Mono',monospace;font-size:.44rem;color:#5a3040;flex-shrink:0;min-width:72px}
+.evp-btn{font-family:'Share Tech Mono',monospace;font-size:.44rem;padding:4px 10px;
+  border-radius:3px;cursor:pointer;border:1px solid;letter-spacing:1px;transition:.2s;background:transparent}
+.evp-btn.trigger{border-color:#ff2244;color:#ff2244}
+.evp-btn.trigger:hover{background:#ff224422;box-shadow:0 0 10px #ff224444}
+.evp-btn.trigger.active{background:#ff224433;box-shadow:0 0 14px #ff224466;border-color:#ff6677}
+.evp-btn.clear{border-color:#3a5070;color:#4a6080}
+.evp-btn.clear:hover{background:#0d203033;border-color:#6090a0;color:#6090a0}
+.evp-dir-btn{font-family:'Share Tech Mono',monospace;font-size:.44rem;padding:3px 8px;
+  border-radius:2px;cursor:pointer;border:1px solid #1a2a40;color:#3a5570;background:transparent;transition:.15s}
+.evp-dir-btn.sel{border-color:#ff2244;color:#ff2244;background:#ff224411}
+.evp-math{background:#040008;border:1px solid #1a0015;border-radius:3px;padding:6px;margin-top:5px;
+  font-family:'Share Tech Mono',monospace;font-size:.44rem;line-height:1.8}
+.evp-math-row{display:flex;justify-content:space-between;align-items:baseline}
+.evp-math-k{color:#4a3050}
+.evp-math-v{font-weight:bold}
+.evp-math-eq{color:#3a2040;font-size:.40rem;margin:2px 0 4px;padding:3px 5px;
+  background:#060010;border-radius:2px;letter-spacing:.5px;word-break:break-all}
+.evp-phase-bar{height:10px;background:#0a0015;border-radius:3px;overflow:hidden;margin:4px 0;position:relative}
+.evp-phase-seg{height:100%;display:inline-block;position:absolute;top:0;transition:all .3s}
+.evp-clearance{font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:900;
+  text-align:center;color:#ff2244;text-shadow:0 0 20px #ff2244;line-height:1;margin:5px 0 2px}
+.evp-clearance-l{font-family:'Share Tech Mono',monospace;font-size:.42rem;text-align:center;color:#5a3040;letter-spacing:2px}
+.evp-vs{display:flex;gap:6px;margin-top:5px}
+.evp-vs-box{flex:1;background:#040010;border:1px solid #0d2040;border-radius:3px;padding:5px;text-align:center}
+.evp-vs-box.active{border-color:#ff2244;background:#0a0015}
+.evp-vs-title{font-family:'Share Tech Mono',monospace;font-size:.38rem;color:#3a4060;letter-spacing:1px;margin-bottom:3px}
+.evp-vs-val{font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700}
 /* Bottom stats bar in modal */
 #imod-bottom{height:44px;border-top:1px solid #0d2040;background:#020810;
   display:flex;align-items:center;padding:0 14px;gap:16px;flex-shrink:0}
@@ -2882,6 +2922,27 @@ details.csec summary:hover{background:#0a1828}
     </div>
     <!-- RIGHT: Data panels -->
     <div id="imod-right">
+      <!-- EVP SOLVER PANEL -->
+      <div id="imod-evp">
+        <div class="evp-title">
+          🚑 EVP Protocol
+          <span id="imod-evp-badge" class="evp-badge off">STANDBY</span>
+        </div>
+        <div class="evp-row">
+          <span class="evp-label">Approach:</span>
+          <button class="evp-dir-btn sel" id="evp-dir-N" onclick="evpSetDir('N')">↑ N</button>
+          <button class="evp-dir-btn" id="evp-dir-S" onclick="evpSetDir('S')">↓ S</button>
+          <button class="evp-dir-btn" id="evp-dir-E" onclick="evpSetDir('E')">→ E</button>
+          <button class="evp-dir-btn" id="evp-dir-W" onclick="evpSetDir('W')">← W</button>
+        </div>
+        <div class="evp-row">
+          <button class="evp-btn trigger" id="evp-trigger-btn" onclick="evpTrigger()">🚨 TRIGGER EVP</button>
+          <button class="evp-btn clear" onclick="evpClear()">✕ CLEAR</button>
+        </div>
+        <div id="imod-evp-math" class="evp-math">
+          <div style="color:#2a1520;font-size:.42rem;text-align:center">Select approach direction and trigger EVP</div>
+        </div>
+      </div>
       <div class="p-section">
         <div class="p-section-t">&#x1F4CA; HCM Delay Components</div>
         <div id="imod-delay-bars"></div>
@@ -5054,6 +5115,9 @@ function setIntxTab(idx, clickedTab){
 }
 
 function openIntx(idx, tab){
+  // Clear EVP if switching junctions
+  if(_evpActive && _evpJctIdx !== idx) evpClear();
+  _evpActive = false; _evpDir = 'N';
   setIntxTab(idx, tab);
   _curIntxIdx = idx;
   var modal = document.getElementById('intx-modal');
@@ -5061,9 +5125,24 @@ function openIntx(idx, tab){
   modal.classList.add('open');
   renderIntxModal(idx);
   startRoadAnimation(idx);
+  // Reset EVP direction UI
+  ['N','S','E','W'].forEach(function(d){
+    var b=document.getElementById('evp-dir-'+d);
+    if(b) b.className='evp-dir-btn'+(d==='N'?' sel':'');
+  });
+  var btn=document.getElementById('evp-trigger-btn');
+  if(btn) btn.className='evp-btn trigger';
+  var badge=document.getElementById('imod-evp-badge');
+  if(badge){badge.textContent='STANDBY';badge.className='evp-badge off';}
+  var box=document.getElementById('imod-evp-math');
+  if(box) box.innerHTML='<div style="color:#2a1520;font-size:.42rem;text-align:center">Select approach direction and trigger EVP</div>';
 }
 
 function closeIntx(){
+  // Clear any active EVP triggered from this modal before closing
+  if(_evpActive) evpClear();
+  _evpActive = false;
+  _evpDir = 'N';
   var modal = document.getElementById('intx-modal');
   if(modal) modal.classList.remove('open');
   if(_roadAnimId){ cancelAnimationFrame(_roadAnimId); _roadAnimId = null; }
@@ -6029,6 +6108,9 @@ function liveUpdateIntxStats(idx){
     }).join('<div style="width:1px;height:28px;background:#0d2040;flex-shrink:0"></div>');
   }
 
+  // ── EVP solver live update ──────────────────────────────────────────
+  evpLiveUpdate();
+
   // ── Update PI + emissions ─────────────────────────────────────────
   var piJ = pi && pi.per_jct && pi.per_jct[idx] ? pi.per_jct[idx] : null;
   if(piJ){
@@ -6045,6 +6127,275 @@ function liveUpdateIntxStats(idx){
   }
 }
 
+
+// ── EVP SOLVER — Intersection Tab ────────────────────────────────────────────
+// State for the intersection-tab EVP panel
+var _evpDir = 'N';          // selected approach direction
+var _evpActive = false;     // EVP currently triggered from modal
+var _evpJctIdx = -1;        // which junction the modal has open
+
+function evpSetDir(dir) {
+  _evpDir = dir;
+  ['N','S','E','W'].forEach(function(d){
+    var b = document.getElementById('evp-dir-'+d);
+    if(b) b.className = 'evp-dir-btn' + (d===dir?' sel':'');
+  });
+  if(_evpActive) evpRenderMath();  // re-solve for new direction
+}
+
+function evpTrigger() {
+  var idx = _curIntxIdx;
+  if(idx < 0) return;
+  _evpActive = true;
+  _evpJctIdx = idx;
+
+  // Activate EVP on the global SIG object — this drives the existing
+  // updateSignals() EVP protocol (green for approach dir, red for cross).
+  var sig = SIG[idx];
+  sig.evp = true;
+  // Manually set the directional states based on chosen approach
+  var isNS = (_evpDir === 'N' || _evpDir === 'S');
+  sig.nsState = isNS ? 'green' : 'red';
+  sig.ewState = isNS ? 'red'   : 'green';
+  sig.state   = 'red';   // stops regular cars on cross street
+  sig.phase   = 0;       // restart phase from green
+
+  var btn = document.getElementById('evp-trigger-btn');
+  if(btn) btn.className = 'evp-btn trigger active';
+  var badge = document.getElementById('imod-evp-badge');
+  if(badge){ badge.textContent='ACTIVE'; badge.className='evp-badge'; }
+
+  evpRenderMath();
+}
+
+function evpClear() {
+  _evpActive = false;
+  if(_evpJctIdx >= 0) {
+    var sig = SIG[_evpJctIdx];
+    sig.evp  = false;
+    sig.phase = 0;  // resume from green
+  }
+  _evpJctIdx = -1;
+  var btn = document.getElementById('evp-trigger-btn');
+  if(btn) btn.className = 'evp-btn trigger';
+  var badge = document.getElementById('imod-evp-badge');
+  if(badge){ badge.textContent='STANDBY'; badge.className='evp-badge off'; }
+  var box = document.getElementById('imod-evp-math');
+  if(box) box.innerHTML = '<div style="color:#2a1520;font-size:.42rem;text-align:center">EVP cleared — normal LP cycling resumed</div>';
+}
+
+function evpRenderMath() {
+  var idx = _curIntxIdx;
+  if(idx < 0) return;
+  var box = document.getElementById('imod-evp-math');
+  if(!box) return;
+
+  var j   = JN[idx];
+  var sig = SIG[idx];
+  var lp  = CUR.lp;
+  var isNS = (_evpDir === 'N' || _evpDir === 'S');
+
+  // ── Webster LP with EVP mask ────────────────────────────────────────────
+  // LP weights: w_i = y_i / (1-y_i)  (Webster marginal delay weight)
+  // EVP junction: w_maj boosted ×250 → LP forces g_i → g_max (approach gets max green)
+  var C      = sig.cycle;
+  var L      = 7.0;
+  var G_tot  = C - L;
+  var yDur   = C * 0.07;
+  var g_min  = 10.0;
+  var g_max  = G_tot - g_min;
+
+  // Phase data for this junction from backend
+  var phIdx  = idx;  // _JN_PHASES index matches JN index
+  // Use LP result if available, else fallback
+  var lam_cur = lp && lp.lambda ? lp.lambda[idx] : 0.5;
+  var x_cur   = lp && lp.x      ? lp.x[idx]      : j.cong;
+  var d_norm  = lp && lp.delay  ? lp.delay[idx]   : 80;
+  var g_norm  = lp && lp.g      ? lp.g[idx]       : G_tot * 0.5;
+
+  // y_maj = c_maj (flow ratio = congestion index from backend phases)
+  // We read from BACKEND which has the actual phase data
+  var y_maj  = j.cong;  // congestion ≈ flow ratio for this junction
+  var y_min  = Math.max(0.1, y_maj * 0.72);  // minor phase ratio (calibrated from _JN_PHASES)
+
+  // Webster weight for approach (EVP direction = major phase)
+  var w_app  = y_maj / Math.max(1 - y_maj, 0.03);
+  var w_cross= y_min / Math.max(1 - y_min, 0.03);
+
+  // With EVP: w_app *= 250 → LP gives g_evp → g_max
+  var w_app_evp = w_app * 250;
+  // Since w_app_evp >> w_cross, LP trivially gives g_evp = g_max
+  var g_evp  = g_max;
+  var lam_evp= g_evp / C;
+
+  // ── HCM d1 Webster uniform delay ───────────────────────────────────────
+  // d1 = C(1-λ)² / [2(1-λx)]    (Webster 1958)
+  function websterD1(Cv, lam, x) {
+    return Cv * Math.pow(1-lam, 2) / Math.max(2*(1-lam*Math.min(x,0.999)), 0.001);
+  }
+  // ── HCM d2 Incremental delay ────────────────────────────────────────────
+  // d2 = 900T[(x-1)+√((x-1)²+8kIx/(cT))]   k=0.5, T=0.25, I=1.0
+  function hcmD2(Cv, lam, x, sat) {
+    var cap_s = sat * lam / 3600;
+    var term = (x-1) + Math.sqrt(Math.max((x-1)*(x-1) + 8*0.5*x/Math.max(cap_s*900,1), 0));
+    return 900 * 0.25 * term;
+  }
+
+  // Platoon Factor PF = 0.67/(1-λ) clamped [0.5,2.0]
+  function pf(lam){ return Math.min(2.0, Math.max(0.5, 0.67/Math.max(1-lam,0.01))); }
+
+  var sat = j.sat_flow || 1800;
+
+  // Normal LP delay on approach arm
+  var d1_n = websterD1(C, lam_cur, x_cur);
+  var d2_n = hcmD2(C, lam_cur, x_cur, sat);
+  var d_approach_normal = Math.min(d1_n * pf(lam_cur) + d2_n, 300);
+
+  // EVP delay on approach arm (maximum green → x_evp → very low)
+  var x_evp = Math.min(y_maj / Math.max(lam_evp, 1e-4), 0.999);
+  var d1_e  = websterD1(C, lam_evp, x_evp);
+  var d2_e  = hcmD2(C, lam_evp, x_evp, sat);
+  var d_approach_evp = Math.min(d1_e * pf(lam_evp) + d2_e, 300);
+
+  // Cross-street delay (gets minimum green during EVP)
+  var lam_cross_evp = g_min / C;
+  var x_cross_evp   = Math.min(y_min / Math.max(lam_cross_evp, 1e-4), 0.999);
+  var d_cross_evp   = Math.min(
+    websterD1(C, lam_cross_evp, x_cross_evp) * pf(lam_cross_evp) +
+    hcmD2(C, lam_cross_evp, x_cross_evp, sat), 300);
+
+  // Delay saving for the ambulance
+  var d_saving = d_approach_normal - d_approach_evp;
+
+  // ── Clearance time ──────────────────────────────────────────────────────
+  // T_clear = d_queue / v_amb + t_intersection
+  // d_queue = queue length × vehicle spacing (7m) + safety margin
+  var q_veh  = lp && lp.q_len ? lp.q_len[idx] : Math.round(j.cong * 25);
+  var spacing = 7.0;  // metres per vehicle (HCM PCE)
+  var d_queue_m = q_veh * spacing;
+  var v_amb_kmh = 40.0;  // km/h approach speed through cleared intersection
+  var v_amb_ms  = v_amb_kmh / 3.6;
+  var t_clear   = d_queue_m / v_amb_ms + 4.0;  // +4s intersection crossing time
+  t_clear = Math.max(8, Math.round(t_clear * 10) / 10);
+
+  // Phase preemption time: remaining red time on approach (if currently red)
+  var phase_state = isNS ? sig.nsState : sig.ewState;
+  var t_preempt;
+  if(phase_state === 'red') {
+    // Time until this arm would have turned green without EVP
+    t_preempt = Math.max(0, C - sig.phase);
+  } else {
+    t_preempt = 0;  // already green
+  }
+  // Time saved = preemption time that was skipped
+  var t_saved_preempt = Math.round(t_preempt * 10) / 10;
+
+  // ── Phase timeline widths (%) ─────────────────────────────────────────
+  var pct_ns_g  = Math.round(g_evp/C*100);
+  var pct_ns_y  = Math.round(yDur/C*100);
+  var pct_ew_g  = Math.round(g_min/C*100);
+  var pct_gap   = 100 - pct_ns_g - pct_ns_y - pct_ew_g - Math.round(yDur/C*100);
+
+  // ── LP objective values ───────────────────────────────────────────────
+  var obj_normal = w_cross * g_norm - w_app  * g_norm;  // normal LP
+  var obj_evp    = w_cross * g_min  - w_app_evp * g_evp; // EVP LP
+
+  // Direction labels
+  var appDir   = _evpDir;
+  var crossDir = isNS ? 'E–W' : 'N–S';
+  var appLabel = isNS ? 'N–S' : 'E–W';
+
+  // ── Build HTML ─────────────────────────────────────────────────────────
+  var c_red='#ff2244', c_grn='#00ff88', c_yel='#ffd700', c_cyn='#00e5ff', c_dim='#3a4060', c_pur='#bb77ff';
+  function row(k, v, vc){ return '<div class="evp-math-row"><span class="evp-math-k">'+k+'</span><span class="evp-math-v" style="color:'+(vc||c_cyn)+'">'+v+'</span></div>'; }
+  function eq(s){ return '<div class="evp-math-eq">'+s+'</div>'; }
+  function hr(){ return '<div style="border-top:1px solid #1a0020;margin:4px 0"></div>'; }
+
+  var html = '';
+
+  // Phase preemption status
+  html += '<div style="font-family:Share Tech Mono,monospace;font-size:.42rem;color:'+c_red+';text-align:center;margin-bottom:4px;letter-spacing:1px">';
+  html += '🚑 APPROACH: '+appDir+' &nbsp;|&nbsp; ';
+  html += (phase_state==='green'?'<span style="color:'+c_grn+'">ALREADY GREEN ✓</span>':
+           '<span style="color:'+c_red+'">PREEMPTING — saved '+t_saved_preempt.toFixed(0)+'s wait</span>');
+  html += '</div>';
+
+  // Phase timeline bar
+  html += '<div class="evp-phase-bar">';
+  html += '<div class="evp-phase-seg" style="left:0%;width:'+pct_ns_g+'%;background:'+c_grn+'88" title="'+appLabel+' Green '+g_evp.toFixed(0)+'s"></div>';
+  html += '<div class="evp-phase-seg" style="left:'+pct_ns_g+'%;width:'+pct_ns_y+'%;background:'+c_yel+'88" title="Yellow '+yDur.toFixed(0)+'s"></div>';
+  var ew_start_pct = pct_ns_g + pct_ns_y;
+  html += '<div class="evp-phase-seg" style="left:'+ew_start_pct+'%;width:'+pct_ew_g+'%;background:#ff224444" title="'+crossDir+' Green (min) '+g_min+'s"></div>';
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-family:Share Tech Mono,monospace;font-size:.38rem;color:#3a2040;margin-bottom:3px">';
+  html += '<span style="color:'+c_grn+'88">'+appLabel+' '+g_evp.toFixed(0)+'s</span>';
+  html += '<span style="color:#ffd70088">Y'+yDur.toFixed(0)+'s</span>';
+  html += '<span style="color:#ff224488">'+crossDir+' '+g_min+'s</span>';
+  html += '</div>';
+
+  html += hr();
+
+  // Webster LP math
+  html += '<div style="color:'+c_pur+';font-size:.40rem;letter-spacing:1px;margin-bottom:3px">WEBSTER LP — EVP OBJECTIVE</div>';
+  html += eq('min Σ(w_cross·g) − w_app·g  |  w_app×250 → g_app→g_max');
+  html += row('w_approach (×250):', (w_app_evp).toFixed(0), c_red);
+  html += row('w_cross:', w_cross.toFixed(3), c_dim);
+  html += row('g_evp (approach):', g_evp.toFixed(0)+'s  [g_max]', c_grn);
+  html += row('g_cross (min):', g_min.toFixed(0)+'s  [g_min]', c_red);
+  html += row('λ_evp:', lam_evp.toFixed(3), c_cyn);
+
+  html += hr();
+
+  // HCM delay comparison
+  html += '<div style="color:'+c_pur+';font-size:.40rem;letter-spacing:1px;margin-bottom:3px">HCM d = d₁·PF + d₂  (approach arm)</div>';
+  html += eq('d₁ = C(1−λ)²/[2(1−λx)]  ·  PF = 0.67/(1−λ)');
+  html += row('d_normal:', d_approach_normal.toFixed(1)+'s', c_yel);
+  html += row('d_evp:', d_approach_evp.toFixed(1)+'s', c_grn);
+  html += row('Δd saved:', d_saving.toFixed(1)+'s  ('+Math.round(d_saving/Math.max(d_approach_normal,1)*100)+'%)', c_grn);
+  html += row('d_cross (EVP):', d_cross_evp.toFixed(1)+'s', c_red);
+
+  html += hr();
+
+  // Clearance time
+  html += '<div style="color:'+c_pur+';font-size:.40rem;letter-spacing:1px;margin-bottom:2px">CLEARANCE MODEL</div>';
+  html += eq('T_clear = Q·s/v_amb + t_box  =  '+q_veh+'×'+spacing+'/'+v_amb_ms.toFixed(1)+' + 4');
+  html += '<div class="evp-clearance">'+t_clear.toFixed(0)+'s</div>';
+  html += '<div class="evp-clearance-l">EST. CLEARANCE TIME</div>';
+
+  html += hr();
+
+  // Before/after comparison boxes
+  html += '<div class="evp-vs">';
+  html += '<div class="evp-vs-box"><div class="evp-vs-title">NORMAL DELAY</div>';
+  html +=   '<div class="evp-vs-val" style="color:'+c_yel+'">'+d_approach_normal.toFixed(0)+'s</div></div>';
+  html += '<div class="evp-vs-box active"><div class="evp-vs-title">EVP DELAY</div>';
+  html +=   '<div class="evp-vs-val" style="color:'+c_grn+'">'+d_approach_evp.toFixed(0)+'s</div></div>';
+  html += '<div class="evp-vs-box"><div class="evp-vs-title">TIME SAVED</div>';
+  html +=   '<div class="evp-vs-val" style="color:'+c_red+'">'+d_saving.toFixed(0)+'s</div></div>';
+  html += '</div>';
+
+  box.innerHTML = html;
+}
+
+// Keep EVP math live while active (called from liveUpdateIntxStats)
+function evpLiveUpdate() {
+  if(_evpActive && _curIntxIdx >= 0) {
+    evpRenderMath();
+    // Keep sig.evp pinned while triggered from modal
+    var sig = SIG[_curIntxIdx];
+    if(sig && !sig.evp) {
+      sig.evp = true;
+      var isNS = (_evpDir === 'N' || _evpDir === 'S');
+      sig.nsState = isNS ? 'green' : 'red';
+      sig.ewState = isNS ? 'red'   : 'green';
+      sig.state   = 'red';
+    }
+  }
+}
+
+window.evpSetDir = evpSetDir;
+window.evpTrigger = evpTrigger;
+window.evpClear = evpClear;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 refreshCUR();
