@@ -5229,7 +5229,8 @@ function setIntxTab(idx, clickedTab){
 function openIntx(idx, tab){
   // Clear EVP if switching junctions
   if(_evpActive && _evpJctIdx !== idx) evpClear();
-  _evpActive = false; _evpDir = 'N';
+  // Only reset direction if EVP is not already active for this junction
+  if(!_evpActive || _evpJctIdx !== idx) _evpDir = 'N';
   setIntxTab(idx, tab);
   _curIntxIdx = idx;
   var modal = document.getElementById('intx-modal');
