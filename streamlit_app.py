@@ -3691,9 +3691,15 @@ function updateSignals(dt){
       var ov=document.getElementById('evpo');
       if(ov){ov.classList.add('on');setTimeout(function(){var o=document.getElementById('evpo');if(o)o.classList.remove('on');},600);}
     }
+    // Keep cycle current even during EVP so phase modulo never drifts
+    sig.cycle = S.cycle;
+    if(!sig.evp && wasEvp){
+      // EVP just ended — snap phase back into the green window so the
+      // signal resumes cycling immediately instead of staying frozen on red.
+      sig.phase = 0;
+    }
     if(sig.evp){
       // EVP: determine which direction the emergency vehicle is coming from
-      // Find the approaching emergency vehicle to this junction
       var evpIsNS = true;  // default
       for(var pi2=0;pi2<particles.length;pi2++){
         var pev=particles[pi2];
@@ -4230,7 +4236,8 @@ function setEmerg(v){
   for(var i=0;i<S.emergDots;i++) particles.push(new Particle(true));
 }
 function setWave(v){S.wave=parseInt(v);var el=g('lwav');if(el)el.textContent=v+' km/h';sv('wavd',v+' km/h');}
-function setCycle(v){S.cycle=parseInt(v);var el=g('lcyc');if(el)el.textContent=v+'s';sv('w-C',v);}
+function setCycle(v){S.cycle=parseInt(v);var el=g('lcyc');if(el)el.textContent=v+'s';sv('w-C',v);// Re-clamp all phases into the new cycle immediately to prevent stuck signals
+for(var _si=0;_si<SIG.length;_si++){SIG[_si].cycle=S.cycle;SIG[_si].phase=SIG[_si].phase%S.cycle;}}
 function setSS(v){S.speed=parseFloat(v);}
 function lTab(n){
   var tabs=document.querySelectorAll('#lp .tab');
