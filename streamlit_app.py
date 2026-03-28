@@ -3837,18 +3837,24 @@ function updateSignals(dt){
         sig.phase = 0;
         // fall through to normal LP cycling below
       } else {
-        // EVP: determine approach direction from the nearest emergency vehicle
+        // EVP: determine approach direction
+        // Modal EVP uses the user-chosen _evpDir directly (N/S = NS axis, E/W = EW axis)
         var evpIsNS = true;
-        for(var pi2=0;pi2<particles.length;pi2++){
-          var pev=particles[pi2];
-          if(!pev.isE) continue;
-          var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
-          var evD2=pev.dir===1?1-pev.prog:pev.prog;
-          if(evEndJ===i&&evD2<0.3){
-            var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
-            var ja2=JN[evStartJ],jb2=JN[i];
-            evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
-            break;
+        if(_evpActive && _evpJctIdx === i) {
+          evpIsNS = (_evpDir === 'N' || _evpDir === 'S');
+        } else {
+          // Particle-proximity fallback for auto-EVP (non-modal)
+          for(var pi2=0;pi2<particles.length;pi2++){
+            var pev=particles[pi2];
+            if(!pev.isE) continue;
+            var evEndJ=pev.dir===1?ED[pev.ei][1]:ED[pev.ei][0];
+            var evD2=pev.dir===1?1-pev.prog:pev.prog;
+            if(evEndJ===i&&evD2<0.3){
+              var evStartJ=pev.dir===1?ED[pev.ei][0]:ED[pev.ei][1];
+              var ja2=JN[evStartJ],jb2=JN[i];
+              evpIsNS=Math.abs(jb2.lat-ja2.lat)>=Math.abs(jb2.lng-ja2.lng);
+              break;
+            }
           }
         }
         sig.nsState = evpIsNS ? 'green' : 'red';
